@@ -90,12 +90,14 @@ publishing {
 	}
 	repositories {
 		maven {
-			url "http://mavenupload.modmuss50.me/"
 			if (project.hasProperty('mavenPass')) {
+				url "http://mavenupload.modmuss50.me/"
 				credentials {
 					username 'buildslave'
 					password project.getProperty('mavenPass')
 				}
+			} else {
+				url "$buildDir/repo"
 			}
 		}
 	}
