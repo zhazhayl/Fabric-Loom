@@ -66,12 +66,12 @@ task javadocJar(type: Jar, dependsOn: javadoc) {
 apply from: 'https://github.com/FabricMC/fabric-docs/raw/master/gradle/license.gradle'
 
 task wrapper(type: Wrapper) {
-	gradleVersion = '4.10.2'
+	gradleVersion = '4.9'
 }
 
 gradlePlugin {
 	plugins {
-		register("fabricLoom") {
+		fabricLoom {
 			id = "fabric-loom"
 			implementationClass = "net.fabricmc.loom.LoomGradlePlugin"
 		}
