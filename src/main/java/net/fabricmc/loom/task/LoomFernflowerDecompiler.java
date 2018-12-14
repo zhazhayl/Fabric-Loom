@@ -24,17 +24,14 @@
 
 package net.fabricmc.loom.task;
 
-import org.jetbrains.java.decompiler.main.decompiler.BaseDecompiler;
+import org.jetbrains.java.decompiler.main.DecompilerContext;
 import org.jetbrains.java.decompiler.main.decompiler.ConsoleDecompiler;
-import org.jetbrains.java.decompiler.main.extern.IBytecodeProvider;
 import org.jetbrains.java.decompiler.main.extern.IFernflowerLogger;
-import org.jetbrains.java.decompiler.main.extern.IResultSaver;
+import org.jetbrains.java.decompiler.main.extern.IFernflowerPreferences;
 
 import java.io.File;
-import java.io.IOException;
-import java.util.*;
-import java.util.jar.JarEntry;
-import java.util.jar.JarOutputStream;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.jar.Manifest;
 
 public class LoomFernflowerDecompiler extends ConsoleDecompiler {
@@ -44,6 +41,14 @@ public class LoomFernflowerDecompiler extends ConsoleDecompiler {
 	public LoomFernflowerDecompiler(File destination, String jarName, Map<String, Object> options, IFernflowerLogger logger) {
 		super(destination, options, logger);
 		this.jarName = jarName;
+	}
+
+	public void addSource(File source) {
+		addSpace(source, true);
+	}
+
+	public void addLibrary(File library) {
+		addSpace(library, false);
 	}
 
 	public Map<String, int[]> getDifferingMappings() {
@@ -83,12 +88,13 @@ public class LoomFernflowerDecompiler extends ConsoleDecompiler {
 	}
 
 	@Override
-	public void saveClassEntry(String s, String s1, String s2, String s3, String s4, int[] mapping) {
-		if (mapping != null) {
-			differingMappings.put(s2, mapping);
+	public void saveClassEntry(String path, String archiveName, String qualifiedName, String entryName, String content) {
+		if (qualifiedName != null && DecompilerContext.getOption(IFernflowerPreferences.BYTECODE_SOURCE_MAPPING)) {
+			int[] mapping = DecompilerContext.getBytecodeSourceMapper().getOriginalLinesMapping();
+			differingMappings.put(qualifiedName, mapping);
 		}
 
-		super.saveClassEntry(s, jarName, s2, s3, s4, mapping);
+		super.saveClassEntry(path, jarName, qualifiedName, entryName, content);
 	}
 
 	@Override
