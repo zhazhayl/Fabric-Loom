@@ -42,7 +42,7 @@ dependencies {
 //	implementation ('org.benf:cfr:0.136')
 	implementation ('net.minecraftforge:forgeflower:1.5.380.24')
 
-	implementation ('net.fabricmc:sponge-mixin:0.7.11.4') {
+	implementation ('net.fabricmc:sponge-mixin:0.7.11.10') {
 		exclude module: 'launchwrapper'
 		exclude module: 'guava'
 	}
