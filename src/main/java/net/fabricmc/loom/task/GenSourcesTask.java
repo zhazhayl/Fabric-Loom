@@ -73,6 +73,7 @@ public class GenSourcesTask extends DefaultTask {
 		options.put(IFernflowerPreferences.DECOMPILE_GENERIC_SIGNATURES, "1");
 		options.put(IFernflowerPreferences.BYTECODE_SOURCE_MAPPING, "1");
 		options.put(IFernflowerPreferences.INDENT_STRING, "\t"); //Use a tab not three spaces :|
+		options.put(IFernflowerPreferences.INCLUDE_ENTIRE_CLASSPATH, "1");
 
 		LoomFernflowerDecompiler decompiler = new LoomFernflowerDecompiler(sourcesJar.getParentFile(), sourcesJar.getName(), options, new LoomFernflowerLogger());
 		decompiler.addSource(mappedJar);
