@@ -10,7 +10,7 @@ targetCompatibility = 1.8
 
 group = 'net.fabricmc'
 archivesBaseName = project.name
-version = '0.1.0-SNAPSHOT'
+version = '0.2.0-SNAPSHOT'
 
 def build = "local"
 def ENV = System.getenv()
@@ -35,17 +35,19 @@ dependencies {
 	implementation ('org.zeroturnaround:zt-zip:1.13')
 	implementation ('com.google.code.gson:gson:2.8.5')
 	implementation ('com.google.guava:guava:27.0.1-jre')
-	implementation ('net.fabricmc:stitch:0.1.0.29')
-	implementation ('net.fabricmc:tiny-remapper:0.1.0.22') {
+	implementation ('net.fabricmc:stitch:0.1.1.42')
+	implementation ('net.fabricmc:tiny-remapper:0.1.0.23') {
 		transitive = false
 	}
-//	implementation ('org.benf:cfr:0.136')
-	implementation ('net.minecraftforge:forgeflower:1.5.380.24')
+	implementation ('net.minecraftforge:forgeflower:1.5.380.26')
 
-	implementation ('net.fabricmc:sponge-mixin:0.7.11.10') {
+	implementation ('net.fabricmc:sponge-mixin:0.7.11.16') {
 		exclude module: 'launchwrapper'
 		exclude module: 'guava'
 	}
+
+	implementation ('org.cadixdev:mercury:0.1.0.fabric-SNAPSHOT')
+
 }
 
 jar {

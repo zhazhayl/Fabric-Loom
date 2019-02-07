@@ -29,13 +29,16 @@ import net.fabricmc.loom.providers.MappingsProvider;
 import net.fabricmc.loom.providers.MinecraftProvider;
 import net.fabricmc.loom.providers.ModRemapperProvider;
 import net.fabricmc.loom.task.RemapJar;
+import net.fabricmc.loom.task.RemapSourcesJar;
 import net.fabricmc.loom.util.Constants;
 import net.fabricmc.loom.util.LoomDependencyManager;
 import net.fabricmc.loom.util.SetupIntelijRunConfigs;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
+import org.gradle.api.UnknownTaskException;
 import org.gradle.api.artifacts.Configuration;
+import org.gradle.api.artifacts.dsl.DependencyHandler;
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
 import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.plugins.JavaPluginConvention;
@@ -53,6 +56,10 @@ import java.util.Set;
 
 public class AbstractPlugin implements Plugin<Project> {
 	protected Project project;
+
+	private void extendsFrom(String a, String b) {
+		project.getConfigurations().getByName(a).extendsFrom(project.getConfigurations().getByName(b));
+	}
 
 	@Override
 	public void apply(Project target) {
@@ -73,21 +80,30 @@ public class AbstractPlugin implements Plugin<Project> {
 
 		Configuration compileModsConfig = project.getConfigurations().maybeCreate(Constants.COMPILE_MODS);
 		compileModsConfig.setTransitive(false); // Dont get transitive deps of mods
+		Configuration compileModsMappedConfig = project.getConfigurations().maybeCreate(Constants.COMPILE_MODS_MAPPED);
+		compileModsMappedConfig.setTransitive(false); // Dont get transitive deps of mods
+		Configuration minecraftNamedConfig = project.getConfigurations().maybeCreate(Constants.MINECRAFT_NAMED);
+		minecraftNamedConfig.setTransitive(false); // The launchers do not recurse dependencies
+		Configuration minecraftIntermediaryConfig = project.getConfigurations().maybeCreate(Constants.MINECRAFT_INTERMEDIARY);
+		minecraftIntermediaryConfig.setTransitive(false);
+		Configuration minecraftDependenciesConfig = project.getConfigurations().maybeCreate(Constants.MINECRAFT_DEPENDENCIES);
+		minecraftDependenciesConfig.setTransitive(false);
 		Configuration minecraftConfig = project.getConfigurations().maybeCreate(Constants.MINECRAFT);
-		minecraftConfig.setTransitive(false); // The launchers do not recurse dependencies
+		minecraftConfig.setTransitive(false);
 
 		project.getConfigurations().maybeCreate(Constants.MAPPINGS);
-
-		Configuration minecraftMappedConfig = project.getConfigurations().maybeCreate(Constants.MINECRAFT_MAPPED);
-		minecraftMappedConfig.setTransitive(false); // The launchers do not recurse dependencies
 
 		configureIDEs();
 		configureCompile();
 
-		if(extension.refmapName == null || extension.refmapName.isEmpty()){
-			project.getLogger().warn("Could not find refmap definition, will be using default name: " + project.getName() + "-refmap.json");
-			extension.refmapName = project.getName() + "-refmap.json";
-		}
+		extendsFrom(Constants.MINECRAFT_NAMED, Constants.MINECRAFT_DEPENDENCIES);
+		extendsFrom(Constants.MINECRAFT_INTERMEDIARY, Constants.MINECRAFT_DEPENDENCIES);
+
+        extendsFrom(Constants.COMPILE_MODS_MAPPED, Constants.MINECRAFT_NAMED);
+        extendsFrom("compile", Constants.COMPILE_MODS_MAPPED);
+        extendsFrom("compile", Constants.MAPPINGS);
+        extendsFrom("annotationProcessor", Constants.COMPILE_MODS_MAPPED);
+        extendsFrom("annotationProcessor", Constants.MAPPINGS);
 
 		Map<Project, Set<Task>> taskMap = project.getAllTasks(true);
 		for (Map.Entry<Project, Set<Task>> entry : taskMap.entrySet()) {
@@ -102,7 +118,7 @@ public class AbstractPlugin implements Plugin<Project> {
 						try {
 							javaCompileTask.getOptions().getCompilerArgs().add("-AinMapFileNamedIntermediary=" + extension.getMappingsProvider().MAPPINGS_TINY.getCanonicalPath());
 							javaCompileTask.getOptions().getCompilerArgs().add("-AoutMapFileNamedIntermediary=" + extension.getMappingsProvider().MAPPINGS_MIXIN_EXPORT.getCanonicalPath());
-							javaCompileTask.getOptions().getCompilerArgs().add("-AoutRefMapFile=" + new File(javaCompileTask.getDestinationDir(), extension.refmapName).getCanonicalPath());
+							javaCompileTask.getOptions().getCompilerArgs().add("-AoutRefMapFile=" + new File(javaCompileTask.getDestinationDir(), extension.getRefmapName()).getCanonicalPath());
 							javaCompileTask.getOptions().getCompilerArgs().add("-AdefaultObfuscationEnv=named:intermediary");
 						} catch (IOException e) {
 							e.printStackTrace();
@@ -194,6 +210,11 @@ public class AbstractPlugin implements Plugin<Project> {
 				flatDirectoryArtifactRepository.setName("UserLocalCacheFiles");
 			});
 
+			project1.getRepositories().flatDir(flatDirectoryArtifactRepository -> {
+				flatDirectoryArtifactRepository.dir(extension.getRemappedModCache());
+				flatDirectoryArtifactRepository.setName("UserLocalRemappedMods");
+			});
+
 			project1.getRepositories().maven(mavenArtifactRepository -> {
 				mavenArtifactRepository.setName("Fabric");
 				mavenArtifactRepository.setUrl("https://maven.fabricmc.net/");
@@ -228,16 +249,32 @@ public class AbstractPlugin implements Plugin<Project> {
 				SetupIntelijRunConfigs.setup(project1);
 			}
 
+			// add dependencies for mixin annotation processor
+			DependencyHandler handler = project1.getDependencies();
+			handler.add("annotationProcessor", "net.fabricmc:sponge-mixin:" + extension.getMixinVersion());
+			handler.add("annotationProcessor", "net.fabricmc:fabric-loom:" + extension.getLoomVersion());
 
-			//Enables the default mod remapper
+			// Enables the default mod remapper
 			if (extension.remapMod) {
 				AbstractArchiveTask jarTask = (AbstractArchiveTask) project1.getTasks().getByName("jar");
 
 				RemapJar remapJarTask = (RemapJar) project1.getTasks().findByName("remapJar");
-				remapJarTask.jar = jarTask.getArchivePath();
+				if (remapJarTask.jar==null) remapJarTask.jar = jarTask.getArchivePath();
 				remapJarTask.doLast(task -> project1.getArtifacts().add("archives", remapJarTask.jar));
 				remapJarTask.dependsOn(project1.getTasks().getByName("jar"));
 				project1.getTasks().getByName("build").dependsOn(remapJarTask);
+
+				try {
+					AbstractArchiveTask sourcesTask = (AbstractArchiveTask) project1.getTasks().getByName("sourcesJar");
+
+					RemapSourcesJar remapSourcesJarTask = (RemapSourcesJar) project1.getTasks().findByName("remapSourcesJar");
+					remapSourcesJarTask.jar = sourcesTask.getArchivePath();
+					remapSourcesJarTask.doLast(task -> project1.getArtifacts().add("archives", remapSourcesJarTask.jar));
+					remapSourcesJarTask.dependsOn(project1.getTasks().getByName("sourcesJar"));
+					project1.getTasks().getByName("build").dependsOn(remapSourcesJarTask);
+				} catch (UnknownTaskException e) {
+					// pass
+				}
 			} else {
 				AbstractArchiveTask jarTask = (AbstractArchiveTask) project1.getTasks().getByName("jar");
 				extension.addUnmappedMod(jarTask.getArchivePath());

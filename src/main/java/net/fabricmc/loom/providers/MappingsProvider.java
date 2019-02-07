@@ -35,6 +35,7 @@ import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.function.Consumer;
 
 //TODO fix local mappings
 //TODO possibly use maven for mappings, can fix above at the same time
@@ -52,19 +53,19 @@ public class MappingsProvider extends DependencyProvider {
 	public File MAPPINGS_MIXIN_EXPORT;
 
 	@Override
-	public void provide(DependencyInfo dependency, Project project, LoomGradleExtension extension) throws Exception {
+	public void provide(DependencyInfo dependency, Project project, LoomGradleExtension extension, Consumer<Runnable> postPopulationScheduler) throws Exception {
 		MinecraftProvider minecraftProvider = getDependencyManager().getProvider(MinecraftProvider.class);
 
 		project.getLogger().lifecycle(":setting up mappings (" + dependency.getDependency().getName() + " " + dependency.getResolvedVersion() + ")");
 
 		String version = dependency.getResolvedVersion();
-		String[] split = version.split("\\.");
-
-		File mappingsJar = dependency.resolveFile();
+		File mappingsJar = dependency.resolveFile().orElseThrow(() -> new RuntimeException("Could not find dependency " + dependency));
 
 		this.mappingsName = dependency.getDependency().getName();
-		this.minecraftVersion = split[0];
-		this.mappingsVersion = split[1];
+		char verSep = version.contains("-") ? '-' : '.';
+
+		this.minecraftVersion = version.substring(0, version.lastIndexOf(verSep));
+		this.mappingsVersion = version.substring(version.lastIndexOf(verSep) + 1);
 
 		initFiles(project);
 
@@ -93,20 +94,18 @@ public class MappingsProvider extends DependencyProvider {
 			});
 		}
 
-		project.getDependencies().add("compile", project.getDependencies().module(dependency.getDependency().getGroup() + ":" + dependency.getDependency().getName() + ":" + version));
-
 		mappedProvider = new MinecraftMappedProvider();
 		mappedProvider.initFiles(project, minecraftProvider, this);
-		mappedProvider.provide(dependency, project, extension);
+		mappedProvider.provide(dependency, project, extension, postPopulationScheduler);
 	}
 
 	public void initFiles(Project project) {
 		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
 		MAPPINGS_DIR = new File(extension.getUserCache(), "mappings");
 
-		MAPPINGS_TINY_BASE = new File(MAPPINGS_DIR, mappingsName + "-tiny-" + minecraftVersion + "." + mappingsVersion + "-base");
-		MAPPINGS_TINY = new File(MAPPINGS_DIR, mappingsName + "-tiny-" + minecraftVersion + "." + mappingsVersion);
-		MAPPINGS_MIXIN_EXPORT = new File(extension.getProjectCache(), "mixin-map-" + minecraftVersion + "." + mappingsVersion + ".tiny");
+		MAPPINGS_TINY_BASE = new File(MAPPINGS_DIR, mappingsName + "-tiny-" + minecraftVersion + "-" + mappingsVersion + "-base");
+		MAPPINGS_TINY = new File(MAPPINGS_DIR, mappingsName + "-tiny-" + minecraftVersion + "-" + mappingsVersion);
+		MAPPINGS_MIXIN_EXPORT = new File(extension.getProjectCache(), "mixin-map-" + minecraftVersion + "-" + mappingsVersion + ".tiny");
 	}
 
 	@Override

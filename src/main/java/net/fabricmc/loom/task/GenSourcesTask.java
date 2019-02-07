@@ -25,10 +25,10 @@
 package net.fabricmc.loom.task;
 
 import com.google.common.io.ByteStreams;
+import com.google.common.io.Files;
 import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.providers.MappingsProvider;
 import net.fabricmc.loom.providers.MinecraftLibraryProvider;
-import org.gradle.api.DefaultTask;
 import org.gradle.api.Project;
 import org.gradle.api.tasks.TaskAction;
 import org.jetbrains.java.decompiler.main.extern.IFernflowerPreferences;
@@ -40,10 +40,12 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 import java.util.jar.*;
 
-public class GenSourcesTask extends DefaultTask {
+public class GenSourcesTask extends DefaultLoomTask {
 	public static File getSourcesJar(Project project) {
 		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
 		MappingsProvider mappingsProvider = extension.getMappingsProvider();
@@ -93,7 +95,7 @@ public class GenSourcesTask extends DefaultTask {
 			project.getLogger().lifecycle(":readjusting line numbers");
 
 			File tmpJar = new File(mappedJar.getAbsolutePath() + ".tmp");
-			mappedJar.renameTo(tmpJar);
+			Files.move(mappedJar, tmpJar);
 			try (
 					FileInputStream fis = new FileInputStream(tmpJar);
 					JarInputStream jis = new JarInputStream(fis);

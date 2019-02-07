@@ -32,6 +32,7 @@ import org.gradle.api.Project;
 
 import java.io.File;
 import java.util.Collection;
+import java.util.function.Consumer;
 
 public class MinecraftMappedProvider extends DependencyProvider {
     public File MINECRAFT_MAPPED_JAR;
@@ -40,7 +41,7 @@ public class MinecraftMappedProvider extends DependencyProvider {
     private MinecraftProvider minecraftProvider;
 
     @Override
-    public void provide(DependencyInfo dependency, Project project, LoomGradleExtension extension) throws Exception {
+    public void provide(DependencyInfo dependency, Project project, LoomGradleExtension extension, Consumer<Runnable> postPopulationScheduler) throws Exception {
         if (!extension.getMappingsProvider().MAPPINGS_TINY.exists()) {
             throw new RuntimeException("mappings file not found");
         }
@@ -64,7 +65,9 @@ public class MinecraftMappedProvider extends DependencyProvider {
         }
 
         String version = minecraftProvider.minecraftVersion + "-mapped-" + extension.getMappingsProvider().mappingsVersion;
-        project.getDependencies().add("compile", project.getDependencies().module("net.minecraft:minecraft:" + version));
+        project.getDependencies().add(Constants.MINECRAFT_NAMED, project.getDependencies().module("net.minecraft:minecraft:" + version));
+        version = minecraftProvider.minecraftVersion + "-intermediary";
+        project.getDependencies().add(Constants.MINECRAFT_INTERMEDIARY, project.getDependencies().module("net.minecraft:minecraft:" + version));
     }
 
     public void initFiles(Project project, MinecraftProvider minecraftProvider, MappingsProvider mappingsProvider) {
@@ -88,6 +91,6 @@ public class MinecraftMappedProvider extends DependencyProvider {
 
     @Override
     public String getTargetConfig() {
-        return Constants.MINECRAFT_MAPPED;
+        return Constants.MINECRAFT_NAMED;
     }
 }

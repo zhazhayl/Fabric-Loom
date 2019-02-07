@@ -24,6 +24,7 @@
 
 package net.fabricmc.loom.util;
 
+import com.google.common.io.Files;
 import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.providers.MappingsProvider;
 import net.fabricmc.loom.task.RemapJar;
@@ -31,9 +32,9 @@ import net.fabricmc.tinyremapper.OutputConsumerPath;
 import net.fabricmc.tinyremapper.TinyRemapper;
 import net.fabricmc.tinyremapper.TinyUtils;
 import org.gradle.api.Project;
-import org.gradle.api.artifacts.Dependency;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -59,9 +60,19 @@ public class ModRemapper {
 		String toM = "intermediary";
 
 		List<File> classpathFiles = new ArrayList<>();
-		classpathFiles.addAll(project.getConfigurations().getByName("compile").getFiles());
+		classpathFiles.addAll(project.getConfigurations().getByName(Constants.COMPILE_MODS_MAPPED).getFiles());
+		classpathFiles.addAll(project.getConfigurations().getByName(Constants.MINECRAFT_NAMED).getFiles());
 		Path[] classpath = classpathFiles.stream().map(File::toPath).toArray(Path[]::new);
 		Path modJarPath = modJar.toPath();
+		boolean classpathContainsModJarPath = false;
+
+		for (Path p : classpath) {
+			if (modJarPath.equals(p)) {
+				modJarPath = p;
+				classpathContainsModJarPath = true;
+				break;
+			}
+		}
 
 		String s =modJar.getAbsolutePath();
 		File modJarOutput = new File(s.substring(0, s.length() - 4) + ".remapped.jar");
@@ -88,7 +99,9 @@ public class ModRemapper {
 		try (OutputConsumerPath outputConsumer = new OutputConsumerPath(modJarOutputPath)) {
 			outputConsumer.addNonClassFiles(modJarPath);
 			remapper.read(classpath);
-			remapper.read(modJarPath);
+			if (!classpathContainsModJarPath) {
+				remapper.read(modJarPath);
+			}
 			remapper.apply(modJarPath, outputConsumer);
 		} catch (Exception e) {
 			throw new RuntimeException("Failed to remap JAR", e);
@@ -100,18 +113,20 @@ public class ModRemapper {
 			throw new RuntimeException("Failed to reobfuscate JAR");
 		}
 
-		if (extension.refmapName != null && extension.refmapName.length() > 0) {
-			if (MixinRefmapHelper.addRefmapName(extension.refmapName, extension.getMixinVersion(), modJarOutput)) {
-				project.getLogger().debug("Transformed mixin reference maps in output JAR!");
+		if (MixinRefmapHelper.addRefmapName(extension.getRefmapName(), extension.getMixinJsonVersion(), modJarOutput)) {
+			project.getLogger().debug("Transformed mixin reference maps in output JAR!");
+		}
+
+		try {
+			if (modJar.exists()) {
+				Files.move(modJar, modJarUnmappedCopy);
+				extension.addUnmappedMod(modJarUnmappedCopy);
 			}
-		}
 
-		if (modJar.exists()) {
-			modJar.renameTo(modJarUnmappedCopy);
-			extension.addUnmappedMod(modJarUnmappedCopy);
+			Files.move(modJarOutput, modJar);
+		} catch (IOException e) {
+			throw new RuntimeException(e);
 		}
-
-		modJarOutput.renameTo(modJar);
 	}
 
 }

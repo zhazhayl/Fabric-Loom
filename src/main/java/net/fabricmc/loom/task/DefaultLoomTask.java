@@ -24,17 +24,12 @@
 
 package net.fabricmc.loom.task;
 
-import net.fabricmc.loom.LoomGradleExtension;
-import org.gradle.api.Project;
-import org.gradle.api.tasks.TaskAction;
+import org.gradle.api.DefaultTask;
 
-public class CleanLoomBinaries extends DefaultLoomTask {
-    @TaskAction
-    public void run() {
-        Project project = this.getProject();
-        LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
-        extension.getMinecraftProvider().jarProvider.getMergedJar().delete();
-        extension.getMinecraftMappedProvider().getIntermediaryJar().delete();
-        extension.getMinecraftMappedProvider().getMappedJar().delete();
-    }
+public abstract class DefaultLoomTask extends DefaultTask {
+
+	public DefaultLoomTask() {
+		setGroup("fabric");
+	}
+
 }

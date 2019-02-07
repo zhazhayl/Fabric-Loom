@@ -33,6 +33,7 @@ public class LoomGradlePlugin extends AbstractPlugin {
 		super.apply(target);
 
 		makeTask("cleanLoomBinaries", CleanLoomBinaries.class);
+		makeTask("cleanLoomMappings", CleanLoomMappings.class);
 
 		makeTask("remapJar", RemapJar.class);
 
@@ -41,6 +42,8 @@ public class LoomGradlePlugin extends AbstractPlugin {
 		makeTask("genIdeaWorkspace", GenIdeaProjectTask.class).dependsOn("idea").setGroup("ide");
 		makeTask("vscode", GenVsCodeProjectTask.class).setGroup("ide");
 		makeTask("genEclipseRuns", GenEclipseRunsTask.class).setGroup("ide");
+
+		makeTask("remapSourcesJar", RemapSourcesJar.class);
 
 		makeTask("runClient", RunClientTask.class).dependsOn("buildNeeded").setGroup("minecraftMapped");
 		makeTask("runServer", RunServerTask.class).dependsOn("buildNeeded").setGroup("minecraftMapped");

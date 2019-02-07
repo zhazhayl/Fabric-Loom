@@ -24,17 +24,23 @@
 
 package net.fabricmc.loom.task;
 
-import net.fabricmc.loom.LoomGradleExtension;
-import org.gradle.api.Project;
+import net.fabricmc.loom.util.SourceRemapper;
+import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.TaskAction;
 
-public class CleanLoomBinaries extends DefaultLoomTask {
-    @TaskAction
-    public void run() {
-        Project project = this.getProject();
-        LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
-        extension.getMinecraftProvider().jarProvider.getMergedJar().delete();
-        extension.getMinecraftMappedProvider().getIntermediaryJar().delete();
-        extension.getMinecraftMappedProvider().getMappedJar().delete();
-    }
+import java.io.File;
+
+public class RemapSourcesJar extends DefaultLoomTask {
+	public File jar;
+	public String direction = "intermediary";
+
+	@Input
+	public File getJar() {
+		return jar;
+	}
+
+	@TaskAction
+	public void remap() throws Exception {
+		SourceRemapper.remapSources(getProject(), jar, jar, direction.equals("named"));
+	}
 }

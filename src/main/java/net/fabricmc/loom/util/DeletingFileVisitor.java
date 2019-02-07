@@ -22,19 +22,25 @@
  * SOFTWARE.
  */
 
-package net.fabricmc.loom.task;
+package net.fabricmc.loom.util;
 
-import net.fabricmc.loom.LoomGradleExtension;
-import org.gradle.api.Project;
-import org.gradle.api.tasks.TaskAction;
+import java.io.IOException;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 
-public class CleanLoomBinaries extends DefaultLoomTask {
-    @TaskAction
-    public void run() {
-        Project project = this.getProject();
-        LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
-        extension.getMinecraftProvider().jarProvider.getMergedJar().delete();
-        extension.getMinecraftMappedProvider().getIntermediaryJar().delete();
-        extension.getMinecraftMappedProvider().getMappedJar().delete();
-    }
+public class DeletingFileVisitor extends SimpleFileVisitor<Path> {
+	@Override
+	public FileVisitResult visitFile(Path path, BasicFileAttributes basicFileAttributes) throws IOException {
+		Files.delete(path);
+		return FileVisitResult.CONTINUE;
+	}
+
+	@Override
+	public FileVisitResult postVisitDirectory(Path path, IOException e) throws IOException {
+		Files.delete(path);
+		return FileVisitResult.CONTINUE;
+	}
 }
