@@ -24,21 +24,45 @@
 
 package net.fabricmc.loom.task;
 
+import org.gradle.api.logging.Logger;
+import org.gradle.api.logging.LogLevel;
+
 import org.jetbrains.java.decompiler.main.extern.IFernflowerLogger;
 
 public class LoomFernflowerLogger extends IFernflowerLogger {
-	@Override
-	public void writeMessage(String s, Severity severity) {
-		if (severity == Severity.WARN || severity == Severity.ERROR) {
-			System.err.println(s);
+	private final Logger log;
+
+	public LoomFernflowerLogger(Logger log) {
+		this.log = log;
+	}
+
+	private static LogLevel wrap(Severity severity) {
+		switch (severity) {
+		case ERROR:
+			return LogLevel.ERROR;
+
+		case INFO:
+			return LogLevel.INFO;
+
+		case TRACE:
+			return LogLevel.DEBUG;
+
+		case WARN:
+			return LogLevel.WARN;
+
+		default:
+			System.out.println("Unexpected log level: " + severity);
+			return LogLevel.QUIET;
 		}
 	}
 
 	@Override
+	public void writeMessage(String s, Severity severity) {
+		log.log(wrap(severity), s);
+	}
+
+	@Override
 	public void writeMessage(String s, Severity severity, Throwable throwable) {
-		if (severity == Severity.WARN || severity == Severity.ERROR) {
-			System.err.println(s);
-			throwable.printStackTrace(System.err);
-		}
+		log.log(wrap(severity), s, throwable);
 	}
 }

@@ -77,7 +77,7 @@ public class GenSourcesTask extends DefaultLoomTask {
 		options.put(IFernflowerPreferences.INDENT_STRING, "\t"); //Use a tab not three spaces :|
 		options.put(IFernflowerPreferences.INCLUDE_ENTIRE_CLASSPATH, "1");
 
-		LoomFernflowerDecompiler decompiler = new LoomFernflowerDecompiler(sourcesJar.getParentFile(), sourcesJar.getName(), options, new LoomFernflowerLogger());
+		LoomFernflowerDecompiler decompiler = new LoomFernflowerDecompiler(sourcesJar.getParentFile(), sourcesJar.getName(), options, new LoomFernflowerLogger(project.getLogger()));
 		decompiler.addSource(mappedJar);
 		for (File lib : libraryProvider.getLibraries()) {
 			try {
