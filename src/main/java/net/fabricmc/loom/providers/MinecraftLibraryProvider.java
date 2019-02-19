@@ -69,6 +69,7 @@ public class MinecraftLibraryProvider {
 				project.getDependencies().add(Constants.MINECRAFT_DEPENDENCIES, project.getDependencies().module(library.getArtifactName()));
 			}
 		}
+		libs = project.getConfigurations().getByName(Constants.MINECRAFT_DEPENDENCIES).getFiles();
 
 		MinecraftVersionInfo.AssetIndex assetIndex = versionInfo.assetIndex;
 
