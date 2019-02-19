@@ -169,7 +169,7 @@ public final class MixinRefmapHelper {
                         String v = value.get(k).getAsString();
                         String v2;
 
-                        if (v.charAt(0) == 'L') {
+                        if (v.charAt(0) == 'L' /* method */ || v.contains(":") /* field */) {
                             // field or member
                             MemberInfo info = MemberInfo.parse(v);
                             String owner = remapper.map(info.owner);
