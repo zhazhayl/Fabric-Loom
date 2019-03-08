@@ -3,6 +3,7 @@ package net.fabricmc.loom.providers.mappings;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.FileSystems;
 import java.nio.file.FileVisitOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -15,7 +16,7 @@ public class EnigmaReader {
 	static final boolean LEGACY = true;
 
 	public static void readEnigma(Path dir, IMappingAcceptor mappingAcceptor) throws IOException {
-		try (Stream<Path> stream = Files.find(dir,
+		try (Stream<Path> stream = Files.find(FileSystems.newFileSystem(dir, null).getPath("/"),
 				Integer.MAX_VALUE,
 				(path, attr) -> attr.isRegularFile() && path.getFileName().toString().endsWith(".mapping"),
 				FileVisitOption.FOLLOW_LINKS)) {
