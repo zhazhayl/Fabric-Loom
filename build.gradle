@@ -28,6 +28,10 @@ repositories {
 		name = "Voldemaven"
 		url = "https://files.minecraftforge.net/maven/"
 	}
+	maven { 
+		name = "Jitpack"
+		url 'https://jitpack.io/'
+	}
 }
 
 dependencies {
@@ -38,7 +42,7 @@ dependencies {
 	implementation ('net.fabricmc:stitch:0.1.1.43') {
 		exclude module: 'enigma'
 	}
-	implementation ('net.fabricmc:tiny-remapper:0.1.0.23') {
+	implementation ('com.github.Chocohead:tiny-remapper:-SNAPSHOT') {
 		transitive = false
 	}
 	implementation ('net.minecraftforge:forgeflower:1.5.380.26')
