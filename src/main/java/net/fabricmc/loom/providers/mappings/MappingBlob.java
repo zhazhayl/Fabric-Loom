@@ -5,8 +5,6 @@ import java.util.Iterator;
 import java.util.Map;
 
 import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping;
-import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping.Field;
-import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping.Method;
 
 public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 	public static class Mapping {
@@ -99,7 +97,11 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 		}
 
 		public Method method(Method other) {
-			return methods.get(other.fromName + other.fromDesc);
+			return method(other.fromName, other.fromDesc);
+		}
+
+		Method method(String srcName, String srcDesc) {
+			return methods.computeIfAbsent(srcName + srcDesc, k -> new Method(srcName, srcDesc));
 		}
 
 		public Iterable<Field> fields() {
@@ -107,47 +109,43 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 		}
 
 		public Field field(Field other) {
-			return fields.get(other.fromName + ";;" + other.fromDesc);
+			return field(other.fromName, other.fromDesc);
+		}
+
+		Field field(String srcName, String srcDesc) {
+			return fields.computeIfAbsent(srcName + ";;" + srcDesc, k -> new Field(srcName, srcDesc));
 		}
 	}
 
 	private final Map<String, Mapping> mappings = new HashMap<>();
 
 	public Mapping get(String srcName) {
-		return mappings.get(srcName);
-	}
-
-	private Mapping getClass(String srcName) {
 		return mappings.computeIfAbsent(srcName, Mapping::new);
 	}
 
 	@Override
 	public void acceptClass(String srcName, String dstName) {
-		getClass(srcName).to = dstName;
-	}
-
-	private Method getMethod(String srcClsName, String srcName, String srcDesc) {
-		return getClass(srcClsName).methods.computeIfAbsent(srcName + srcDesc, k -> new Method(srcName, srcDesc));
+		get(srcName).to = dstName;
 	}
 
 	@Override
 	public void acceptMethod(String srcClsName, String srcName, String srcDesc, String dstClsName, String dstName, String dstDesc) {
-		getMethod(srcClsName, srcName, srcDesc).setMapping(dstName, dstDesc);
+		get(srcClsName).method(srcName, srcDesc).setMapping(dstName, dstDesc);
 	}
 
 	@Override
 	public void acceptMethodArg(String srcClsName, String srcMethodName, String srcMethodDesc, int argIndex, int lvIndex, String dstArgName) {
-		getMethod(srcClsName, srcMethodName, srcMethodDesc).addArg(dstArgName, lvIndex);
+		get(srcClsName).method(srcMethodName, srcMethodDesc).addArg(dstArgName, lvIndex);
 	}
 
 	@Override
 	public void acceptMethodVar(String srcClsName, String srcMethodName, String srcMethodDesc, int varIndex, int lvIndex, String dstVarName) {
-		getMethod(srcClsName, srcMethodName, srcMethodDesc).addArg(dstVarName, lvIndex);
+		get(srcClsName).method(srcMethodName, srcMethodDesc).addArg(dstVarName, lvIndex);
 	}
 
 	@Override
 	public void acceptField(String srcClsName, String srcName, String srcDesc, String dstClsName, String dstName, String dstDesc) {
-		getClass(srcClsName).fields.computeIfAbsent(srcName + ";;" + srcDesc, k -> new Field(srcName, srcDesc)).setMapping(dstName, dstDesc);
+		get(srcClsName).field(srcName, srcDesc).setMapping(dstName, dstDesc);
 	}
 
 	@Override
