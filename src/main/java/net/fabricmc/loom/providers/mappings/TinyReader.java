@@ -23,7 +23,7 @@ public class TinyReader {
 				continue;
 			}
 
-			if (line.isEmpty()) continue;
+			if (line.isEmpty() || line.startsWith("#")) continue;
 
 			String[] parts = line.split("\t");
 			if (parts.length < 3) throw new IOException("invalid tiny line (missing columns): "+line);
