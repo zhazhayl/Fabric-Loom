@@ -23,7 +23,7 @@ public class TinyWriter implements AutoCloseable {
 
 	public void acceptClass(String notchName, String namedName, String interName) {
 		try {
-			writer.write("CL:\t");
+			writer.write("CLASS\t");
 			writer.write(notchName);
 			writer.write('\t');
 			writer.write(namedName);
