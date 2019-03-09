@@ -57,9 +57,20 @@ public class EnigmaReader {
 				switch (parts[0]) {
 				case "CLASS":
 					if (parts.length < 2 || parts.length > 3) throw new IOException("invalid enigma line (missing/extra columns): "+line);
-					contextStack.add("C"+parts[1]);
+					String className;
+					if (indent > 0) {//If we're an intent in we're an inner class so want the outer classes's name
+						StringBuilder classNameBits = new StringBuilder(parts[1]);
+						String context = contextStack.peek();
+						if (context == null || context.charAt(0) != 'C') throw new IOException("Invalid enigma line (indented class without outer class): "+line);
+						classNameBits.insert(0, '$');
+						classNameBits.insert(0, context);
+						className = classNameBits.toString();
+					} else {
+						className = parts[1];
+					}
+					contextStack.add("C"+className);
 					indent++;
-					if (parts.length == 3) mappingAcceptor.acceptClass(parts[1], parts[2]);
+					if (parts.length == 3) mappingAcceptor.acceptClass(className, parts[2]);
 					break;
 				case "METHOD": {
 					if (parts.length < 3 || parts.length > 4) throw new IOException("invalid enigma line (missing/extra columns): "+line);

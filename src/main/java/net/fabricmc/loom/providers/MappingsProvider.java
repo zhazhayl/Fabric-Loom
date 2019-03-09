@@ -41,6 +41,7 @@ import net.fabricmc.tinyremapper.TinyUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.gradle.api.Project;
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -55,6 +56,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 //TODO fix local mappings
 //TODO possibly use maven for mappings, can fix above at the same time
@@ -101,7 +104,7 @@ public class MappingsProvider extends DependencyProvider {
 				case "zip": {//Directly downloaded the enigma file (:enigma@zip)
 					if (parameterNames.exists()) parameterNames.delete();
 
-					project.getLogger().lifecycle(":writing " + intermediaryNames.getName());
+					project.getLogger().lifecycle(":loading " + intermediaryNames.getName());
 					MappingBlob tiny = new MappingBlob();
 					if (!intermediaryNames.exists()) {//Grab intermediary mappings (which aren't in the enigma file)
 						FileUtils.copyURLToFile(new URL("https://github.com/FabricMC/intermediary/raw/master/mappings/" + minecraftVersion + ".tiny"), intermediaryNames);
@@ -138,14 +141,21 @@ public class MappingsProvider extends DependencyProvider {
 					project.getLogger().lifecycle(":writing " + parameterNames.getName());
 					try (BufferedWriter writer = new BufferedWriter(new FileWriter(parameterNames, false))) {
 						for (Mapping mapping : enigma) {
-							Mapping enigmaMap = enigma.get(mapping.from);
-							String mappedName = mapping.toOr(enigmaMap.to());
+							Mapping tinyMap = tiny.get(mapping.from);
+							String mappedName = mapping.toOr(tinyMap.toOr(mapping.from));
 
 							for (Method method : mapping.methods()) {
 								if (method.hasArgs()) {
-									writer.write(mappedName + '/' + method.nameOr(enigmaMap.method(method).name()));
+									String name = method.nameOr(tinyMap.method(method).nameOr(method.fromName));
+									String desc = remapSig(method.fromDesc, enigma, tiny);
+									if (name == null) {
+										System.err.println("Couldn't find name for " + mappedName + '/' + method.fromName + method.fromDesc);
+										continue;
+									}
+									writer.write(mappedName + '/' + name + desc);
 									writer.newLine();
 									for (String arg : method.namedArgs()) {
+										if (arg.endsWith(": null")) continue; //Skip nulls
 										writer.write("\t" + arg);
 										writer.newLine();
 									}
@@ -232,6 +242,21 @@ public class MappingsProvider extends DependencyProvider {
 		mappedProvider = new MinecraftMappedProvider();
 		mappedProvider.initFiles(project, minecraftProvider, this);
 		mappedProvider.provide(dependency, project, extension, postPopulationScheduler);
+	}
+
+	private static String remapSig(String desc, MappingBlob mappings, MappingBlob fallback) {
+		Pattern classFinder = Pattern.compile("L([^;]+);");
+		StringBuffer buf = new StringBuffer();
+
+        Matcher matcher = classFinder.matcher(desc);
+        while (matcher.find()) {
+        	String className = matcher.group(1);
+        	String newClassName = mappings.tryFor(className).map(Mapping::to).orElse(fallback.tryFor(className).map(Mapping::to).orElse(className));
+            matcher.appendReplacement(buf, Matcher.quoteReplacement('L' + newClassName + ';'));
+        }
+        matcher.appendTail(buf);
+
+        return buf.toString();
 	}
 
 	public void initFiles(Project project) {

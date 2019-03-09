@@ -3,6 +3,7 @@ package net.fabricmc.loom.providers.mappings;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Optional;
 
 import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping;
 
@@ -13,6 +14,11 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 
 			public Method(String fromName, String fromDesc) {
 				super(fromName, fromDesc);
+
+				if (fromName.charAt(0) == '<') {
+					//If we're an <init> (or theoretically a <clinit>) we'll never get a name so should do it now
+					setMapping(fromName, null);
+				}
 			}
 
 			void addArg(String name, int index) {
@@ -121,6 +127,10 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 
 	public Mapping get(String srcName) {
 		return mappings.computeIfAbsent(srcName, Mapping::new);
+	}
+
+	public Optional<Mapping> tryFor(String srcName) {
+		return Optional.ofNullable(mappings.get(srcName));
 	}
 
 	@Override
