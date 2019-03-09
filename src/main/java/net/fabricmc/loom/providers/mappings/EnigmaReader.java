@@ -30,6 +30,7 @@ public class EnigmaReader {
 		try (BufferedReader reader = Files.newBufferedReader(file)) {
 			String line;
 			Queue<String> contextStack = Collections.asLifoQueue(new ArrayDeque<>());
+			Queue<String> contextNamedStack = Collections.asLifoQueue(new ArrayDeque<>());
 			int indent = 0;
 
 			while ((line = reader.readLine()) != null) {
@@ -43,6 +44,7 @@ public class EnigmaReader {
 					if (indentChange < 0) {
 						for (int i = 0; i < -indentChange; i++) {
 							contextStack.remove();
+							contextNamedStack.remove();
 						}
 
 						indent = newIndent;
@@ -57,20 +59,27 @@ public class EnigmaReader {
 				switch (parts[0]) {
 				case "CLASS":
 					if (parts.length < 2 || parts.length > 3) throw new IOException("invalid enigma line (missing/extra columns): "+line);
-					String className;
-					if (indent > 0) {//If we're an intent in we're an inner class so want the outer classes's name
-						StringBuilder classNameBits = new StringBuilder(parts[1]);
-						String context = contextStack.peek();
-						if (context == null || context.charAt(0) != 'C') throw new IOException("Invalid enigma line (indented class without outer class): "+line);
-						classNameBits.insert(0, '$');
-						classNameBits.insert(0, context);
-						className = classNameBits.toString();
-					} else {
-						className = parts[1];
-					}
-					contextStack.add("C"+className);
+					contextStack.add("C"+parts[1]);
 					indent++;
-					if (parts.length == 3) mappingAcceptor.acceptClass(className, parts[2]);
+					if (parts.length == 3) {
+						String className;
+						if (indent > 1) {//If we're an intent in we're an inner class so want the outer classes's name
+							StringBuilder classNameBits = new StringBuilder(parts[2]);
+							String context = contextNamedStack.peek();
+							if (context == null || context.charAt(0) != 'C') throw new IOException("Invalid enigma line (named inner class without outer class name): "+line);
+							//Named inner classes shouldn't ever carry the outer class's package + name
+							assert !parts[2].startsWith(context.substring(1)): "Pre-prefixed enigma class name: " + parts[2];
+							classNameBits.insert(0, '$');
+							classNameBits.insert(0, context.substring(1));
+							className = classNameBits.toString();
+						} else {
+							className = parts[2];
+						}
+						contextNamedStack.add('C' + className);
+						mappingAcceptor.acceptClass(parts[1], className);
+					} else {
+						contextNamedStack.add('C' + parts[1]); //No name, but we still need something to avoid underflowing
+					}
 					break;
 				case "METHOD": {
 					if (parts.length < 3 || parts.length > 4) throw new IOException("invalid enigma line (missing/extra columns): "+line);
@@ -79,7 +88,12 @@ public class EnigmaReader {
 					if (context == null || context.charAt(0) != 'C') throw new IOException("invalid enigma line (method without class): "+line);
 					contextStack.add("M"+parts[1]+parts[parts.length - 1]);
 					indent++;
-					if (parts.length == 4) mappingAcceptor.acceptMethod(context.substring(1), parts[1], parts[3], null, parts[2], null);
+					if (parts.length == 4) {
+						mappingAcceptor.acceptMethod(context.substring(1), parts[1], parts[3], contextNamedStack.peek(), parts[2], null);
+						contextNamedStack.add('M' + parts[2]);
+					} else {
+						contextNamedStack.add('M' + parts[1]); //No name, but we still need something to avoid underflowing
+					}
 					break;
 				}
 				case "ARG":
@@ -117,7 +131,7 @@ public class EnigmaReader {
 					if (parts.length != 4) throw new IOException("invalid enigma line (missing/extra columns): "+line);
 					String context = contextStack.peek();
 					if (context == null || context.charAt(0) != 'C') throw new IOException("invalid enigma line (field without class): "+line);
-					mappingAcceptor.acceptField(context.substring(1), parts[1], parts[3], null, parts[2], null);
+					mappingAcceptor.acceptField(context.substring(1), parts[1], parts[3], contextNamedStack.peek(), parts[2], null);
 					break;
 				default:
 					throw new IOException("invalid enigma line (unknown type): "+line);
