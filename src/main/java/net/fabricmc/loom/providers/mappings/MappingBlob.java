@@ -3,7 +3,6 @@ package net.fabricmc.loom.providers.mappings;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Optional;
 
 import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping;
 
@@ -34,13 +33,17 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 				return args.length > 0;
 			}
 
+			String[] args() {
+				return args;
+			}
+
 			public String arg(int index) {
 				return args.length > index ? args[index] : null;
 			}
 
 			public Iterable<String> namedArgs() {
 				return () -> new Iterator<String>() {
-					int head = args.length - 1;
+					private int head = args.length - 1;
 
 					@Override
 					public boolean hasNext() {
@@ -102,6 +105,10 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 			return methods.values();
 		}
 
+		public boolean hasMethod(Method other) {
+			return methods.containsKey(other.fromName + other.fromDesc);
+		}
+
 		public Method method(Method other) {
 			return method(other.fromName, other.fromDesc);
 		}
@@ -112,6 +119,10 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 
 		public Iterable<Field> fields() {
 			return fields.values();
+		}
+
+		public boolean hasField(Field other) {
+			return fields.containsKey(other.fromName + ";;" + other.fromDesc);
 		}
 
 		public Field field(Field other) {
@@ -129,8 +140,9 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 		return mappings.computeIfAbsent(srcName, Mapping::new);
 	}
 
-	public Optional<Mapping> tryFor(String srcName) {
-		return Optional.ofNullable(mappings.get(srcName));
+	public String tryMapName(String srcName) {
+		Mapping mapping = mappings.get(srcName);
+		return mapping != null ? mapping.to : null;
 	}
 
 	@Override

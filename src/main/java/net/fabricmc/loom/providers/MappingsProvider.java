@@ -27,8 +27,11 @@ package net.fabricmc.loom.providers;
 import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.providers.mappings.EnigmaReader;
 import net.fabricmc.loom.providers.mappings.MappingBlob;
+import net.fabricmc.loom.providers.mappings.MappingSplat;
+import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping;
+import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping.CombinedField;
+import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping.CombinedMethod;
 import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping;
-import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping.Field;
 import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping.Method;
 import net.fabricmc.loom.providers.mappings.TinyReader;
 import net.fabricmc.loom.providers.mappings.TinyWriter;
@@ -56,8 +59,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 //TODO fix local mappings
 //TODO possibly use maven for mappings, can fix above at the same time
@@ -115,47 +116,34 @@ public class MappingsProvider extends DependencyProvider {
 					MappingBlob enigma = new MappingBlob();
 					EnigmaReader.readEnigma(mappingsJar.toPath(), enigma);
 
+					project.getLogger().lifecycle(":combining mappings");
+					MappingSplat combined = new MappingSplat(enigma, tiny);
+
 					project.getLogger().lifecycle(":writing " + MAPPINGS_TINY_BASE.getName());
 					try (TinyWriter writer = new TinyWriter(MAPPINGS_TINY_BASE.toPath())) {
-						for (Mapping interMap : tiny) {
-							String notch = interMap.from;
-							Mapping namedMap = enigma.get(notch);
+						for (CombinedMapping mapping : combined) {
+							String notch = mapping.from;
+							writer.acceptClass(notch, mapping.to, mapping.fallback);
 
-							String inter = interMap.to();
-							writer.acceptClass(notch, namedMap.toOr(inter), inter);
-
-							for (Method method : interMap.methods()) {
-								Method namedMethod = namedMap.method(method);
-								inter = method.name();
-								writer.acceptMethod(notch, method.fromName, method.fromDesc, namedMethod.nameOr(inter), inter);
+							for (CombinedMethod method : mapping.methods()) {
+								writer.acceptMethod(notch, method.from, method.fromDesc, method.to, method.fallback);
 							}
 
-							for (Field field : interMap.fields()) {
-								Field namedField = namedMap.field(field);
-								inter = field.name();
-								writer.acceptField(notch, field.fromName, field.fromDesc, namedField.nameOr(inter), inter);
+							for (CombinedField field : mapping.fields()) {
+								writer.acceptField(notch, field.from, field.fromDesc, field.to, field.fallback);
 							}
 						}
 					}
 
 					project.getLogger().lifecycle(":writing " + parameterNames.getName());
 					try (BufferedWriter writer = new BufferedWriter(new FileWriter(parameterNames, false))) {
-						for (Mapping mapping : enigma) {
-							Mapping tinyMap = tiny.get(mapping.from);
-							String mappedName = mapping.toOr(tinyMap.toOr(mapping.from));
-
-							for (Method method : mapping.methods()) {
+						for (CombinedMapping mapping : combined) {
+							for (CombinedMethod method : mapping.methods()) {
 								if (method.hasArgs()) {
-									String name = method.nameOr(tinyMap.method(method).nameOr(method.fromName));
-									String desc = remapSig(method.fromDesc, enigma, tiny);
-									if (name == null) {
-										System.err.println("Couldn't find name for " + mappedName + '/' + method.fromName + method.fromDesc);
-										continue;
-									}
-									writer.write(mappedName + '/' + name + desc);
+									writer.write(mapping.to + '/' + method.to + method.toDesc);
 									writer.newLine();
 									for (String arg : method.namedArgs()) {
-										if (arg.endsWith(": null")) continue; //Skip nulls
+										assert !arg.endsWith(": null"); //Skip nulls
 										writer.write("\t" + arg);
 										writer.newLine();
 									}
@@ -242,21 +230,6 @@ public class MappingsProvider extends DependencyProvider {
 		mappedProvider = new MinecraftMappedProvider();
 		mappedProvider.initFiles(project, minecraftProvider, this);
 		mappedProvider.provide(dependency, project, extension, postPopulationScheduler);
-	}
-
-	private static String remapSig(String desc, MappingBlob mappings, MappingBlob fallback) {
-		Pattern classFinder = Pattern.compile("L([^;]+);");
-		StringBuffer buf = new StringBuffer();
-
-        Matcher matcher = classFinder.matcher(desc);
-        while (matcher.find()) {
-        	String className = matcher.group(1);
-        	String newClassName = mappings.tryFor(className).map(Mapping::to).orElse(fallback.tryFor(className).map(Mapping::to).orElse(className));
-            matcher.appendReplacement(buf, Matcher.quoteReplacement('L' + newClassName + ';'));
-        }
-        matcher.appendTail(buf);
-
-        return buf.toString();
 	}
 
 	public void initFiles(Project project) {
