@@ -138,7 +138,7 @@ public class MappingsProvider extends DependencyProvider {
 						for (CombinedMapping mapping : combined) {
 							for (CombinedMethod method : mapping.methods()) {
 								if (method.hasArgs()) {
-									writer.write(mapping.to + '/' + method.to + method.toDesc);
+									writer.write(mapping.to + '/' + method.from + method.fromDesc);
 									writer.newLine();
 									for (String arg : method.namedArgs()) {
 										assert !arg.endsWith(": null"); //Skip nulls
@@ -213,7 +213,12 @@ public class MappingsProvider extends DependencyProvider {
 				@Override
 				public void load(Map<String, String> classMap, Map<String, String> fieldMap, Map<String, String> methodMap, Map<String, String[]> localMap) {
 					load(classMap, fieldMap, methodMap);
-					localMap.putAll(lines);
+					if ("official".equals(fromM)) {
+						localMap.putAll(lines);
+					} else {
+						//If we're not going from notch names to something else the line map is useless
+						project.getLogger().warn("Missing param map from " + fromM + " to " + toM);
+					}
 				}
 
 				@Override
