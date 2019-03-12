@@ -167,7 +167,16 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 					CombinedMethod combinedMethod = new CombinedMethod(notch, method.fromDesc, notch, interDesc, notch, nameDesc, method.args());
 					combined.methods.put(notch + method.fromDesc, combinedMethod);
 				} else {
-					throw new IllegalStateException("Extra mappings missing from fallback! Unable to find " + mapping.from + '#' + method.fromName + method.fromDesc + " (" + mapping.to + '#' + method.name() + ')');
+					//throw new IllegalStateException("Extra mappings missing from fallback! Unable to find " + mapping.from + '#' + method.fromName + method.fromDesc + " (" + mapping.to + '#' + method.name() + ')');
+					//Generic overrides will not have intermediary (fallback) mappings, but will often have Enigma mappings anyway
+					//This does mean typically the Enigma mappings will disappear anyway behind being a synthetic method
+					//Either way, short of running up the class hierarchy to resolve things probably, we'll just let it slide
+					/*String interDesc = remapDesc(method.fromDesc, fallbackRemapper);
+					String nameDesc = makeDesc(method, remapper);
+
+					CombinedMethod combinedMethod = new CombinedMethod(notch, method.fromDesc, notch, interDesc, method.nameOr(notch), nameDesc, method.args());
+					combined.methods.put(notch + method.fromDesc, combinedMethod);*/
+					//Although we can't really register mappings for them as Tiny Remapper is smart enough to realise they are propagated over by the real overrides
 				}
 			}
 
