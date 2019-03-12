@@ -182,47 +182,47 @@ public class MappingsProvider extends DependencyProvider {
 					MAPPINGS_TINY_BASE.getAbsolutePath(),
 					MAPPINGS_TINY.getAbsolutePath()
 			});
+		}
 
-			if (parameterNames.exists()) {
-				//Merge the tiny mappings with parameter names
-				Map<String, String[]> lines = new HashMap<>();
+		if (parameterNames.exists()) {
+			//Merge the tiny mappings with parameter names
+			Map<String, String[]> lines = new HashMap<>();
 
-				try (BufferedReader reader = new BufferedReader(new FileReader(parameterNames))) {
-					for (String line = reader.readLine(), current = null; line != null; line = reader.readLine()) {
-						if (current == null || line.charAt(0) != '\t') {
-							current = line;
-						} else {
-							int split = line.indexOf(':'); //\tno: name
-							int number = Integer.parseInt(line.substring(1, split));
-							String name = line.substring(split + 2);
+			try (BufferedReader reader = new BufferedReader(new FileReader(parameterNames))) {
+				for (String line = reader.readLine(), current = null; line != null; line = reader.readLine()) {
+					if (current == null || line.charAt(0) != '\t') {
+						current = line;
+					} else {
+						int split = line.indexOf(':'); //\tno: name
+						int number = Integer.parseInt(line.substring(1, split));
+						String name = line.substring(split + 2);
 
-							String[] lineSet = lines.get(current);
-							if (lineSet == null) {
-								//The args are written backwards so the biggest index is first
-								lines.put(current, lineSet = new String[number + 1]);
-							}
-							lineSet[number] = name;
+						String[] lineSet = lines.get(current);
+						if (lineSet == null) {
+							//The args are written backwards so the biggest index is first
+							lines.put(current, lineSet = new String[number + 1]);
 						}
+						lineSet[number] = name;
 					}
 				}
-
-				mcRemappingFactory = (fromM, toM) -> new IMappingProvider() {
-					private final IMappingProvider normal = TinyUtils.createTinyMappingProvider(MAPPINGS_TINY.toPath(), fromM, toM);
-
-					@Override
-					public void load(Map<String, String> classMap, Map<String, String> fieldMap, Map<String, String> methodMap, Map<String, String[]> localMap) {
-						load(classMap, fieldMap, methodMap);
-						localMap.putAll(lines);
-					}
-
-					@Override
-					public void load(Map<String, String> classMap, Map<String, String> fieldMap, Map<String, String> methodMap) {
-						normal.load(classMap, fieldMap, methodMap);
-					}
-				};
-			} else {
-				mcRemappingFactory = (fromM, toM) -> TinyUtils.createTinyMappingProvider(MAPPINGS_TINY.toPath(), fromM, toM);
 			}
+
+			mcRemappingFactory = (fromM, toM) -> new IMappingProvider() {
+				private final IMappingProvider normal = TinyUtils.createTinyMappingProvider(MAPPINGS_TINY.toPath(), fromM, toM);
+
+				@Override
+				public void load(Map<String, String> classMap, Map<String, String> fieldMap, Map<String, String> methodMap, Map<String, String[]> localMap) {
+					load(classMap, fieldMap, methodMap);
+					localMap.putAll(lines);
+				}
+
+				@Override
+				public void load(Map<String, String> classMap, Map<String, String> fieldMap, Map<String, String> methodMap) {
+					normal.load(classMap, fieldMap, methodMap);
+				}
+			};
+		} else {
+			mcRemappingFactory = (fromM, toM) -> TinyUtils.createTinyMappingProvider(MAPPINGS_TINY.toPath(), fromM, toM);
 		}
 
 		mappedProvider = new MinecraftMappedProvider();
