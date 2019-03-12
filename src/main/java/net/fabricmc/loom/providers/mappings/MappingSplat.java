@@ -4,6 +4,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.StringJoiner;
 import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -107,7 +108,7 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 			Mapping other = mappings.get(notch);
 
 			String inter = either(mapping.to, notch);
-			String name = either(other.to, inter);
+			String name = findName(other.to, inter, notch, mappings);
 			assert !inter.equals(notch) || name.equals(notch);
 
 			CombinedMapping combined = new CombinedMapping(notch, inter, name);
@@ -195,6 +196,37 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 
 	private static <T> T either(T prefered, T other) {
 		return prefered != null ? prefered : other;
+	}
+
+	private static String findName(String name, String inter, String notch, MappingBlob mappings) {
+		if (name != null) {
+			return name;
+		} else {
+			String[] segments = notch.split("\\$");
+
+			if (segments.length > 1) {
+				for (int end = segments.length - 1, depth = 1; end > 0; end--, depth++) {
+					StringJoiner nameBits = new StringJoiner("$");
+					for (int i = 0; i < end; i++) {
+						nameBits.add(segments[i]);
+					}
+
+					Mapping parent = mappings.get(nameBits.toString());
+					if (parent.to != null) {
+						String[] extra = inter.split("\\$");
+
+						nameBits = new StringJoiner("$");
+						nameBits.add(parent.to);
+						for (int extraEnd = extra.length, i = extraEnd - depth; i < extraEnd; i++) {
+							nameBits.add(extra[i]);
+						}
+						return nameBits.toString();
+					}
+				}
+			}
+
+			return inter;
+		}
 	}
 
 	private static String makeDesc(Field method, UnaryOperator<String> remapper) {
