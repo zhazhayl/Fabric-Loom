@@ -29,6 +29,7 @@ import net.fabricmc.loom.providers.mappings.EnigmaReader;
 import net.fabricmc.loom.providers.mappings.MappingBlob;
 import net.fabricmc.loom.providers.mappings.MappingSplat;
 import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping;
+import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping.ArgOnlyMethod;
 import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping.CombinedField;
 import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping.CombinedMethod;
 import net.fabricmc.loom.providers.mappings.TinyReader;
@@ -136,15 +137,13 @@ public class MappingsProvider extends DependencyProvider {
 					project.getLogger().lifecycle(":writing " + parameterNames.getName());
 					try (BufferedWriter writer = new BufferedWriter(new FileWriter(parameterNames, false))) {
 						for (CombinedMapping mapping : combined) {
-							for (CombinedMethod method : mapping.methods()) {
-								if (method.hasArgs()) {
-									writer.write(mapping.to + '/' + method.from + method.fromDesc);
+							for (ArgOnlyMethod method : mapping.allArgs()) {
+								writer.write(mapping.to + '/' + method.from + method.fromDesc);
+								writer.newLine();
+								for (String arg : method.namedArgs()) {
+									assert !arg.endsWith(": null"); //Skip nulls
+									writer.write("\t" + arg);
 									writer.newLine();
-									for (String arg : method.namedArgs()) {
-										assert !arg.endsWith(": null"); //Skip nulls
-										writer.write("\t" + arg);
-										writer.newLine();
-									}
 								}
 							}
 						}

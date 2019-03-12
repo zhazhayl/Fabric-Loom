@@ -2,8 +2,10 @@ package net.fabricmc.loom.providers.mappings;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import java.util.StringJoiner;
 import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
@@ -13,6 +15,7 @@ import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping;
 import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping.Field;
 import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping.Method;
 import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping;
+import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping.ArgOnlyMethod;
 import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping.CombinedField;
 import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping.CombinedMethod;
 
@@ -70,9 +73,46 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 				}
 			}
 		}
+		public static class ArgOnlyMethod {
+			public final String from, fromDesc;
+			private final String[] args;
+
+			ArgOnlyMethod(CombinedMethod method) {
+				this(method.from, method.fallbackDesc, method.args);
+			}
+
+			public ArgOnlyMethod(String from, String fromDesc, String[] args) {
+				this.from = from;
+				this.fromDesc = fromDesc;
+				this.args = args;
+			}
+
+			public String arg(int index) {
+				return args.length > index ? args[index] : null;
+			}
+
+			public Iterable<String> namedArgs() {
+				return () -> new Iterator<String>() {
+					private int head = args.length - 1;
+
+					@Override
+					public boolean hasNext() {
+						return head >= 0;
+					}
+
+					@Override
+					public String next() {
+						String next = head + ": " + args[head--];
+						while (hasNext() && args[head] == null) head--;
+						return next;
+					}
+				};
+			}
+		}
 
 		public final String from, fallback, to;
 		final Map<String, CombinedMethod> methods = new HashMap<>();
+		final Map<String, ArgOnlyMethod> bonusArgs = new HashMap<>();
 		final Map<String, CombinedField> fields = new HashMap<>();
 
 		public CombinedMapping(String from, String fallback, String to) {
@@ -83,6 +123,16 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 
 		public Iterable<CombinedMethod> methods() {
 			return methods.values();
+		}
+
+		public Iterable<ArgOnlyMethod> bonusArgs() {
+			return bonusArgs.values();
+		}
+
+		public Iterable<ArgOnlyMethod> allArgs() {
+			Set<ArgOnlyMethod> args = new HashSet<>(bonusArgs.values());
+			methods.values().stream().filter(CombinedMethod::hasArgs).map(ArgOnlyMethod::new).forEach(args::add);
+			return Collections.unmodifiableSet(args);
 		}
 
 		public Iterable<CombinedField> fields() {
@@ -167,6 +217,9 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 
 					CombinedMethod combinedMethod = new CombinedMethod(notch, method.fromDesc, notch, interDesc, notch, nameDesc, method.args());
 					combined.methods.put(notch + method.fromDesc, combinedMethod);
+				} else if (!method.hasArgs()) {
+					//Purely a name mapping, not going to work without intermediaries to back it up
+					throw new IllegalStateException("Extra mappings missing from fallback! Unable to find " + mapping.from + '#' + method.fromName + method.fromDesc + " (" + mapping.to + '#' + method.name() + ')');
 				} else {
 					//throw new IllegalStateException("Extra mappings missing from fallback! Unable to find " + mapping.from + '#' + method.fromName + method.fromDesc + " (" + mapping.to + '#' + method.name() + ')');
 					//Generic overrides will not have intermediary (fallback) mappings, but will often have Enigma mappings anyway
@@ -178,6 +231,8 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 					CombinedMethod combinedMethod = new CombinedMethod(notch, method.fromDesc, notch, interDesc, method.nameOr(notch), nameDesc, method.args());
 					combined.methods.put(notch + method.fromDesc, combinedMethod);*/
 					//Although we can't really register mappings for them as Tiny Remapper is smart enough to realise they are propagated over by the real overrides
+					ArgOnlyMethod bonusMethod = new ArgOnlyMethod(notch, method.fromDesc, method.args());
+					combined.bonusArgs.put(notch + method.fromDesc, bonusMethod);
 				}
 			}
 
