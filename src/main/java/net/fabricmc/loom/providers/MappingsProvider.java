@@ -31,8 +31,6 @@ import net.fabricmc.loom.providers.mappings.MappingSplat;
 import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping;
 import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping.CombinedField;
 import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping.CombinedMethod;
-import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping;
-import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping.Method;
 import net.fabricmc.loom.providers.mappings.TinyReader;
 import net.fabricmc.loom.providers.mappings.TinyWriter;
 import net.fabricmc.loom.util.Constants;
