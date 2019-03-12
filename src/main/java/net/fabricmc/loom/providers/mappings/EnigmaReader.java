@@ -63,7 +63,7 @@ public class EnigmaReader {
 					indent++;
 					if (parts.length == 3) {
 						String className;
-						if (indent > 1) {//If we're an intent in we're an inner class so want the outer classes's name
+						if (indent > 1) {//If we're an indent in, we're an inner class so want the outer classes's name
 							StringBuilder classNameBits = new StringBuilder(parts[2]);
 							String context = contextNamedStack.peek();
 							if (context == null || context.charAt(0) != 'C') throw new IOException("Invalid enigma line (named inner class without outer class name): "+line);

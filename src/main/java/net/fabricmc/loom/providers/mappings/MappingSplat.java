@@ -241,12 +241,12 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 	private static String remapDesc(String desc, UnaryOperator<String> classRemapper) {
 		StringBuffer buf = new StringBuffer();
 
-        Matcher matcher = CLASS_FINDER.matcher(desc);
-        while (matcher.find()) {
-            matcher.appendReplacement(buf, Matcher.quoteReplacement('L' + classRemapper.apply(matcher.group(1)) + ';'));
-        }
-        matcher.appendTail(buf);
+		Matcher matcher = CLASS_FINDER.matcher(desc);
+		while (matcher.find()) {
+			matcher.appendReplacement(buf, Matcher.quoteReplacement('L' + classRemapper.apply(matcher.group(1)) + ';'));
+		}
+		matcher.appendTail(buf);
 
-        return buf.toString();
+		return buf.toString();
 	}
 }

@@ -248,9 +248,9 @@ public class MappingsProvider extends DependencyProvider {
 
 	public void clearFiles() {
 		MAPPINGS_TINY.delete();
-        MAPPINGS_TINY_BASE.delete();
-        intermediaryNames.delete();
-        parameterNames.delete();
+		MAPPINGS_TINY_BASE.delete();
+		intermediaryNames.delete();
+		parameterNames.delete();
 	}
 
 	@Override
