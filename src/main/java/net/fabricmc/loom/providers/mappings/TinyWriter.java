@@ -56,7 +56,7 @@ public class TinyWriter implements AutoCloseable {
 	public void acceptField(String notchClass, String notchName, String desc, String namedName, String interName) {
 		try {
 			writer.write("FIELD\t");
-			writer.write(notchName);
+			writer.write(notchClass);
 			writer.write('\t');
 			writer.write(desc);
 			writer.write('\t');
