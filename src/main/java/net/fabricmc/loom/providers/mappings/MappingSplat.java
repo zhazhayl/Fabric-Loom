@@ -148,7 +148,7 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 		for (Mapping mapping : mappings) {
 			String notch = mapping.from;
 
-			Mapping other = mappings.get(notch);
+			Mapping other = fallback.get(notch);
 			CombinedMapping combined = this.mappings.get(notch);
 			if (other == null || combined == null) {
 				System.err.println("Missing " + (other == null ? combined == null ? "both" : "from mappings" : "from combined"));
@@ -167,14 +167,14 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 					CombinedMethod combinedMethod = new CombinedMethod(notch, method.fromDesc, notch, interDesc, notch, nameDesc, method.args());
 					combined.methods.put(notch + method.fromDesc, combinedMethod);
 				} else {
-					throw new IllegalStateException("Extra mappings missing from fallback! Unable to find " + notch + '#' + method.fromName + method.fromDesc);
+					throw new IllegalStateException("Extra mappings missing from fallback! Unable to find " + mapping.from + '#' + method.fromName + method.fromDesc + " (" + mapping.to + '#' + method.name() + ')');
 				}
 			}
 
 			for (Field field : mapping.fields()) {
 				if (other.hasField(field)) continue;
 
-				throw new IllegalStateException("Extra mapping missing from fallback! Unable to find " + notch + '#' + field.fromName + " (" + field.fromDesc + ')');
+				throw new IllegalStateException("Extra mapping missing from fallback! Unable to find " + mapping.from + '#' + field.fromName + " (" + field.fromDesc + ')');
 			}
 		}
 	}
