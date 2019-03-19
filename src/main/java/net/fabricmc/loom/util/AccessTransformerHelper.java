@@ -12,12 +12,22 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.commons.Remapper;
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.InnerClassNode;
+import org.objectweb.asm.tree.MethodNode;
 
 import org.zeroturnaround.zip.ZipUtil;
 import org.zeroturnaround.zip.transform.ByteArrayZipEntryTransformer;
@@ -109,25 +119,133 @@ public class AccessTransformerHelper {
 		}
     }
 
-    public static class ZipAT extends ByteArrayZipEntryTransformer {
-    	private boolean hasTransformed = false;
+    private static class ZipAT extends ByteArrayZipEntryTransformer {
+    	/** The class name of the type we're aiming to transform */
+    	public final String className;
+    	/** A set of all methods we're aiming to transform in {@link #className} */
+    	private final Set<String> transforms;
+    	/** Whether to transform the access of {@link #className} itself */
+    	private final boolean selfAT;
+    	/** A set of all inner classes that need to be transformed */
+    	private final Set<String> innerTransforms = new HashSet<>();
+    	/** Whether we have been used (ie {@link #transform(ZipEntry, byte[])} has been called) */
+    	boolean hasTransformed = false;
 
-    	public ZipAT() {
-			// TODO Auto-generated constructor stub
+    	ZipAT(Entry<String, Set<String>> entry, String wildcard) {
+			this(entry.getKey(), entry.getValue(), wildcard);
 		}
+
+    	ZipAT(String className, Set<String> transforms, String wildcard) {
+			this.className = className;
+			this.transforms = transforms;
+
+			if (selfAT = transforms.remove(wildcard)) {
+				//Remember to do the inner class attribute too (if there is one)
+				innerTransforms.add(className);
+			}
+		}
+
+    	public boolean changesOwnAccess() {
+    		return selfAT;
+    	}
+
+    	void addInnerTransform(Set<String> name) {
+    		innerTransforms.addAll(name);
+    	}
 
 		@Override
-		protected byte[] transform(ZipEntry zipEntry, byte[] input) throws IOException {
-			hasTransformed = true;
-			return null;
+		protected byte[] transform(ZipEntry zipEntry, byte[] data) throws IOException {
+			if (hasTransformed) throw new IllegalStateException("Transformer for " + className + " was attempted to be reused");
+			hasTransformed = true; //We only expect to be run once (although aren't technically limited to prevent it)
+
+			ClassNode clazz = new ClassNode();
+	        ClassReader reader = new ClassReader(data);
+	        reader.accept(clazz, 0);
+
+	        if (selfAT) clazz.access = flipBits(clazz.access);
+	        if (!innerTransforms.isEmpty()) {
+				for (InnerClassNode innerClass : clazz.innerClasses) {
+					if (innerTransforms.contains(innerClass.name)) {
+						innerClass.access = flipBits(innerClass.access);
+					}
+				}
+			}
+
+	        if (!transforms.isEmpty()) {
+	        	for (MethodNode method : clazz.methods) {
+	        		if (transforms.remove(method.name + method.desc)) {
+	        			method.access = flipBits(method.access);
+	        			//Technically speaking we should probably do INVOKESPECIAL -> INVOKEVIRTUAL for private -> public transforms
+	        			//But equally that's effort, so let's see how far we can get before it becomes an issue (from being lazy)
+	        			if (transforms.isEmpty()) break;
+	        		}
+	        	}
+	        }
+
+	        if (!transforms.isEmpty()) {//There's still more we never found, not so good that
+	        	throw new IllegalStateException("Ran through class " + clazz.name + " but couldn't find " + transforms);
+	        }
+
+	        ClassWriter writer = new ClassWriter(0);
+	        clazz.accept(writer);
+	        return writer.toByteArray();
 		}
 
-		public boolean didTransform() {
-			return hasTransformed;
+		private static final int ACCESSES = ~(Opcodes.ACC_PUBLIC | Opcodes.ACC_PROTECTED | Opcodes.ACC_PRIVATE);
+		private static int flipBits(int access) {
+			access &= ACCESSES;
+			access |= Opcodes.ACC_PUBLIC;
+			access &= ~Opcodes.ACC_FINAL;
+			return access;
 		}
     }
 
-    public static ZipEntryTransformerEntry[] makeZipATs(Map<String, Set<String>> transforms, String wildcard) {
-    	return null;
+    public static class ZipEntryAT extends ZipEntryTransformerEntry {
+		public ZipEntryAT(ZipAT transformer) {
+			super(transformer.className + ".class", transformer);
+		}
+
+		/** Whether the transformer for this entry has been applied */
+		public boolean didTransform() {
+			return ((ZipAT) getTransformer()).hasTransformed;
+		}
+    }
+
+    public static ZipEntryAT[] makeZipATs(Set<String> classPool, Map<String, Set<String>> transforms, String wildcard) {
+    	Map<String, ZipAT> transformers = transforms.entrySet().stream().collect(Collectors.toMap(Entry::getKey, entry -> new ZipAT(entry, wildcard)));
+
+    	Set<String> classChanges = transformers.entrySet().stream().filter(entry -> entry.getValue().changesOwnAccess()).map(Entry::getKey).collect(Collectors.toSet());
+    	if (!classChanges.isEmpty()) {
+    		Map<String, Set<String>> rootClasses = new HashMap<>();
+
+    		for (String className : classChanges) {
+    			int split = className.indexOf('$');
+    			if (split > 0) {
+    				//If an access change happens to an inner class we'll have to muck about with inner attributes
+    				rootClasses.computeIfAbsent(className.substring(0, split), k -> new HashSet<>()).add(className);
+    			}
+    		}
+
+    		if (!rootClasses.isEmpty()) {
+    			for (Entry<String, Set<String>> rootEntry : rootClasses.entrySet()) {
+    				String rootClass = rootEntry.getKey();
+
+    				//Find "all" nested classes to update the access flags
+    				for (String pool : classPool) {
+    					if (pool.startsWith(rootClass)) {
+    						if (transformers.containsKey(pool)) {
+    							transformers.get(pool).addInnerTransform(rootEntry.getValue());
+    						} else {
+    							ZipAT z;
+    							transformers.put(pool, z = new ZipAT(pool, Collections.emptySet(), null));
+    							z.addInnerTransform(rootEntry.getValue());
+    						}
+    					}
+    				}
+    			}
+    		}
+    	}
+
+    	return transformers.values().stream().map(ZipEntryAT::new).toArray(ZipEntryAT[]::new);
     }
 }

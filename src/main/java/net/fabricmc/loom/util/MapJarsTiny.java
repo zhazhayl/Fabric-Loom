@@ -28,6 +28,7 @@ package net.fabricmc.loom.util;
 import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.providers.MinecraftJarProvider;
 import net.fabricmc.loom.providers.MinecraftMappedProvider;
+import net.fabricmc.loom.util.AccessTransformerHelper.ZipEntryAT;
 import net.fabricmc.mappings.ClassEntry;
 import net.fabricmc.mappings.EntryTriple;
 import net.fabricmc.mappings.Mappings;
@@ -40,31 +41,20 @@ import net.fabricmc.tinyremapper.TinyRemapper;
 import org.gradle.api.InvalidUserDataException;
 import org.gradle.api.Project;
 
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.InnerClassNode;
-import org.objectweb.asm.tree.MethodNode;
-
-import org.apache.commons.io.IOUtils;
-import com.google.common.io.Files;
+import org.zeroturnaround.zip.ZipUtil;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.jar.JarEntry;
-import java.util.jar.JarFile;
-import java.util.jar.JarOutputStream;
 import java.util.stream.Collectors;
 
 public class MapJarsTiny {
@@ -165,92 +155,28 @@ public class MapJarsTiny {
 		project.getLogger().info("Found " + transforms.size() + " classes that need tinkering with");
 		project.getLogger().lifecycle(":transforming minecraft");
 
-		//Move these out of the way as we need to make new jars in their place
-		File intermediaryJar = preATmove(jarProvider.MINECRAFT_INTERMEDIARY_JAR);
-		File namedJar = preATmove(jarProvider.MINECRAFT_MAPPED_JAR);
-
 		project.getLogger().info("Transforming intermediary jar");
-		doTheDeed(intermediaryJar, jarProvider.MINECRAFT_INTERMEDIARY_JAR, interTransforms, wildcard);
+		doTheDeed(jarProvider.MINECRAFT_INTERMEDIARY_JAR, mappings, "intermediary", interTransforms, wildcard);
 		project.getLogger().info("Transforming named jar");
-		doTheDeed(namedJar, jarProvider.MINECRAFT_MAPPED_JAR, transforms, wildcard);
-
+		doTheDeed(jarProvider.MINECRAFT_MAPPED_JAR, mappings, "named", transforms, wildcard);
 		project.getLogger().info("Transformation complete"); //Probably, successful is another matter
-		intermediaryJar.delete();
-		namedJar.delete(); //Done with these now
 	}
 
-	private static File preATmove(File jar) throws IOException {
-		File moved = new File(jar.getParentFile(), "preAT-" + jar.getName());
-		Files.move(jar, moved);
-		return moved;
-	}
+	private static void doTheDeed(File jar, Mappings mappings, String type, Map<String, Set<String>> transforms, String wildcard) throws IOException {
+		Set<String> classPool = mappings.getClassEntries().parallelStream().map(entry -> entry.get(type)).collect(Collectors.toSet());
+		ZipEntryAT[] transformers = AccessTransformerHelper.makeZipATs(classPool, transforms, wildcard);
 
-	private static void doTheDeed(File from, File to, Map<String, Set<String>> transforms, String wildcard) throws IOException {
-		try (JarFile jar = new JarFile(from); JarOutputStream out = new JarOutputStream(new FileOutputStream(to))) {
-			for (Enumeration<JarEntry> entries = jar.entries(); entries.hasMoreElements();) {
-				JarEntry entry = entries.nextElement();
+		ZipUtil.transformEntries(jar, transformers);
 
-				InputStream in = jar.getInputStream(entry);
-				String name = entry.getName();
-				byte[] data = IOUtils.toByteArray(in);
-
-				if (data != null && name.endsWith(".class")) {
-					String className = name.substring(0, name.length() - 6);
-					data = transform(data, transforms.get(className), wildcard);
-				}
-
-				JarEntry newEntry = new JarEntry(name);
-				out.putNextEntry(newEntry);
-				out.write(data);
-				out.closeEntry();
-			}
-		}
-	}
-
-
-	private static byte[] transform(byte[] data, Set<String> transforms, String wildcard) {
-		if (transforms == null || transforms.isEmpty()) return data;
-
-		ClassNode clazz = new ClassNode();
-        ClassReader reader = new ClassReader(data);
-        reader.accept(clazz, 0);
-
-        if (transforms.remove(wildcard)) {
-        	clazz.access = flipBits(clazz.access);
-        	//Remember to do the inner class attribute too (if there is one)
-			for (InnerClassNode innerClass : clazz.innerClasses) {
-				if (innerClass.name.equals(clazz.name)) {
-					innerClass.access = flipBits(innerClass.access);
-					break;
+		if (!Arrays.stream(transformers).allMatch(ZipEntryAT::didTransform)) {
+			List<String> missed = new ArrayList<>();
+			for (ZipEntryAT transformer : transformers) {
+				if (!transformer.didTransform()) {
+					String name = transformer.getPath();
+					missed.add(name.substring(0, name.length() - ".class".length()));
 				}
 			}
+			throw new IllegalStateException("Finished transforming but missed " + missed);
 		}
-
-        if (!transforms.isEmpty()) {
-        	for (MethodNode method : clazz.methods) {
-        		if (transforms.remove(method.name + method.desc)) {
-        			method.access = flipBits(method.access);
-        			//Technically speaking we should probably do INVOKESPECIAL -> INVOKEVIRTUAL for private -> public transforms
-        			//But equally that's effort, so let's see how far we can get before it becomes an issue (from being lazy)
-        			if (transforms.isEmpty()) break;
-        		}
-        	}
-        }
-
-        if (!transforms.isEmpty()) {//There's still more we never found, not so good that
-        	throw new IllegalStateException("Ran through class " + clazz.name + " but couldn't find " + transforms);
-        }
-
-        ClassWriter writer = new ClassWriter(0);
-        clazz.accept(writer);
-        return writer.toByteArray();
-	}
-
-	private static final int ACCESSES = ~(Opcodes.ACC_PUBLIC | Opcodes.ACC_PROTECTED | Opcodes.ACC_PRIVATE);
-	private static int flipBits(int access) {
-		access &= ACCESSES;
-		access |= Opcodes.ACC_PUBLIC;
-		access &= ~Opcodes.ACC_FINAL;
-		return access;
 	}
 }
