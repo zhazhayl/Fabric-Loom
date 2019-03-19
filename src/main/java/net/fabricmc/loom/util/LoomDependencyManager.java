@@ -54,7 +54,7 @@ public class LoomDependencyManager {
 	public <T> T getProvider(Class<T> clazz){
 		for(DependencyProvider provider : dependencyProviderList){
 			if(provider.getClass() == clazz){
-				return (T) provider;
+				return clazz.cast(provider);
 			}
 		}
 		return null;

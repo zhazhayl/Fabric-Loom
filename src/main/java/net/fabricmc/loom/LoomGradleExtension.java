@@ -51,7 +51,7 @@ public class LoomGradleExtension {
 	private List<File> unmappedModsBuilt = new ArrayList<>();
 
 	//Not to be set in the build.gradle
-	private Project project;
+	private final Project project;
 	private LoomDependencyManager dependencyManager;
 	private JsonObject installerJson;
 	private int installerJsonPriority = Integer.MAX_VALUE; // 0+, higher = less prioritized

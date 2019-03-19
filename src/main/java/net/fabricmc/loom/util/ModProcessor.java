@@ -29,15 +29,11 @@ import com.google.gson.JsonObject;
 import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.providers.MappingsProvider;
 import net.fabricmc.loom.providers.MinecraftMappedProvider;
-import net.fabricmc.loom.providers.MinecraftProvider;
 import net.fabricmc.tinyremapper.OutputConsumerPath;
 import net.fabricmc.tinyremapper.TinyRemapper;
 import net.fabricmc.tinyremapper.TinyUtils;
 import org.apache.commons.io.IOUtils;
 import org.gradle.api.Project;
-import org.gradle.api.artifacts.Configuration;
-import org.gradle.api.artifacts.ExternalModuleDependency;
-import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
 
 import java.io.File;
 import java.io.IOException;
