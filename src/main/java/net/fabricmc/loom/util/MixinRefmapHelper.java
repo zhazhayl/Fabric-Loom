@@ -38,7 +38,6 @@ import org.zeroturnaround.zip.transform.ZipEntryTransformerEntry;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.lang.reflect.Field;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -130,15 +129,7 @@ public final class MixinRefmapHelper {
         Set<String> mixinRefmapFilenames = findRefmaps(output);
 
         if (mixinRefmapFilenames.size() > 0) {
-            Remapper asmRemapper;
-            // TODO: Expose in tiny-remapper
-            try {
-                Field f = TinyRemapper.class.getDeclaredField("remapper");;
-                f.setAccessible(true);
-                asmRemapper = (Remapper) f.get(remapper);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
+            Remapper asmRemapper = remapper.getRemapper();
 
             ZipUtil.transformEntries(
                     output,

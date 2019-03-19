@@ -42,6 +42,7 @@ dependencies {
 	implementation ('net.fabricmc:stitch:0.1.1.43') {
 		exclude module: 'enigma'
 	}
+	implementation ('net.fabricmc:tiny-mappings-parser:0.1.1.7')
 	implementation ('com.github.Chocohead:tiny-remapper:-SNAPSHOT') {
 		transitive = false
 	}
