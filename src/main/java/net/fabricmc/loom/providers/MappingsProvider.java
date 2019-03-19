@@ -148,6 +148,7 @@ public class MappingsProvider extends DependencyProvider {
 							}
 						}
 					}
+					addDependency(dependency.getDepString(), project, "runtimeOnly");
 					break;
 				}
 				case "gz": //Directly downloaded the tiny file (:tiny@gz)
@@ -156,6 +157,7 @@ public class MappingsProvider extends DependencyProvider {
 						Path fileToExtract = fileSystem.getPath(dependency.getDependency().getName() + '-' + dependency.getResolvedVersion() + "-tiny");
 						Files.copy(fileToExtract, MAPPINGS_TINY_BASE.toPath());
 					}
+					addDependency(dependency.getDepString(), project, "runtimeOnly");
 					break;
 
 				case "jar": //Downloaded a jar containing the tiny jar
