@@ -25,32 +25,68 @@
 package net.fabricmc.loom.providers;
 
 import net.fabricmc.loom.LoomGradleExtension;
+import net.fabricmc.loom.util.AccessTransformerHelper;
 import net.fabricmc.loom.util.Constants;
-import net.fabricmc.loom.util.DependencyProvider;
 import net.fabricmc.loom.util.MapJarsTiny;
+import net.fabricmc.stitch.util.Pair;
+
 import org.gradle.api.Project;
 
+import com.google.common.io.Files;
+
 import java.io.File;
+import java.io.IOException;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Set;
 import java.util.function.Consumer;
 
-public class MinecraftMappedProvider extends DependencyProvider {
+public class MinecraftMappedProvider {
     public File MINECRAFT_MAPPED_JAR;
     public File MINECRAFT_INTERMEDIARY_JAR;
 
     private MinecraftProvider minecraftProvider;
 
-    @Override
-    public void provide(DependencyInfo dependency, Project project, LoomGradleExtension extension, Consumer<Runnable> postPopulationScheduler) throws Exception {
-        if (!extension.getMappingsProvider().MAPPINGS_TINY.exists()) {
+    public void provide(Project project, LoomGradleExtension extension, MinecraftProvider minecraftProvider, MappingsProvider mappingsProvider, Consumer<Runnable> postPopulationScheduler) throws IOException {
+        if (!mappingsProvider.MAPPINGS_TINY.exists()) {
             throw new RuntimeException("mappings file not found");
         }
 
-        if (!extension.getMinecraftProvider().jarProvider.getMergedJar().exists()) {
+        if (!minecraftProvider.jarProvider.getMergedJar().exists()) {
             throw new RuntimeException("input merged jar not found");
         }
 
-        if(!getMappedJar().exists() || !getIntermediaryJar().exists()){
+        this.minecraftProvider = minecraftProvider;
+
+        String atOffset; //Explicitly flag AT'd jars differently to vanilla/stock ones
+        File cache; //Save to the project cache when ATing to simplify flagging AT changes
+        Set<Pair<String, String>> targets;
+        boolean atChange = false;
+        if (extension.hasAT()) {
+        	atOffset = "-transformed";
+        	cache = extension.getProjectCache();
+
+        	project.getLogger().info("Negotiating access transformations...");
+    		targets = AccessTransformerHelper.loadATs(extension.getAT());
+    		project.getLogger().info("Access transformations solved for " + targets.size() + " targets");
+
+    		File lastAT = new File(cache, "last-seen.at");
+    		if (lastAT.exists() ? !AccessTransformerHelper.loadATs(lastAT).equals(targets) : !targets.isEmpty()) {
+    			Files.copy(extension.getAT(), lastAT); //Replace the old with the new
+    			atChange = true;
+    		}
+        } else {
+        	atOffset = "";
+        	cache = extension.getUserCache();
+        	targets = Collections.emptySet();
+        }
+
+        String intermediaryJar = minecraftProvider.minecraftVersion + "-intermediary" + atOffset;
+        MINECRAFT_INTERMEDIARY_JAR = new File(cache, "minecraft-" + intermediaryJar + ".jar");
+        String mappedJar = minecraftProvider.minecraftVersion + "-mapped" + atOffset + '-' + mappingsProvider.mappingsVersion;
+        MINECRAFT_MAPPED_JAR = new File(cache, "minecraft-" + mappedJar + ".jar");
+
+        if (!getMappedJar().exists() || !getIntermediaryJar().exists() || atChange) {
             if (getMappedJar().exists()) {
                 getMappedJar().delete();
             }
@@ -58,23 +94,15 @@ public class MinecraftMappedProvider extends DependencyProvider {
                 getIntermediaryJar().delete();
             }
             new MapJarsTiny().mapJars(minecraftProvider.jarProvider, this, project);
+            if (!targets.isEmpty()) MapJarsTiny.transform(project, targets, this, mappingsProvider);
         }
 
         if (!MINECRAFT_MAPPED_JAR.exists()) {
             throw new RuntimeException("mapped jar not found");
         }
 
-        String version = minecraftProvider.minecraftVersion + "-mapped-" + extension.getMappingsProvider().mappingsVersion;
-        project.getDependencies().add(Constants.MINECRAFT_NAMED, project.getDependencies().module("net.minecraft:minecraft:" + version));
-        version = minecraftProvider.minecraftVersion + "-intermediary";
-        project.getDependencies().add(Constants.MINECRAFT_INTERMEDIARY, project.getDependencies().module("net.minecraft:minecraft:" + version));
-    }
-
-    public void initFiles(Project project, MinecraftProvider minecraftProvider, MappingsProvider mappingsProvider) {
-        LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
-        this.minecraftProvider = minecraftProvider;
-        MINECRAFT_INTERMEDIARY_JAR = new File(extension.getUserCache(), "minecraft-" + minecraftProvider.minecraftVersion + "-intermediary.jar");
-        MINECRAFT_MAPPED_JAR = new File(extension.getUserCache(), "minecraft-" + minecraftProvider.minecraftVersion + "-mapped-" + mappingsProvider.mappingsVersion + ".jar");
+        project.getDependencies().add(Constants.MINECRAFT_NAMED, project.getDependencies().module("net.minecraft:minecraft:" + mappedJar));
+        project.getDependencies().add(Constants.MINECRAFT_INTERMEDIARY, project.getDependencies().module("net.minecraft:minecraft:" + intermediaryJar));
     }
 
     public Collection<File> getMapperPaths() {
@@ -87,10 +115,5 @@ public class MinecraftMappedProvider extends DependencyProvider {
 
     public File getMappedJar() {
         return MINECRAFT_MAPPED_JAR;
-    }
-
-    @Override
-    public String getTargetConfig() {
-        return Constants.MINECRAFT_NAMED;
     }
 }

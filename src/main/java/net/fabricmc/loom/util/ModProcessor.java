@@ -107,6 +107,10 @@ public class ModProcessor {
 			throw new RuntimeException("Failed to remap JAR to " + toM + " file not found: " + output.getAbsolutePath());
 		}
 
+		if (AccessTransformerHelper.deobfATs(remapper, output)) {
+			project.getLogger().info("Found and remapped access transformer in " + input.getName());
+		}
+
 		if (MixinRefmapHelper.transformRefmaps(remapper, output)) {
 			project.getLogger().lifecycle(":remapping " + input.getName() + " (Mixin reference maps)");
 			remapper.finish();

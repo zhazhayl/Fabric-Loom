@@ -98,6 +98,9 @@ public class ModRemapper {
 
 		try (OutputConsumerPath outputConsumer = new OutputConsumerPath(modJarOutputPath)) {
 			outputConsumer.addNonClassFiles(modJarPath);
+			if (AccessTransformerHelper.obfATs(extension, task, remapper, outputConsumer)) {
+				project.getLogger().info("Remapped access transformer");
+			}
 			remapper.read(classpath);
 			if (!classpathContainsModJarPath) {
 				remapper.read(modJarPath);

@@ -232,8 +232,7 @@ public class MappingsProvider extends DependencyProvider {
 		}
 
 		mappedProvider = new MinecraftMappedProvider();
-		mappedProvider.initFiles(project, minecraftProvider, this);
-		mappedProvider.provide(dependency, project, extension, postPopulationScheduler);
+		mappedProvider.provide(project, extension, minecraftProvider, this, postPopulationScheduler);
 	}
 
 	public void initFiles(Project project) {

@@ -32,7 +32,6 @@ import net.fabricmc.loom.util.LoomDependencyManager;
 import org.cadixdev.lorenz.MappingSet;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
-import org.gradle.api.artifacts.ConfigurationContainer;
 import org.gradle.api.artifacts.Dependency;
 
 import javax.annotation.Nullable;
@@ -48,6 +47,7 @@ public class LoomGradleExtension {
 	public boolean remapMod = true;
 	public boolean autoGenIDERuns = true;
 
+	private File atFile;
 	private List<File> unmappedModsBuilt = new ArrayList<>();
 
 	//Not to be set in the build.gradle
@@ -224,5 +224,17 @@ public class LoomGradleExtension {
 		}
 
 		return refmapName;
+	}
+
+	public void setAT(Object file) {
+		atFile = project.file(file);
+	}
+
+	public boolean hasAT() {
+		return atFile != null;
+	}
+
+	public File getAT() {
+		return atFile;
 	}
 }
