@@ -40,6 +40,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.attribute.FileTime;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -106,10 +107,13 @@ public class GenSourcesTask extends DefaultLoomTask {
 
 				while ((entry = jis.getNextJarEntry()) != null) {
 					JarEntry outputEntry = new JarEntry(entry.getName());
-					outputEntry.setTime(entry.getTime());
-					outputEntry.setCreationTime(entry.getCreationTime());
-					outputEntry.setLastAccessTime(entry.getLastAccessTime());
-					outputEntry.setLastModifiedTime(entry.getLastModifiedTime());
+					if (entry.getTime() != -1) outputEntry.setTime(entry.getTime());
+					FileTime time = entry.getCreationTime();
+					if (time != null) outputEntry.setCreationTime(time);
+					time = entry.getLastModifiedTime();
+					if (time != null) outputEntry.setLastModifiedTime(time);
+					time = entry.getLastAccessTime();
+					if (time != null) outputEntry.setLastAccessTime(time);
 
 					if (!entry.getName().endsWith(".class")) {
 						jos.putNextEntry(outputEntry);

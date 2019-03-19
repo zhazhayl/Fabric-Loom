@@ -153,6 +153,11 @@ public class AccessTransformerHelper {
     		innerTransforms.addAll(name);
     	}
 
+    	@Override
+    	protected boolean preserveTimestamps() {
+    		return true;
+    	}
+
 		@Override
 		protected byte[] transform(ZipEntry zipEntry, byte[] data) throws IOException {
 			if (hasTransformed) throw new IllegalStateException("Transformer for " + className + " was attempted to be reused");
