@@ -59,7 +59,15 @@ public class EnigmaReader {
 				switch (parts[0]) {
 				case "CLASS":
 					if (parts.length < 2 || parts.length > 3) throw new IOException("invalid enigma line (missing/extra columns): "+line);
-					contextStack.add("C"+parts[1]);
+					String obfName = parts[1];
+					if (indent >= 1 && obfName.contains("/")) {//Some inner classes carry the named outer class, others the obf'd outer class
+						int split = obfName.lastIndexOf('$');
+						assert split > 2; //Should be at least a/b$c
+						String context = contextStack.peek();
+						if (context == null || context.charAt(0) != 'C') throw new IOException("Invalid enigma line (named inner class without outer class name): "+line);
+						obfName = context.substring(1) + '$' + obfName.substring(split + 1);
+					}
+					contextStack.add('C' + obfName);
 					indent++;
 					if (parts.length == 3) {
 						String className;
@@ -76,9 +84,9 @@ public class EnigmaReader {
 							className = parts[2];
 						}
 						contextNamedStack.add('C' + className);
-						mappingAcceptor.acceptClass(parts[1], className);
+						mappingAcceptor.acceptClass(obfName, className);
 					} else {
-						contextNamedStack.add('C' + parts[1]); //No name, but we still need something to avoid underflowing
+						contextNamedStack.add('C' + obfName); //No name, but we still need something to avoid underflowing
 					}
 					break;
 				case "METHOD": {
