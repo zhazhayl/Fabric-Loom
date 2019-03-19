@@ -21,6 +21,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 
+import org.gradle.api.tasks.AbstractCopyTask;
+
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
@@ -48,6 +50,21 @@ public class AccessTransformerHelper {
 		void accept(String className, String method) throws IOException;
 	}
 	private static final String MAGIC_AT_NAME = "silky.at";
+
+	public static void copyInAT(LoomGradleExtension extension, AbstractCopyTask task) {
+		if (extension.hasAT()) {
+			String atName = extension.getAT().getName();
+			task.from(extension.getAT(), spec -> {
+				spec.rename(oldName -> {
+					if (!atName.equals(oldName)) {
+						//We only expect to include the AT, not anything extra
+						throw new IllegalArgumentException("Unexpected file name: " + oldName + " (expected " + atName + ')');
+					}
+					return MAGIC_AT_NAME;
+				});
+			});
+		}
+	}
 
 	public static boolean obfATs(LoomGradleExtension extension, RemapJar task, TinyRemapper tiny, OutputConsumerPath consumer) throws IOException {
 		if (extension.hasAT()) {

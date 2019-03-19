@@ -30,6 +30,7 @@ import net.fabricmc.loom.providers.MinecraftProvider;
 import net.fabricmc.loom.providers.ModRemapperProvider;
 import net.fabricmc.loom.task.RemapJar;
 import net.fabricmc.loom.task.RemapSourcesJar;
+import net.fabricmc.loom.util.AccessTransformerHelper;
 import net.fabricmc.loom.util.Constants;
 import net.fabricmc.loom.util.LoomDependencyManager;
 import net.fabricmc.loom.util.SetupIntelijRunConfigs;
@@ -257,6 +258,7 @@ public class AbstractPlugin implements Plugin<Project> {
 			// Enables the default mod remapper
 			if (extension.remapMod) {
 				AbstractArchiveTask jarTask = (AbstractArchiveTask) project1.getTasks().getByName("jar");
+				AccessTransformerHelper.copyInAT(extension, jarTask);
 
 				RemapJar remapJarTask = (RemapJar) project1.getTasks().findByName("remapJar");
 				if (remapJarTask.jar==null) remapJarTask.jar = jarTask.getArchivePath();
@@ -266,6 +268,7 @@ public class AbstractPlugin implements Plugin<Project> {
 
 				try {
 					AbstractArchiveTask sourcesTask = (AbstractArchiveTask) project1.getTasks().getByName("sourcesJar");
+					AccessTransformerHelper.copyInAT(extension, sourcesTask);
 
 					RemapSourcesJar remapSourcesJarTask = (RemapSourcesJar) project1.getTasks().findByName("remapSourcesJar");
 					remapSourcesJarTask.jar = sourcesTask.getArchivePath();
