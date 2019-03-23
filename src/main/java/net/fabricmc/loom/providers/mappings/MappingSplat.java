@@ -293,7 +293,7 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 	}
 
 	private static final Pattern CLASS_FINDER = Pattern.compile("L([^;]+);");
-	private static String remapDesc(String desc, UnaryOperator<String> classRemapper) {
+	public static String remapDesc(String desc, UnaryOperator<String> classRemapper) {
 		StringBuffer buf = new StringBuffer();
 
 		Matcher matcher = CLASS_FINDER.matcher(desc);

@@ -28,6 +28,7 @@ package net.fabricmc.loom.util;
 import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.providers.MinecraftJarProvider;
 import net.fabricmc.loom.providers.MinecraftMappedProvider;
+import net.fabricmc.loom.providers.mappings.MappingSplat;
 import net.fabricmc.loom.util.AccessTransformerHelper.ZipEntryAT;
 import net.fabricmc.mappings.ClassEntry;
 import net.fabricmc.mappings.EntryTriple;
@@ -54,7 +55,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
 public class MapJarsTiny {
@@ -141,6 +144,44 @@ public class MapJarsTiny {
 				targets.remove(named.getName() + named.getDesc());
 				if (targets.isEmpty()) methods.remove(named.getOwner());
 			}
+		}
+
+		if (!methods.isEmpty()) {
+			List<String> resolved = new ArrayList<>();
+			UnaryOperator<String> remapper = name -> {
+				for (ClassEntry classEntry : mappings.getClassEntries()) {
+					if (name.equals(classEntry.get("named"))) {
+						return classEntry.get("intermediary");
+					}
+				}
+
+				return name;
+			};
+
+			for (Entry<String, Set<String>> entry : methods.entrySet()) {
+				List<String> resolvedConstructors = new ArrayList<>();
+				Set<String> unresolvedMethods = entry.getValue();
+
+				for (String method : unresolvedMethods) {
+					//Constructors aren't included as part of the mappings, but that doesn't mean that they don't need remapping
+					if (method.startsWith("<init>(")) {
+						resolvedConstructors.add(method);
+
+						transforms.computeIfAbsent(entry.getKey(), k -> new HashSet<>()).add(method);
+						interTransforms.computeIfAbsent(remapper.apply(entry.getKey()), k -> new HashSet<>()).add(MappingSplat.remapDesc(method, remapper));
+					}
+				}
+
+				if (!resolvedConstructors.isEmpty()) {
+					unresolvedMethods.removeAll(resolvedConstructors);
+
+					if (unresolvedMethods.isEmpty()) {
+						resolved.add(entry.getKey());
+					}
+				}
+			}
+
+			if (!resolved.isEmpty()) resolved.forEach(methods::remove);
 		}
 
 		if (!rawClasses.isEmpty() || !methods.isEmpty()) {
