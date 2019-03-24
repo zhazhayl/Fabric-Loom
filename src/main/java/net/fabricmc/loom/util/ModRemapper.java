@@ -42,10 +42,10 @@ import java.util.List;
 
 public class ModRemapper {
 	public static void remap(RemapJar task) {
-		remap(task, task.jar);
+		remap(task, task.jar, !task.includeAT);
 	}
 
-	public static void remap(Task task, File modJar) {
+	public static void remap(Task task, File modJar, boolean skipATs) {
 		Project project = task.getProject();
 
 		if (!modJar.exists()) {
@@ -100,7 +100,7 @@ public class ModRemapper {
 
 		try (OutputConsumerPath outputConsumer = new OutputConsumerPath(modJarOutputPath)) {
 			outputConsumer.addNonClassFiles(modJarPath);
-			if (AccessTransformerHelper.obfATs(extension, task, remapper, outputConsumer)) {
+			if (!skipATs && AccessTransformerHelper.obfATs(extension, task, remapper, outputConsumer)) {
 				project.getLogger().info("Remapped access transformer");
 			}
 			remapper.read(classpath);

@@ -32,6 +32,8 @@ import java.io.File;
 
 public class RemapJar extends DefaultLoomTask {
 	public File jar;
+	@Input
+	public boolean includeAT = true;
 
 	@Input
 	public File getJar() {

@@ -186,6 +186,14 @@ public class AbstractPlugin implements Plugin<Project> {
 		EclipseModel eclipseModel = (EclipseModel) project.getExtensions().getByName("eclipse");
 	}
 
+	public static class JarSettings {
+		public boolean includeAT = true;
+
+		public void setInclude(boolean flag) {
+			includeAT = flag;
+		}
+	}
+
 	/**
 	 * Add Minecraft dependencies to compile time
 	 */
@@ -197,6 +205,12 @@ public class AbstractPlugin implements Plugin<Project> {
 
 		Javadoc javadoc = (Javadoc) project.getTasks().getByName(JavaPlugin.JAVADOC_TASK_NAME);
 		javadoc.setClasspath(main.getOutput().plus(main.getCompileClasspath()));
+
+		project.getTasks().getByName("jar").getExtensions().create("AT", JarSettings.class);
+		try {
+			project.getTasks().getByName("sourcesJar").getExtensions().create("AT", JarSettings.class);
+		} catch (UnknownTaskException e) {
+		}
 
 		project.afterEvaluate(project1 -> {
 			LoomGradleExtension extension = project1.getExtensions().getByType(LoomGradleExtension.class);
@@ -258,17 +272,24 @@ public class AbstractPlugin implements Plugin<Project> {
 			// Enables the default mod remapper
 			if (extension.remapMod) {
 				AbstractArchiveTask jarTask = (AbstractArchiveTask) project1.getTasks().getByName("jar");
-				AccessTransformerHelper.copyInAT(extension, jarTask);
+				if (jarTask.getExtensions().getByType(JarSettings.class).includeAT) {
+					AccessTransformerHelper.copyInAT(extension, jarTask);
+				}
 
 				RemapJar remapJarTask = (RemapJar) project1.getTasks().findByName("remapJar");
-				if (remapJarTask.jar==null) remapJarTask.jar = jarTask.getArchivePath();
+				if (remapJarTask.jar == null) {
+					remapJarTask.jar = jarTask.getArchivePath();
+					remapJarTask.includeAT = jarTask.getExtensions().getByType(JarSettings.class).includeAT;
+				}
 				remapJarTask.doLast(task -> project1.getArtifacts().add("archives", remapJarTask.jar));
 				remapJarTask.dependsOn(project1.getTasks().getByName("jar"));
 				project1.getTasks().getByName("build").dependsOn(remapJarTask);
 
 				try {
 					AbstractArchiveTask sourcesTask = (AbstractArchiveTask) project1.getTasks().getByName("sourcesJar");
-					AccessTransformerHelper.copyInAT(extension, sourcesTask);
+					if (sourcesTask.getExtensions().getByType(JarSettings.class).includeAT) {
+						AccessTransformerHelper.copyInAT(extension, sourcesTask);
+					}
 
 					RemapSourcesJar remapSourcesJarTask = (RemapSourcesJar) project1.getTasks().findByName("remapSourcesJar");
 					remapSourcesJarTask.jar = sourcesTask.getArchivePath();

@@ -1,5 +1,6 @@
 package net.fabricmc.loom.task;
 
+import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.bundling.Jar;
 
 import groovy.lang.Closure;
@@ -8,6 +9,9 @@ import net.fabricmc.loom.util.AccessTransformerHelper;
 import net.fabricmc.loom.util.ModRemapper;
 
 public class RemappingJar extends Jar {
+	@Input
+	public boolean includeAT = true;
+
 	public RemappingJar() {
 		setGroup("fabric");
 
@@ -21,7 +25,7 @@ public class RemappingJar extends Jar {
 			}
 		});
 		doLast(task -> {
-			ModRemapper.remap(task, getArchivePath());
+			ModRemapper.remap(task, getArchivePath(), !includeAT);
 		});
 	}
 }
