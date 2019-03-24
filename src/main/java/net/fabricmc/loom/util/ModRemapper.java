@@ -100,14 +100,14 @@ public class ModRemapper {
 
 		try (OutputConsumerPath outputConsumer = new OutputConsumerPath(modJarOutputPath)) {
 			outputConsumer.addNonClassFiles(modJarPath);
-			if (!skipATs && AccessTransformerHelper.obfATs(extension, task, remapper, outputConsumer)) {
-				project.getLogger().info("Remapped access transformer");
-			}
 			remapper.read(classpath);
 			if (!classpathContainsModJarPath) {
 				remapper.read(modJarPath);
 			}
 			remapper.apply(modJarPath, outputConsumer);
+			if (!skipATs && AccessTransformerHelper.obfATs(extension, task, remapper, outputConsumer)) {
+				project.getLogger().info("Remapped access transformer");
+			}
 		} catch (Exception e) {
 			throw new RuntimeException("Failed to remap JAR", e);
 		} finally {

@@ -102,8 +102,10 @@ public class AccessTransformerHelper {
 		}, (className, method) -> {
 			to.write(remapper.map(className));
 			to.write(' ');
-			//Abuse the fact AsmRemapper merges the name and desc together to save us having to re-split them up
-			to.write(remapper.mapMethodName(className, method, ""));
+			int split = method.indexOf('(');
+			String name = method.substring(0, split);
+			String desc = method.substring(split);
+			to.write(remapper.mapMethodName(className, name, desc) + remapper.mapMethodDesc(desc));
 			to.newLine();
 		});
 	}
