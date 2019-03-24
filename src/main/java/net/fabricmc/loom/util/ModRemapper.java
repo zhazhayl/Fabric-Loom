@@ -32,6 +32,7 @@ import net.fabricmc.tinyremapper.OutputConsumerPath;
 import net.fabricmc.tinyremapper.TinyRemapper;
 import net.fabricmc.tinyremapper.TinyUtils;
 import org.gradle.api.Project;
+import org.gradle.api.Task;
 
 import java.io.File;
 import java.io.IOException;
@@ -40,18 +41,19 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ModRemapper {
-
 	public static void remap(RemapJar task) {
-		Project project = task.getProject();
-		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
+		remap(task, task.jar);
+	}
 
-		File modJar = task.jar;
+	public static void remap(Task task, File modJar) {
+		Project project = task.getProject();
 
 		if (!modJar.exists()) {
 			project.getLogger().error("Source .JAR not found!");
 			return;
 		}
 
+		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
 		MappingsProvider mappingsProvider = extension.getMappingsProvider();
 
 		Path mappings = mappingsProvider.MAPPINGS_TINY.toPath();

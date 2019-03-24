@@ -21,6 +21,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 
+import org.gradle.api.Task;
 import org.gradle.api.tasks.AbstractCopyTask;
 
 import org.objectweb.asm.ClassReader;
@@ -37,7 +38,6 @@ import org.zeroturnaround.zip.transform.StreamZipEntryTransformer;
 import org.zeroturnaround.zip.transform.ZipEntryTransformerEntry;
 
 import net.fabricmc.loom.LoomGradleExtension;
-import net.fabricmc.loom.task.RemapJar;
 import net.fabricmc.stitch.util.Pair;
 import net.fabricmc.tinyremapper.OutputConsumerPath;
 import net.fabricmc.tinyremapper.TinyRemapper;
@@ -66,7 +66,7 @@ public class AccessTransformerHelper {
 		}
 	}
 
-	public static boolean obfATs(LoomGradleExtension extension, RemapJar task, TinyRemapper tiny, OutputConsumerPath consumer) throws IOException {
+	public static boolean obfATs(LoomGradleExtension extension, Task task, TinyRemapper tiny, OutputConsumerPath consumer) throws IOException {
 		if (extension.hasAT()) {
 			File at = new File(task.getTemporaryDir(), MAGIC_AT_NAME);
 
