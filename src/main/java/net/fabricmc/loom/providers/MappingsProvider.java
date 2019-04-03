@@ -47,6 +47,7 @@ import org.gradle.api.Project;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.net.URL;
@@ -58,6 +59,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.zip.GZIPInputStream;
 
 //TODO fix local mappings
 //TODO possibly use maven for mappings, can fix above at the same time
@@ -153,10 +155,7 @@ public class MappingsProvider extends DependencyProvider {
 				}
 				case "gz": //Directly downloaded the tiny file (:tiny@gz)
 					project.getLogger().lifecycle(":extracting " + mappingsJar.getName());
-					try (FileSystem fileSystem = FileSystems.newFileSystem(mappingsJar.toPath(), null)) {
-						Path fileToExtract = fileSystem.getPath(dependency.getDependency().getName() + '-' + dependency.getResolvedVersion() + "-tiny");
-						Files.copy(fileToExtract, MAPPINGS_TINY_BASE.toPath());
-					}
+					FileUtils.copyInputStreamToFile(new GZIPInputStream(new FileInputStream(mappingsJar)), MAPPINGS_TINY_BASE);
 					addDependency(dependency.getDepString(), project, "runtimeOnly");
 					break;
 
