@@ -99,7 +99,7 @@ public class ModProcessor {
 
 		JarEntry entry = parentJar.getJarEntry(fileName);
 		if(entry == null){
-			throw new RuntimeException(Strings.format("%s was not found in %s", fileName, parentJar.getName()));
+			throw new RuntimeException(String.format("%s was not found in %s", fileName, parentJar.getName()));
 		}
 
 		File nestedFile = new File(extension.getNestedModCache(), fileName.substring(fileName.lastIndexOf("/")));
