@@ -123,14 +123,14 @@ public class ModProcessor {
 
 	private static void stripNestedJars(File file){
 		//Strip out all contained jar info as we dont want loader to try and load the jars contained in dev.
-		ZipUtil.transformEntries(file, new ZipEntryTransformerEntry[]{(new ZipEntryTransformerEntry("fabric.mod.json", new StringZipEntryTransformer() {
+		ZipUtil.transformEntry(file, new ZipEntryTransformerEntry("fabric.mod.json", new StringZipEntryTransformer() {
 			@Override
 			protected String transform(ZipEntry zipEntry, String input) throws IOException {
 				JsonObject json = GSON.fromJson(input, JsonObject.class);
 				json.remove("jars");
 				return GSON.toJson(json);
 			}
-		}))});
+		}));
 	}
 
 	private static void remapJar(File input, File output, Project project){
