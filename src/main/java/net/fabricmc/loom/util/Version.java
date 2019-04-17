@@ -24,29 +24,37 @@
 
 package net.fabricmc.loom.util;
 
-import com.google.common.hash.HashCode;
-import com.google.common.hash.Hashing;
-import com.google.common.io.Files;
+public class Version {
 
-import java.io.File;
-import java.io.IOException;
+	private String mappingsVersion;
+	private String minecraftVersion;
 
-public class Checksum {
-	public static boolean equals(File file, String checksum) {
-		if (file == null) {
-			return false;
+	private String version;
+
+	public Version(String version) {
+		this.version = version;
+
+		if(version.contains("+build.")){
+			this.minecraftVersion = version.substring(0, version.lastIndexOf('+'));
+			this.mappingsVersion = version.substring(version.lastIndexOf('.') + 1);
+		} else {
+			//TODO legacy remove when no longer needed
+			char verSep = version.contains("-") ? '-' : '.';
+			this.minecraftVersion = version.substring(0, version.lastIndexOf(verSep));
+			this.mappingsVersion = version.substring(version.lastIndexOf(verSep) + 1);
 		}
-		try {
-			//noinspection deprecation
-			HashCode hash = Files.asByteSource(file).hash(Hashing.sha1());
-			StringBuilder builder = new StringBuilder();
-			for (Byte hashBytes : hash.asBytes()) {
-				builder.append(Integer.toString((hashBytes & 0xFF) + 0x100, 16).substring(1));
-			}
-			return builder.toString().equals(checksum);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		return false;
+	}
+
+	public String getMappingsVersion() {
+		return mappingsVersion;
+	}
+
+	public String getMinecraftVersion() {
+		return minecraftVersion;
+	}
+
+	@Override
+	public String toString() {
+		return version;
 	}
 }

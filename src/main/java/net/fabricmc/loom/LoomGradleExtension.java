@@ -31,6 +31,7 @@ import net.fabricmc.loom.providers.MinecraftProvider;
 import net.fabricmc.loom.util.LoomDependencyManager;
 import org.cadixdev.lorenz.MappingSet;
 import org.gradle.api.Project;
+import org.gradle.api.UnknownDomainObjectException;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.Dependency;
 
@@ -46,6 +47,7 @@ public class LoomGradleExtension {
 	public String loaderLaunchMethod;
 	public boolean remapMod = true;
 	public boolean autoGenIDERuns = true;
+	public boolean extractJars = false;
 
 	private File atFile;
 	private List<File> unmappedModsBuilt = new ArrayList<>();
@@ -108,6 +110,14 @@ public class LoomGradleExtension {
 		return remappedModCache;
 	}
 
+	public File getNestedModCache() {
+		File nestedModCache = new File(getProjectCache(), "nested_mods/");
+		if (!nestedModCache.exists()) {
+			nestedModCache.mkdir();
+		}
+		return nestedModCache;
+	}
+
 	@Nullable
 	private Dependency findDependency(Collection<String> configs, BiPredicate<String, String> groupNameFilter) {
 		for (String s : configs) {
@@ -147,6 +157,14 @@ public class LoomGradleExtension {
 
 			return false;
 		});
+
+		if(dependency == null && !AbstractPlugin.isRootProject(project)){
+			try {
+				return project.getRootProject().getExtensions().getByType(LoomGradleExtension.class).getLoomVersion();
+			} catch (UnknownDomainObjectException e){
+				return null;
+			}
+		}
 
 		return dependency != null ? dependency.getVersion() : null;
 	}

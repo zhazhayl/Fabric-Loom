@@ -36,6 +36,7 @@ import net.fabricmc.loom.providers.mappings.TinyReader;
 import net.fabricmc.loom.providers.mappings.TinyWriter;
 import net.fabricmc.loom.util.Constants;
 import net.fabricmc.loom.util.DependencyProvider;
+import net.fabricmc.loom.util.Version;
 import net.fabricmc.stitch.commands.CommandProposeFieldNames;
 import net.fabricmc.tinyremapper.IMappingProvider;
 import net.fabricmc.tinyremapper.TinyUtils;
@@ -89,10 +90,10 @@ public class MappingsProvider extends DependencyProvider {
 		File mappingsJar = dependency.resolveFile().orElseThrow(() -> new RuntimeException("Could not find dependency " + dependency));
 
 		this.mappingsName = dependency.getDependency().getName();
-		char verSep = version.contains("-") ? '-' : '.';
 
-		this.minecraftVersion = version.substring(0, version.lastIndexOf(verSep));
-		this.mappingsVersion = version.substring(version.lastIndexOf(verSep) + 1);
+		Version mappingsVersion = new Version(version);
+		this.minecraftVersion = mappingsVersion.getMinecraftVersion();
+		this.mappingsVersion = mappingsVersion.getMappingsVersion();
 
 		initFiles(project);
 
