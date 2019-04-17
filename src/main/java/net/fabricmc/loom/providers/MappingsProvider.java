@@ -110,7 +110,7 @@ public class MappingsProvider extends DependencyProvider {
 					project.getLogger().lifecycle(":loading " + intermediaryNames.getName());
 					MappingBlob tiny = new MappingBlob();
 					if (!intermediaryNames.exists()) {//Grab intermediary mappings (which aren't in the enigma file)
-						FileUtils.copyURLToFile(new URL("https://github.com/FabricMC/intermediary/raw/master/mappings/" + minecraftVersion + ".tiny"), intermediaryNames);
+						FileUtils.copyURLToFile(new URL("https://github.com/FabricMC/intermediary/raw/master/mappings/" + minecraftVersion.replace(" ", "%20") + ".tiny"), intermediaryNames);
 					}
 					TinyReader.readTiny(intermediaryNames.toPath(), tiny);
 
