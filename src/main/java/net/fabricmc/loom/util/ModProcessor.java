@@ -77,6 +77,7 @@ public class ModProcessor {
 		JarFile jarFile = new JarFile(input);
 		JarEntry modJsonEntry = jarFile.getJarEntry("fabric.mod.json");
 		if(modJsonEntry == null){
+			jarFile.close();
 			return;
 		}
 		try(InputStream inputStream = jarFile.getInputStream(modJsonEntry)){
