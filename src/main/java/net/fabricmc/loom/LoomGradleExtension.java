@@ -166,7 +166,7 @@ public class LoomGradleExtension {
 			}
 		}
 
-		return dependency != null ? dependency.getVersion() : null;
+		return dependency != null ? LoomGradleExtension.class.getPackage().getSpecificationVersion() : null;
 	}
 
 	@Nullable
