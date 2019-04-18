@@ -273,7 +273,7 @@ public class AbstractPlugin implements Plugin<Project> {
 			// add dependencies for mixin annotation processor
 			DependencyHandler handler = project1.getDependencies();
 			handler.add("annotationProcessor", "net.fabricmc:sponge-mixin:" + extension.getMixinVersion());
-			handler.add("annotationProcessor", "com.chocohead.Github:fabric-loom:" + extension.getLoomVersion());
+			handler.add("annotationProcessor", "com.github.Chocohead:fabric-loom:" + extension.getLoomVersion());
 
 			// Enables the default mod remapper
 			if (extension.remapMod) {
