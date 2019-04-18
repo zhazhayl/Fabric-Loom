@@ -14,7 +14,10 @@ Usage: `gradlew genSources eclipse/idea/vscode`
 
 
 ## What do I need to change?
-Whilst not a whole lot needs to change compared to a normal Loom setup, there is a tweak that has to be made in order to get said setup running. Both the Forge and Jitpack mavens are needed to grab ForgeFlower and a [Tiny Remapper fork](https://github.com/Chocohead/tiny-remapper) respectively in order for Sin² to work:
+Whilst not a whole lot needs to change compared to a normal Loom setup, there is a pair of tweaks that have to be made in order to get said setup running. A full example of a working `build.gradle` using everything Sin² offers can be found [here](https://github.com/Chocohead/Fabric-ASM/blob/master/build.gradle).
+
+### Repos
+First, both the Forge and Jitpack mavens are needed to grab ForgeFlower and a [Tiny Remapper fork](https://github.com/Chocohead/tiny-remapper) respectively in order for Sin² to work:
 ```groovy
 maven {
 	name = "Forge"
@@ -29,6 +32,32 @@ If using a Gradle setup similar to the [Fabric Example Mod](https://github.com/F
 
 If using a more stockish Gradle setup, these will want to be added to the `buildscript` `repositories` block in `build.gradle` instead.
 
+### Loom version
+Second, the Gradle plugin needs to change in order to pull the right version of Loom. Sin² versions are marked by the short Git commit revision. The following will need to be switched in `build.gradle`:
+```groovy
+plugins {
+	//Old/normal Loom plugin
+	//id 'fabric-loom' version '0.2.1-SNAPSHOT'
+	//Sin² Edition Loom
+	id 'fabric-loom' version '4e7f1b9'
+	...
+}
+```
+When using using a Gradle setup similar to the Fabric Example Mod.
+```groovy
+buildscript {
+	repositories {
+		...
+	}
+	dependencies {
+		//Old/normal Loom plugin
+		//classpath 'net.fabricmc:fabric-loom:0.2.1-SNAPSHOT'
+		//Sin² Edition Loom
+		classpath 'com.github.Chocohead:fabric-loom:4e7f1b9'
+	}
+}
+```
+When using a more stockish Gradle setup.
 
 
 ## How do I use the new things?
