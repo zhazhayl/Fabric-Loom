@@ -67,12 +67,18 @@ Fairly simple stuff, just like with Enigma. Only without the obvious benefits.
 
 
 ### Access Transformers
-//**TODO**
+Sin² provides dev time access transformations for making Minecraft classes and methods public (and non-final). For an explaination of how to use this, as well as the runtime component for using the ATs in game, see [here](https://github.com/Chocohead/Fabric-ASM#sailing-the-shenanigans).
 
 
 ### Additional tasks
-//**TODO**
-
+Sin² adds an additional task type for producing remapping jars from other source sets on top of what the default `jar` task makes. It avoids the gotcha that a [`RemapJar`](https://github.com/Chocohead/fabric-loom/blob/ATs/src/main/java/net/fabricmc/loom/task/RemapJar.java) type task has in that the jar has to be supplied from elsewhere already made. [`RemappingJar`](https://github.com/Chocohead/fabric-loom/blob/ATs/src/main/java/net/fabricmc/loom/task/RemappingJar.java) is an extension of the normal `Jar` task which both remaps the output, and can optionally include the access transformer for the project:
+```groovy
+task exampleJar(type: RemappingJar, dependsOn: exampleClasses) {
+	from sourceSets.example.output
+	includeAT = false
+}
+```
+The example source set will now produce a seperate jar which doesn't include the (remapped) access transformer file. Like the normal `Jar` task as many files can be added to the compilation set as desired.
 
 
 ## What's broken?
