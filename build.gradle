@@ -16,6 +16,10 @@ def build = "local"
 def ENV = System.getenv()
 if (ENV.BUILD_NUMBER) {
 	build = "jenkins #${ENV.BUILD_NUMBER}"
+} else {
+	def process = 'git rev-parse --short HEAD'.execute()
+    process.waitFor()
+    if (!process.exitValue()) build = "Sin² ${process.text.trim()}" 
 }
 
 repositories {
