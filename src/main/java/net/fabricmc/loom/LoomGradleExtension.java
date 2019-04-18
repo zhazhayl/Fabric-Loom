@@ -148,7 +148,7 @@ public class LoomGradleExtension {
 	public String getLoomVersion() {
 		Dependency dependency = findBuildscriptDependency((group, name) -> {
 			if (name.equalsIgnoreCase("fabric-loom")) {
-				return group.equalsIgnoreCase("net.fabricmc");
+				return group.equalsIgnoreCase("com.chocohead.Github");
 			}
 
 			if (name.equalsIgnoreCase("fabric-loom.gradle.plugin")) {
