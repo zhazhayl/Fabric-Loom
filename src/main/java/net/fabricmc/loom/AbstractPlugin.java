@@ -246,11 +246,6 @@ public class AbstractPlugin implements Plugin<Project> {
 				mavenArtifactRepository.setUrl("https://libraries.minecraft.net/");
 			});
 
-			project1.getRepositories().maven(mavenArtifactRepository -> {
-				mavenArtifactRepository.setName("Jitpack");
-				mavenArtifactRepository.setUrl("https://jitpack.io/");
-			});
-
 			project1.getRepositories().mavenCentral();
 			project1.getRepositories().jcenter();
 
@@ -273,7 +268,7 @@ public class AbstractPlugin implements Plugin<Project> {
 			// add dependencies for mixin annotation processor
 			DependencyHandler handler = project1.getDependencies();
 			handler.add("annotationProcessor", "net.fabricmc:sponge-mixin:" + extension.getMixinVersion());
-			handler.add("annotationProcessor", "com.github.Chocohead:fabric-loom:" + extension.getLoomVersion());
+			handler.add("annotationProcessor", "net.fabricmc:fabric-loom:" + extension.getLoomVersion());
 
 			// Enables the default mod remapper
 			if (extension.remapMod) {
