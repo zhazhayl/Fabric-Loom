@@ -27,12 +27,17 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+import net.fabricmc.stitch.util.Pair;
 
 import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping;
 import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping.Field;
@@ -219,6 +224,9 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 			}
 		}
 
+		//Sometimes Yarn versions include their own mappings without Intermediary backing (which is bad really)
+		Map<String, Pair<String, Map<String, String>>> yarnOnlyMappings = new HashMap<>();
+
 		for (Mapping mapping : mappings) {
 			String notch = mapping.from;
 
@@ -242,7 +250,9 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 					combined.methods.put(notch + method.fromDesc, combinedMethod);
 				} else if (!method.hasArgs()) {
 					//Purely a name mapping, not going to work without intermediaries to back it up
-					throw new IllegalStateException("Extra mappings missing from fallback! Unable to find " + mapping.from + '#' + method.fromName + method.fromDesc + " (" + mapping.to + '#' + method.name() + ')');
+					yarnOnlyMappings.computeIfAbsent(mapping.from, k -> Pair.of(mapping.to, new HashMap<>())).getRight().put(method.fromName + method.fromDesc, method.name());
+					continue;
+					//throw new IllegalStateException("Extra mappings missing from fallback! Unable to find " + mapping.from + '#' + method.fromName + method.fromDesc + " (" + mapping.to + '#' + method.name() + ')');
 				} else {
 					//throw new IllegalStateException("Extra mappings missing from fallback! Unable to find " + mapping.from + '#' + method.fromName + method.fromDesc + " (" + mapping.to + '#' + method.name() + ')');
 					//Generic overrides will not have intermediary (fallback) mappings, but will often have Enigma mappings anyway
@@ -262,7 +272,33 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 			for (Field field : mapping.fields()) {
 				if (other.hasField(field)) continue;
 
-				throw new IllegalStateException("Extra mapping missing from fallback! Unable to find " + mapping.from + '#' + field.fromName + " (" + field.fromDesc + ')');
+				yarnOnlyMappings.computeIfAbsent(mapping.from, k -> Pair.of(mapping.to, new HashMap<>())).getRight().put(field.fromName + ' ' + field.fromDesc, field.name());
+				//throw new IllegalStateException("Extra mapping missing from fallback! Unable to find " + mapping.from + '#' + field.fromName + " (" + field.fromDesc + ')');
+			}
+		}
+
+		if (!yarnOnlyMappings.isEmpty()) {//We should crash from this, but that's a nuisance as Yarn has to get fixed
+			System.out.println("Invalid Yarn mappings (ie missing Intermediaries) found:");
+
+			for (Entry<String, Pair<String, Map<String, String>>> entry : yarnOnlyMappings.entrySet()) {
+				String notch = entry.getKey();
+				String yarn = entry.getValue().getLeft();
+				System.out.println("\tIn " + notch + " (" + yarn + ')');
+
+				//Split the methods apart from the fields
+				Map<Boolean, List<Entry<String, String>>> extras = entry.getValue().getRight().entrySet().stream().collect(Collectors.partitioningBy(extra -> extra.getKey().contains("(")));
+
+				System.out.println("\t\tExtra mapped methods:");
+				for (Entry<String, String> extra : extras.get(Boolean.TRUE)) {
+					System.out.println("\t\t\t" + extra.getKey() + " => " + extra.getValue());
+				}
+
+				System.out.println("\t\tExtra mapped fields:");
+				for (Entry<String, String> extra : extras.get(Boolean.FALSE)) {
+					System.out.println("\t\t\t" + extra.getKey() + " => " + extra.getValue());
+				}
+
+				System.out.println();
 			}
 		}
 	}
