@@ -63,7 +63,7 @@ dependencies {
 
 jar {
 	manifest {
-		attributes 'Specification-Version': version
+		attributes 'Implementation-Title': "Loom $version"
 		attributes 'Implementation-Version': version + " Build(" + build + ")"
 	}
 }

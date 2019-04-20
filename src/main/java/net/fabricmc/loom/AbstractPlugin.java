@@ -25,6 +25,7 @@
 package net.fabricmc.loom;
 
 import com.google.common.collect.ImmutableMap;
+
 import net.fabricmc.loom.providers.MappingsProvider;
 import net.fabricmc.loom.providers.MinecraftProvider;
 import net.fabricmc.loom.providers.ModRemapperProvider;
@@ -35,8 +36,10 @@ import net.fabricmc.loom.util.Constants;
 import net.fabricmc.loom.util.LoomDependencyManager;
 import net.fabricmc.loom.util.NestedJars;
 import net.fabricmc.loom.util.SetupIntelijRunConfigs;
+
 import org.gradle.api.*;
 import org.gradle.api.artifacts.Configuration;
+import org.gradle.api.artifacts.ModuleDependency;
 import org.gradle.api.artifacts.dsl.DependencyHandler;
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
 import org.gradle.api.plugins.JavaPlugin;
@@ -268,7 +271,7 @@ public class AbstractPlugin implements Plugin<Project> {
 			// add dependencies for mixin annotation processor
 			DependencyHandler handler = project1.getDependencies();
 			handler.add("annotationProcessor", "net.fabricmc:sponge-mixin:" + extension.getMixinVersion());
-			handler.add("annotationProcessor", "net.fabricmc:fabric-loom:" + extension.getLoomVersion());
+			((ModuleDependency) handler.add("annotationProcessor", "net.fabricmc:fabric-loom:" + extension.getLoomVersion())).setTransitive(false);
 
 			// Enables the default mod remapper
 			if (extension.remapMod) {

@@ -67,9 +67,6 @@ public class MinecraftProvider extends DependencyProvider {
 		versionInfo = gson.fromJson(reader, MinecraftVersionInfo.class);
 		reader.close();
 
-		// Add Loom as an annotation processor
-        addDependency(project.files(this.getClass().getProtectionDomain().getCodeSource().getLocation()), project, "compileOnly");
-
 		downloadJars(project.getLogger());
 
 		libraryProvider = new MinecraftLibraryProvider();
