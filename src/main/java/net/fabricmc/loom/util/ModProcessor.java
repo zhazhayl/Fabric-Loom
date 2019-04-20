@@ -194,7 +194,7 @@ public class ModProcessor {
 		}
 	}
 
-	private static void readInstallerJson(File file, Project project){
+	static void readInstallerJson(File file, Project project){
 		try {
 			JarFile jarFile = new JarFile(file);
 
