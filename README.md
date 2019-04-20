@@ -39,7 +39,7 @@ plugins {
 	//Old/normal Loom plugin
 	//id 'fabric-loom' version '0.2.1-SNAPSHOT'
 	//Sin² Edition Loom
-	id 'fabric-loom' version '5ed2377'
+	id 'fabric-loom' version 'b14ae91'
 	...
 }
 ```
@@ -53,7 +53,7 @@ buildscript {
 		//Old/normal Loom plugin
 		//classpath 'net.fabricmc:fabric-loom:0.2.1-SNAPSHOT'
 		//Sin² Edition Loom
-		classpath 'com.github.Chocohead:fabric-loom:5ed2377'
+		classpath 'com.github.Chocohead:fabric-loom:b14ae91'
 	}
 }
 ```
