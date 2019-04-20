@@ -272,7 +272,7 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 			for (Field field : mapping.fields()) {
 				if (other.hasField(field)) continue;
 
-				yarnOnlyMappings.computeIfAbsent(mapping.from, k -> Pair.of(mapping.to, new HashMap<>())).getRight().put(field.fromName + ' ' + field.fromDesc, field.name());
+				yarnOnlyMappings.computeIfAbsent(mapping.from, k -> Pair.of(mapping.to, new HashMap<>())).getRight().put(field.fromDesc + ' ' + field.fromName, field.name());
 				//throw new IllegalStateException("Extra mapping missing from fallback! Unable to find " + mapping.from + '#' + field.fromName + " (" + field.fromDesc + ')');
 			}
 		}
@@ -288,17 +288,20 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 				//Split the methods apart from the fields
 				Map<Boolean, List<Entry<String, String>>> extras = entry.getValue().getRight().entrySet().stream().collect(Collectors.partitioningBy(extra -> extra.getKey().contains("(")));
 
-				System.out.println("\t\tExtra mapped methods:");
-				for (Entry<String, String> extra : extras.get(Boolean.TRUE)) {
-					System.out.println("\t\t\t" + extra.getKey() + " => " + extra.getValue());
-				}
-
-				System.out.println("\t\tExtra mapped fields:");
-				for (Entry<String, String> extra : extras.get(Boolean.FALSE)) {
-					System.out.println("\t\t\t" + extra.getKey() + " => " + extra.getValue());
-				}
+				printExtras(extras.get(Boolean.TRUE), "methods");
+				printExtras(extras.get(Boolean.FALSE), "fields");
 
 				System.out.println();
+			}
+		}
+	}
+
+	private static void printExtras(List<Entry<String, String>> extras, String type) {
+		if (!extras.isEmpty()) {
+			System.out.println("\t\tExtra mapped " + type + ':');
+
+			for (Entry<String, String> extra : extras) {
+				System.out.println("\t\t\t" + extra.getKey() + " => " + extra.getValue());
 			}
 		}
 	}
