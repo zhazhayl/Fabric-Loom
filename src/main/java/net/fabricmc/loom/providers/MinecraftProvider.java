@@ -70,7 +70,7 @@ public class MinecraftProvider extends DependencyProvider {
 		downloadJars(project.getLogger());
 
 		libraryProvider = new MinecraftLibraryProvider();
-		libraryProvider.provide(this, project);
+		libraryProvider.provide(this, project, postPopulationScheduler);
 		jarProvider = new MinecraftJarProvider(project, this);
 	}
 

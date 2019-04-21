@@ -24,24 +24,15 @@
 
 package net.fabricmc.loom.providers;
 
-import com.google.gson.Gson;
 import net.fabricmc.loom.LoomGradleExtension;
-import net.fabricmc.loom.util.Checksum;
 import net.fabricmc.loom.util.Constants;
-import net.fabricmc.loom.util.DownloadUtil;
 import net.fabricmc.loom.util.MinecraftVersionInfo;
-import net.fabricmc.loom.util.assets.AssetIndex;
-import net.fabricmc.loom.util.assets.AssetObject;
-import net.fabricmc.loom.util.progress.ProgressLogger;
 import org.gradle.api.Project;
 
 import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
-import java.net.URL;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.Map;
+import java.util.function.Consumer;
 
 public class MinecraftLibraryProvider {
 
@@ -49,8 +40,7 @@ public class MinecraftLibraryProvider {
 
 	private Collection<File> libs = new HashSet<>();
 
-	public void provide(MinecraftProvider minecraftProvider, Project project) throws IOException {
-		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
+	public void provide(MinecraftProvider minecraftProvider, Project project, Consumer<Runnable> postPopulationScheduler) {
 		MinecraftVersionInfo versionInfo = minecraftProvider.versionInfo;
 
 		initFiles(project, minecraftProvider);
@@ -68,7 +58,8 @@ public class MinecraftLibraryProvider {
 				project.getDependencies().add(Constants.MINECRAFT_DEPENDENCIES, project.getDependencies().module(library.getArtifactName()));
 			}
 		}
-		libs = project.getConfigurations().getByName(Constants.MINECRAFT_DEPENDENCIES).getFiles();
+
+		postPopulationScheduler.accept(() -> libs = project.getConfigurations().getByName(Constants.MINECRAFT_DEPENDENCIES).getFiles());
 	}
 
 	public Collection<File> getLibraries() {
