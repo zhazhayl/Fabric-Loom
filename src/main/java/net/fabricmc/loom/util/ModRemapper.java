@@ -38,11 +38,12 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 public class ModRemapper {
 	public static void remap(RemapJar task) {
-		remap(task, task.jar, !task.includeAT);
+		remap(task, task.getJar(), !task.includeAT);
 	}
 
 	public static void remap(Task task, File modJar, boolean skipATs) {
@@ -64,23 +65,14 @@ public class ModRemapper {
 		List<File> classpathFiles = new ArrayList<>();
 		classpathFiles.addAll(project.getConfigurations().getByName(Constants.COMPILE_MODS_MAPPED).getFiles());
 		classpathFiles.addAll(project.getConfigurations().getByName(Constants.MINECRAFT_NAMED).getFiles());
-		Path[] classpath = classpathFiles.stream().map(File::toPath).toArray(Path[]::new);
-		Path modJarPath = modJar.toPath();
-		boolean classpathContainsModJarPath = false;
+		final Path modJarPath = modJar.toPath();
+		Path[] classpath = classpathFiles.stream().map(File::toPath).filter((p) -> !modJarPath.equals(p)).toArray(Path[]::new);
 
-		for (Path p : classpath) {
-			if (modJarPath.equals(p)) {
-				modJarPath = p;
-				classpathContainsModJarPath = true;
-				break;
-			}
-		}
-
-		String s =modJar.getAbsolutePath();
+		String s = modJar.getAbsolutePath();
 		File modJarOutput = new File(s.substring(0, s.length() - 4) + ".remapped.jar");
 		Path modJarOutputPath = modJarOutput.toPath();
 
-		File modJarUnmappedCopy = new File(s.substring(0, s.length() - 4) + "-dev.jar");
+		File modJarUnmappedCopy = task.getBackupTo();
 		if (modJarUnmappedCopy.exists()) {
 			modJarUnmappedCopy.delete();
 		}

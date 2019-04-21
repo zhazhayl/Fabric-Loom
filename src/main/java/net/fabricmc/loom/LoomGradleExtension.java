@@ -94,8 +94,24 @@ public class LoomGradleExtension {
 		return userCache;
 	}
 
-	public File getProjectCache(){
-		File projectCache = new File(project.getRootDir(), ".gradle/minecraft/");
+	public File getRootProjectPersistentCache() {
+		File projectCache = new File(project.file(".gradle"), "loom-cache");
+		if(!projectCache.exists()){
+			projectCache.mkdirs();
+		}
+		return projectCache;
+	}
+
+	public File getRootProjectBuildCache() {
+		File projectCache = new File(project.getRootProject().getBuildDir(), "loom-cache");
+		if(!projectCache.exists()){
+			projectCache.mkdirs();
+		}
+		return projectCache;
+	}
+
+	public File getProjectBuildCache() {
+		File projectCache = new File(project.getBuildDir(), "loom-cache");
 		if(!projectCache.exists()){
 			projectCache.mkdirs();
 		}
@@ -103,7 +119,7 @@ public class LoomGradleExtension {
 	}
 
 	public File getRemappedModCache() {
-		File remappedModCache = new File(getProjectCache(), "remapped_mods/");
+		File remappedModCache = new File(getRootProjectPersistentCache(), "remapped_mods");
 		if (!remappedModCache.exists()) {
 			remappedModCache.mkdir();
 		}
@@ -111,7 +127,7 @@ public class LoomGradleExtension {
 	}
 
 	public File getNestedModCache() {
-		File nestedModCache = new File(getProjectCache(), "nested_mods/");
+		File nestedModCache = new File(getRootProjectPersistentCache(), "nested_mods");
 		if (!nestedModCache.exists()) {
 			nestedModCache.mkdir();
 		}
