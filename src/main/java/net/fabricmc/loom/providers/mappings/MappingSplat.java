@@ -106,7 +106,7 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 			private final String[] args;
 
 			ArgOnlyMethod(CombinedMethod method) {
-				this(method.from, method.fallbackDesc, method.args);
+				this(method.from, method.fromDesc, method.args);
 			}
 
 			public ArgOnlyMethod(String from, String fromDesc, String[] args) {
