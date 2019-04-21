@@ -248,24 +248,19 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 
 					CombinedMethod combinedMethod = new CombinedMethod(notch, method.fromDesc, notch, interDesc, notch, nameDesc, method.args());
 					combined.methods.put(notch + method.fromDesc, combinedMethod);
-				} else if (!method.hasArgs()) {
-					//Purely a name mapping, not going to work without intermediaries to back it up
-					yarnOnlyMappings.computeIfAbsent(mapping.from, k -> Pair.of(mapping.to, new HashMap<>())).getRight().put(method.fromName + method.fromDesc, method.name());
-					continue;
-					//throw new IllegalStateException("Extra mappings missing from fallback! Unable to find " + mapping.from + '#' + method.fromName + method.fromDesc + " (" + mapping.to + '#' + method.name() + ')');
 				} else {
-					//throw new IllegalStateException("Extra mappings missing from fallback! Unable to find " + mapping.from + '#' + method.fromName + method.fromDesc + " (" + mapping.to + '#' + method.name() + ')');
-					//Generic overrides will not have intermediary (fallback) mappings, but will often have Enigma mappings anyway
-					//This does mean typically the Enigma mappings will disappear anyway behind being a synthetic method
-					//Either way, short of running up the class hierarchy to resolve things probably, we'll just let it slide
-					/*String interDesc = remapDesc(method.fromDesc, fallbackRemapper);
-					String nameDesc = makeDesc(method, remapper);
+					if (!notch.equals(method.nameOr(notch))) {
+						//Changing Notch names without intermediaries to back it up is not cross-version safe and shouldn't be done
+						//throw new IllegalStateException("Extra mappings missing from fallback! Unable to find " + mapping.from + '#' + method.fromName + method.fromDesc + " (" + mapping.to + '#' + method.name() + ')');
 
-					CombinedMethod combinedMethod = new CombinedMethod(notch, method.fromDesc, notch, interDesc, method.nameOr(notch), nameDesc, method.args());
-					combined.methods.put(notch + method.fromDesc, combinedMethod);*/
-					//Although we can't really register mappings for them as Tiny Remapper is smart enough to realise they are propagated over by the real overrides
-					ArgOnlyMethod bonusMethod = new ArgOnlyMethod(notch, method.fromDesc, method.args());
-					combined.bonusArgs.put(notch + method.fromDesc, bonusMethod);
+						//Yarn sometimes does however, so we'll just the cases where it does and not use them
+						yarnOnlyMappings.computeIfAbsent(mapping.from, k -> Pair.of(mapping.to, new HashMap<>())).getRight().put(method.fromName + method.fromDesc, method.name());
+					}
+
+					if (method.hasArgs()) {
+						ArgOnlyMethod bonusMethod = new ArgOnlyMethod(notch, method.fromDesc, method.args());
+						combined.bonusArgs.put(notch + method.fromDesc, bonusMethod);
+					}
 				}
 			}
 
