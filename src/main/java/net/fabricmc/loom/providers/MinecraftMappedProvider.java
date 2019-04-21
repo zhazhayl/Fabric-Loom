@@ -64,7 +64,14 @@ public class MinecraftMappedProvider {
         boolean atChange = false;
         if (extension.hasAT()) {
         	atOffset = "-transformed";
-        	cache = extension.getRootProjectPersistentCache();
+        	cache = new File(extension.getRootProjectPersistentCache(), "access_transformed_jars");
+        	cache.mkdir();
+
+        	//Add the transformed jars repo so that Gradle can find Minecraft
+        	project.getRepositories().flatDir(repo -> {
+        		repo.setName("AccessTransformedJars");
+				repo.dir(cache);
+			});
 
         	project.getLogger().info("Negotiating access transformations...");
     		targets = AccessTransformerHelper.loadATs(extension.getAT());
