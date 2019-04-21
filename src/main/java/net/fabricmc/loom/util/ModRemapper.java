@@ -38,15 +38,14 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 public class ModRemapper {
 	public static void remap(RemapJar task) {
-		remap(task, task.getJar(), !task.includeAT);
+		remap(task, task.getJar(), task.getBackupTo(), !task.includeAT);
 	}
 
-	public static void remap(Task task, File modJar, boolean skipATs) {
+	public static void remap(Task task, File modJar, File modBackup, boolean skipATs) {
 		Project project = task.getProject();
 
 		if (!modJar.exists()) {
@@ -72,7 +71,7 @@ public class ModRemapper {
 		File modJarOutput = new File(s.substring(0, s.length() - 4) + ".remapped.jar");
 		Path modJarOutputPath = modJarOutput.toPath();
 
-		File modJarUnmappedCopy = task.getBackupTo();
+		File modJarUnmappedCopy = modBackup;
 		if (modJarUnmappedCopy.exists()) {
 			modJarUnmappedCopy.delete();
 		}
@@ -92,11 +91,9 @@ public class ModRemapper {
 
 		try (OutputConsumerPath outputConsumer = new OutputConsumerPath(modJarOutputPath)) {
 			outputConsumer.addNonClassFiles(modJarPath);
-			remapper.read(classpath);
-			if (!classpathContainsModJarPath) {
-				remapper.read(modJarPath);
-			}
-			remapper.apply(modJarPath, outputConsumer);
+			remapper.readClassPath(classpath);
+			remapper.readInputs(modJarPath);
+			remapper.apply(outputConsumer);
 			if (!skipATs && AccessTransformerHelper.obfATs(extension, task, remapper, outputConsumer)) {
 				project.getLogger().info("Remapped access transformer");
 			}

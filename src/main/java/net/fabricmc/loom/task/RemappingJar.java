@@ -23,7 +23,10 @@
  */
 package net.fabricmc.loom.task;
 
+import java.io.File;
+
 import org.gradle.api.tasks.Input;
+import org.gradle.api.tasks.OutputFile;
 import org.gradle.api.tasks.bundling.Jar;
 
 import groovy.lang.Closure;
@@ -32,6 +35,7 @@ import net.fabricmc.loom.util.AccessTransformerHelper;
 import net.fabricmc.loom.util.ModRemapper;
 
 public class RemappingJar extends Jar {
+	public File backupTo;
 	@Input
 	public boolean includeAT = true;
 
@@ -48,7 +52,17 @@ public class RemappingJar extends Jar {
 			}
 		});
 		doLast(task -> {
-			ModRemapper.remap(task, getArchivePath(), !includeAT);
+			ModRemapper.remap(task, getArchivePath(), getBackupTo(), !includeAT);
 		});
+	}
+
+	@OutputFile
+	public File getBackupTo() {
+		if (backupTo == null) {
+			String s = getArchivePath().getAbsolutePath();
+			return new File(s.substring(0, s.length() - 4) + "-dev.jar");
+		}
+
+		return backupTo;
 	}
 }

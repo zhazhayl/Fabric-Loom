@@ -64,7 +64,7 @@ public class MinecraftMappedProvider {
         boolean atChange = false;
         if (extension.hasAT()) {
         	atOffset = "-transformed";
-        	cache = extension.getProjectCache();
+        	cache = extension.getRootProjectPersistentCache();
 
         	project.getLogger().info("Negotiating access transformations...");
     		targets = AccessTransformerHelper.loadATs(extension.getAT());
