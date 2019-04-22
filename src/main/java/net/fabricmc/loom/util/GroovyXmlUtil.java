@@ -22,44 +22,46 @@
  * SOFTWARE.
  */
 
-package net.fabricmc.loom.task;
+package net.fabricmc.loom.util;
 
-import net.fabricmc.loom.util.ModRemapper;
-import org.gradle.api.tasks.Input;
-import org.gradle.api.tasks.OutputFile;
-import org.gradle.api.tasks.TaskAction;
+import groovy.util.Node;
 
-import java.io.File;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-public class RemapJar extends DefaultLoomTask {
-	public File jar;
-	public File destination;
-	public boolean nestJar = true;
-	@Input
-	public boolean includeAT = true;
+public final class GroovyXmlUtil {
+	private GroovyXmlUtil() {
 
-	@Input
-	public File getJar() {
-		return jar;
 	}
 
-	@Input
-	public boolean isNestJar() {
-		return nestJar;
-	}
-
-	@OutputFile
-	public File getDestination() {
-		if (destination == null) {
-			String s = jar.getAbsolutePath();
-			return new File(s.substring(0, s.length() - 4) + "-dev.jar");
+	public static Node getOrCreateNode(Node parent, String name) {
+		for (Object object : parent.children()) {
+			if (object instanceof Node && name.equals(((Node) object).name())) {
+				return (Node) object;
+			}
 		}
 
-		return destination;
+		return parent.appendNode(name);
 	}
 
-	@TaskAction
-	public void remap() {
-		ModRemapper.remap(this);
+	public static Optional<Node> getNode(Node parent, String name) {
+		for (Object object : parent.children()) {
+			if (object instanceof Node && name.equals(((Node) object).name())) {
+				return Optional.of((Node) object);
+			}
+		}
+
+		return Optional.empty();
+	}
+
+	public static Stream<Node> childrenNodesStream(Node node) {
+		//noinspection unchecked
+		return (Stream<Node>) (Stream) (((List<Object>) node.children()).stream().filter((i) -> i instanceof Node));
+	}
+
+	public static Iterable<Node> childrenNodes(Node node) {
+		return childrenNodesStream(node).collect(Collectors.toList());
 	}
 }

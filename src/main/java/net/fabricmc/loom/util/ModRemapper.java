@@ -42,10 +42,10 @@ import java.util.List;
 
 public class ModRemapper {
 	public static void remap(RemapJar task) {
-		remap(task, task.getJar(), task.getBackupTo(), !task.includeAT);
+		remap(task, task.getJar(), task.getDestination(), task.isNestJar(), !task.includeAT);
 	}
 
-	public static void remap(Task task, File modJar, File modBackup, boolean skipATs) {
+	public static void remap(Task task, File modJar, File modBackup, boolean nest, boolean skipATs) {
 		Project project = task.getProject();
 
 		if (!modJar.exists()) {
@@ -111,8 +111,10 @@ public class ModRemapper {
 			project.getLogger().debug("Transformed mixin reference maps in output JAR!");
 		}
 
-		if (NestedJars.addNestedJars(project, modJarOutput)) {
-			project.getLogger().debug("Added nested jar paths to mod json");
+		if (nest) {
+			if (NestedJars.addNestedJars(project, modJarOutput)) {
+				project.getLogger().debug("Added nested jar paths to mod json");
+			}
 		}
 
 		try {

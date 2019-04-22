@@ -35,7 +35,8 @@ import net.fabricmc.loom.util.AccessTransformerHelper;
 import net.fabricmc.loom.util.ModRemapper;
 
 public class RemappingJar extends Jar {
-	public File backupTo;
+	public File destination;
+	public boolean nestJar = true;
 	@Input
 	public boolean includeAT = true;
 
@@ -52,17 +53,17 @@ public class RemappingJar extends Jar {
 			}
 		});
 		doLast(task -> {
-			ModRemapper.remap(task, getArchivePath(), getBackupTo(), !includeAT);
+			ModRemapper.remap(task, getArchivePath(), getDestination(), nestJar, !includeAT);
 		});
 	}
 
 	@OutputFile
-	public File getBackupTo() {
-		if (backupTo == null) {
+	public File getDestination() {
+		if (destination == null) {
 			String s = getArchivePath().getAbsolutePath();
 			return new File(s.substring(0, s.length() - 4) + "-dev.jar");
 		}
 
-		return backupTo;
+		return destination;
 	}
 }
