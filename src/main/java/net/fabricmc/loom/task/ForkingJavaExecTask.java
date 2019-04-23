@@ -24,45 +24,30 @@
 
 package net.fabricmc.loom.task;
 
-import org.gradle.api.logging.Logger;
-import org.gradle.api.logging.LogLevel;
+import org.gradle.api.Action;
+import org.gradle.api.Task;
+import org.gradle.api.artifacts.ConfigurationContainer;
+import org.gradle.api.artifacts.dsl.DependencyHandler;
+import org.gradle.api.file.FileCollection;
+import org.gradle.process.ExecResult;
+import org.gradle.process.JavaExecSpec;
 
-import org.jetbrains.java.decompiler.main.extern.IFernflowerLogger;
+/**
+ * Simple trait like interface for a Task that wishes to execute a java process
+ * with the classpath of the gradle plugin plus groovy.
+ *
+ * Created by covers1624 on 11/02/19.
+ */
+public interface ForkingJavaExecTask extends Task {
 
-public class LoomFernflowerLogger extends IFernflowerLogger {
-	private final Logger log;
-
-	public LoomFernflowerLogger(Logger log) {
-		this.log = log;
-	}
-
-	private static LogLevel wrap(Severity severity) {
-		switch (severity) {
-		case ERROR:
-			return LogLevel.ERROR;
-
-		case INFO:
-			return LogLevel.INFO;
-
-		case TRACE:
-			return LogLevel.DEBUG;
-
-		case WARN:
-			return LogLevel.WARN;
-
-		default:
-			System.out.println("Unexpected log level: " + severity);
-			return LogLevel.QUIET;
-		}
-	}
-
-	@Override
-	public void writeMessage(String s, Severity severity) {
-		log.log(wrap(severity), s);
-	}
-
-	@Override
-	public void writeMessage(String s, Severity severity, Throwable throwable) {
-		log.log(wrap(severity), s, throwable);
-	}
+    default ExecResult javaexec(Action<? super JavaExecSpec> action) {
+        ConfigurationContainer configurations = getProject().getBuildscript().getConfigurations();
+        DependencyHandler handler = getProject().getDependencies();
+        FileCollection classpath = configurations.getByName("classpath")//
+                .plus(configurations.detachedConfiguration(handler.localGroovy()));
+        return getProject().javaexec(spec -> {
+            spec.classpath(classpath);
+            action.execute(spec);
+        });
+    }
 }

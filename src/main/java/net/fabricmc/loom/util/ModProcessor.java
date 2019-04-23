@@ -186,9 +186,11 @@ public class ModProcessor {
 			project.getLogger().info("Found and remapped access transformer in " + input.getName());
 		}
 
-		if (MixinRefmapHelper.transformRefmaps(remapper, output)) {
-			project.getLogger().lifecycle(":remapping " + input.getName() + " (Mixin reference maps)");
-			remapper.finish();
+		if (extension.remapDependencyMixinRefMaps) {
+			if (MixinRefmapHelper.transformRefmaps(remapper, output)) {
+				project.getLogger().lifecycle(":remapping " + input.getName() + " (Mixin reference maps)");
+				remapper.finish();
+			}
 		}
 	}
 
