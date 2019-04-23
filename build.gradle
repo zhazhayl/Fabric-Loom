@@ -47,7 +47,7 @@ dependencies {
 		exclude module: 'enigma'
 	}
 	implementation ('net.fabricmc:tiny-mappings-parser:0.1.1.8')
-	implementation ('com.github.Chocohead:tiny-remapper:2b0a51a') {
+	implementation ('com.github.Chocohead:tiny-remapper:ddc99f7') {
 		transitive = false
 	}
 	implementation ('net.minecraftforge:forgeflower:1.5.380.26')
