@@ -24,8 +24,8 @@
 
 package net.fabricmc.loom.task.fernflower;
 
-import net.fabricmc.fernflower.api.IFabricResultSaver;
 import org.jetbrains.java.decompiler.main.DecompilerContext;
+import org.jetbrains.java.decompiler.main.extern.IFernflowerPreferences;
 import org.jetbrains.java.decompiler.main.extern.IResultSaver;
 
 import java.io.*;
@@ -45,7 +45,7 @@ import java.util.zip.ZipOutputStream;
 /**
  * Created by covers1624 on 18/02/19.
  */
-public class ThreadSafeResultSaver implements IResultSaver, IFabricResultSaver {
+public class ThreadSafeResultSaver implements IResultSaver {
     private final Supplier<File> output;
     private final Supplier<File> lineMapFile;
 
@@ -81,11 +81,13 @@ public class ThreadSafeResultSaver implements IResultSaver, IFabricResultSaver {
 
     @Override
     public void saveClassEntry(String path, String archiveName, String qualifiedName, String entryName, String content) {
-        this.saveClassEntry(path, archiveName, qualifiedName, entryName, content, null);
-    }
+    	int[] mapping;
+    	if (qualifiedName != null && DecompilerContext.getOption(IFernflowerPreferences.BYTECODE_SOURCE_MAPPING)) {
+			mapping = DecompilerContext.getBytecodeSourceMapper().getOriginalLinesMapping();
+    	} else {
+    		mapping = null;
+    	}
 
-    @Override
-    public void saveClassEntry(String path, String archiveName, String qualifiedName, String entryName, String content, int[] mapping) {
         String key = path + "/" + archiveName;
         ExecutorService executor = saveExecutors.get(key);
         executor.submit(() -> {

@@ -62,6 +62,8 @@ public class FernFlowerTask extends DefaultLoomTask implements ForkingJavaExecTa
         Map<String, Object> options = new HashMap<>();
         options.put(IFernflowerPreferences.DECOMPILE_GENERIC_SIGNATURES, "1");
         options.put(IFernflowerPreferences.BYTECODE_SOURCE_MAPPING, "1");
+        options.put(IFernflowerPreferences.INDENT_STRING, "\t"); //Use a tab not three spaces :|
+		options.put(IFernflowerPreferences.INCLUDE_ENTIRE_CLASSPATH, "1");
         options.put(IFernflowerPreferences.LOG_LEVEL, "trace");
         getLogging().captureStandardOutput(LogLevel.LIFECYCLE);
 
@@ -146,6 +148,8 @@ public class FernFlowerTask extends DefaultLoomTask implements ForkingJavaExecTa
     public void setLineMapFile(Object lineMapFile) { this.lineMapFile = lineMapFile; }
     public void setLibraries(Object libraries) { this.libraries = libraries; }
     public void setNoFork(boolean noFork) { this.noFork = noFork; }
-    public void setNumThreads(int numThreads) { this.numThreads = numThreads; }
+    public void setNumThreads(int numThreads) { this.numThreads = numThreads;
+    if (numThreads > 1) getProject().getLogger().warn("Using multiple threads is unsupported with ForgeFlower");
+    }
     //@formatter:on
 }

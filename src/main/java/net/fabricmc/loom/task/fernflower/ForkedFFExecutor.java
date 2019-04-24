@@ -97,9 +97,9 @@ public class ForkedFFExecutor {
         IFernflowerLogger logger = new ThreadIDFFLogger();
         Fernflower ff = new Fernflower(FernFlowerUtils::getBytecode, saver, options, logger);
         for (File library : libraries) {
-            ff.addLibrary(library);
+            ff.getStructContext().addSpace(library, false);
         }
-        ff.addSource(input);
+        ff.getStructContext().addSpace(input, true);
         ff.decompileContext();
     }
 }
