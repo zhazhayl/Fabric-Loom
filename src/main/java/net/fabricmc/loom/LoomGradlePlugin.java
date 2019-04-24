@@ -25,21 +25,25 @@
 package net.fabricmc.loom;
 
 import net.fabricmc.loom.providers.MappingsProvider;
-import net.fabricmc.loom.providers.MinecraftAssetsProvider;
 import net.fabricmc.loom.providers.MinecraftLibraryProvider;
 import net.fabricmc.loom.task.*;
 import net.fabricmc.loom.task.fernflower.FernFlowerTask;
 import net.fabricmc.loom.util.LineNumberRemapper;
 import net.fabricmc.loom.util.progress.ProgressLogger;
 import net.fabricmc.stitch.util.StitchUtil;
+
+import org.gradle.api.Action;
 import org.gradle.api.Project;
+import org.gradle.api.Task;
 import org.gradle.api.tasks.TaskContainer;
+import org.gradle.api.tasks.TaskProvider;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
+import java.util.function.BiConsumer;
 
 public class LoomGradlePlugin extends AbstractPlugin {
 	private static File getMappedByproduct(Project project, String suffix) {
@@ -59,19 +63,15 @@ public class LoomGradlePlugin extends AbstractPlugin {
 		super.apply(target);
 
 		TaskContainer tasks = target.getTasks();
-		
+
 		tasks.register("cleanLoomBinaries", CleanLoomBinaries.class);
 		tasks.register("cleanLoomMappings", CleanLoomMappings.class);
 
 		tasks.register("remapJar", RemapJar.class);
 
-		tasks.register("genSources", FernFlowerTask.class, t -> {
+		register(project, "genSources", FernFlowerTask.class, t -> {
 			t.getOutputs().upToDateWhen((o) -> false);
-		});
-		project.afterEvaluate((p) -> {
-			FernFlowerTask task = (FernFlowerTask) p.getTasks().getByName("genSources");
-
-			Project project = this.getProject();
+		}, (project, task) -> {
 			LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
 			MinecraftLibraryProvider libraryProvider = extension.getMinecraftProvider().libraryProvider;
 			MappingsProvider mappingsProvider = extension.getMappingsProvider();
@@ -85,7 +85,7 @@ public class LoomGradlePlugin extends AbstractPlugin {
 			task.setLineMapFile(linemapFile);
 			task.setLibraries(libraryProvider.getLibraries());
 
-			task.doLast((tt) -> {
+			task.doLast(t -> {
 				project.getLogger().lifecycle(":adjusting line numbers");
 				LineNumberRemapper remapper = new LineNumberRemapper();
 				remapper.readMappings(linemapFile);
@@ -116,7 +116,9 @@ public class LoomGradlePlugin extends AbstractPlugin {
 			});
 		});
 
-		tasks.register("downloadAssets", DownloadAssetsTask.class);
+		tasks.register("downloadAssets", DownloadAssetsTask.class, t -> {
+			t.setGroup("ide");
+		});
 
 		tasks.register("genIdeaWorkspace", GenIdeaProjectTask.class, t -> {
 			t.dependsOn("idea", "downloadAssets");
@@ -144,5 +146,22 @@ public class LoomGradlePlugin extends AbstractPlugin {
 			t.dependsOn("buildNeeded");
 			t.setGroup("minecraftMapped");
 		});
+	}
+
+	/**
+	 * Adds the given task to the given project, running the first configuration immediately, and the second on {@link Project#afterEvaluate(Action)}
+	 *
+	 * @param project The project to add the task to
+	 * @param name The name of the task to be added
+	 * @param taskClass The type of the task to be added
+	 * @param configuration Any configuration to be done on the task immediately
+	 * @param postConfiguration Any configuration to be done on the task once the project has been evaluated
+	 *
+	 * @return The created task provider from {@link TaskContainer#register(String, Class, Action)}
+	 */
+	private static <T extends Task> TaskProvider<T> register(Project project, String name, Class<T> taskClass, Action<? super T> configuration, BiConsumer<? super Project, ? super T> postConfiguration) {
+		TaskProvider<T> task = project.getTasks().register(name, taskClass, configuration);
+		project.afterEvaluate(p -> task.configure(t -> postConfiguration.accept(p, t)));
+		return task;
 	}
 }
