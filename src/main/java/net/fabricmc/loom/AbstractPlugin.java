@@ -42,6 +42,7 @@ import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.Dependency;
 import org.gradle.api.artifacts.ModuleDependency;
 import org.gradle.api.artifacts.dsl.DependencyHandler;
+import org.gradle.api.artifacts.repositories.FlatDirectoryArtifactRepository;
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
 import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.plugins.JavaPluginConvention;
@@ -80,12 +81,19 @@ public class AbstractPlugin implements Plugin<Project> {
 		project.apply(ImmutableMap.of("plugin", "eclipse"));
 		project.apply(ImmutableMap.of("plugin", "idea"));
 
-		project.getExtensions().create("minecraft", LoomGradleExtension.class, project);
+		LoomGradleExtension extension = project.getExtensions().create("minecraft", LoomGradleExtension.class, project);
 
-		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
-		// Force add Mojang repository
+		// Add default repositories
+		addDirectoryRepo(target, "UserCacheFiles", extension.getUserCache());
+		addDirectoryRepo(target, "UserLocalCacheFiles", extension.getRootProjectBuildCache());
+		addDirectoryRepo(target, "UserLocalRemappedMods", extension.getRemappedModCache());
+		addMavenRepo(target, "Fabric", "https://maven.fabricmc.net/");
+		//addMavenRepo(target, "SpongePowered", "http://repo.spongepowered.org/maven/");
 		addMavenRepo(target, "Mojang", "https://libraries.minecraft.net/");
+		target.getRepositories().mavenCentral();
+		target.getRepositories().jcenter();
 
+		// Create default configurations
 		Configuration compileModsConfig = project.getConfigurations().maybeCreate(Constants.COMPILE_MODS);
 		compileModsConfig.setTransitive(true);
 		Configuration compileModsMappedConfig = project.getConfigurations().maybeCreate(Constants.COMPILE_MODS_MAPPED);
@@ -154,10 +162,17 @@ public class AbstractPlugin implements Plugin<Project> {
 	 * @param url The URL of the repository
 	 * @return An object containing the name and the URL of the repository that can be modified later
 	 */
-	public MavenArtifactRepository addMavenRepo(Project target, final String name, final String url) {
+	public static MavenArtifactRepository addMavenRepo(Project target, final String name, final String url) {
 		return target.getRepositories().maven(repo -> {
 			repo.setName(name);
 			repo.setUrl(url);
+		});
+	}
+
+	public static FlatDirectoryArtifactRepository addDirectoryRepo(Project target, final String name, final Object directory) {
+		return target.getRepositories().flatDir(repo -> {
+			repo.setName(name);
+			repo.dir(directory);
 		});
 	}
 
@@ -206,38 +221,7 @@ public class AbstractPlugin implements Plugin<Project> {
 		project.afterEvaluate(project1 -> {
 			LoomGradleExtension extension = project1.getExtensions().getByType(LoomGradleExtension.class);
 
-			project1.getRepositories().flatDir(flatDirectoryArtifactRepository -> {
-				flatDirectoryArtifactRepository.dir(extension.getUserCache());
-				flatDirectoryArtifactRepository.setName("UserCacheFiles");
-			});
 
-			project1.getRepositories().flatDir(flatDirectoryArtifactRepository -> {
-				flatDirectoryArtifactRepository.dir(extension.getRootProjectBuildCache());
-				flatDirectoryArtifactRepository.setName("UserLocalCacheFiles");
-			});
-
-			project1.getRepositories().flatDir(flatDirectoryArtifactRepository -> {
-				flatDirectoryArtifactRepository.dir(extension.getRemappedModCache());
-				flatDirectoryArtifactRepository.setName("UserLocalRemappedMods");
-			});
-
-			project1.getRepositories().maven(mavenArtifactRepository -> {
-				mavenArtifactRepository.setName("Fabric");
-				mavenArtifactRepository.setUrl("https://maven.fabricmc.net/");
-			});
-
-			/* project1.getRepositories().maven(mavenArtifactRepository -> {
-				mavenArtifactRepository.setName("SpongePowered");
-				mavenArtifactRepository.setUrl("http://repo.spongepowered.org/maven");
-			}); */
-
-			project1.getRepositories().maven(mavenArtifactRepository -> {
-				mavenArtifactRepository.setName("Mojang");
-				mavenArtifactRepository.setUrl("https://libraries.minecraft.net/");
-			});
-
-			project1.getRepositories().mavenCentral();
-			project1.getRepositories().jcenter();
 
 			LoomDependencyManager dependencyManager = new LoomDependencyManager();
 			extension.setDependencyManager(dependencyManager);
