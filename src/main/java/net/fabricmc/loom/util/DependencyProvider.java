@@ -87,6 +87,7 @@ public abstract class DependencyProvider {
 		return dependencyManager;
 	}
 
+	@Deprecated
 	public static class DependencyInfo {
 		final Project project;
 		final Dependency dependency;
@@ -197,6 +198,7 @@ public abstract class DependencyProvider {
 		}
 	}
 
+	@Deprecated
 	public static class FileDependencyInfo extends DependencyInfo {
 		protected final Map<String, File> classifierToFile = new HashMap<>();
 		protected final String group = "net.fabricmc.synthetic", name, version;
