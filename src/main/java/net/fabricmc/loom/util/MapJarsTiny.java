@@ -82,7 +82,7 @@ public class MapJarsTiny {
 			project.getLogger().lifecycle(":remapping minecraft (TinyRemapper, " + fromM + " -> " + toM + ")");
 
 			TinyRemapper remapper = TinyRemapper.newRemapper()
-					.withMappings(mappingsProvider.mcRemappingFactory.apply(fromM, toM))
+					.withMappings(mappingsProvider.mcRemappingFactory.create(fromM, toM))
 					.renameInvalidLocals(true)
 					.rebuildSourceFilenames(true)
 					.build();

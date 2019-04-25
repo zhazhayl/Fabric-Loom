@@ -32,6 +32,7 @@ import net.fabricmc.loom.util.SourceRemapper;
 import org.gradle.api.Project;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Optional;
 import java.util.function.Consumer;
 
@@ -54,7 +55,11 @@ public class ModRemapperProvider extends DependencyProvider {
 		File output = new File(modStore, outputNamePrefix + ".jar");
 		if (!output.exists() || input.lastModified() <= 0 || input.lastModified() > output.lastModified()) {
 			//If the output doesn't exist, or appears to be outdated compared to the input we'll remap it
-			ModProcessor.handleMod(input, output, project);
+			try {
+				ModProcessor.handleMod(input, output, project);
+			} catch (IOException e) {
+				throw new RuntimeException("Failed to remap mod", e);
+			}
 
 			if (!output.exists()){
 				throw new RuntimeException("Failed to remap mod");
