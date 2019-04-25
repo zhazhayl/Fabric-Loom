@@ -156,7 +156,7 @@ public class ArtifactInfo {
 				builder.put("", shortest);
 
 				int start = shortestName.length();
-				sortedFiles.stream().collect(Collectors.collectingAndThen(Collectors.toMap(file -> {
+				sortedFiles.stream().collect(Collectors.collectingAndThen(Collectors.<File, String, File>toMap(file -> {
 					//Now we just have to work out what classifier type the other files are, this shouldn't even return an empty string
 					String classifier = FilenameUtils.removeExtension(file.getName()).substring(start);
 
