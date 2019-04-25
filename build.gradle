@@ -82,6 +82,7 @@ apply from: 'https://github.com/FabricMC/fabric-docs/raw/master/gradle/license.g
 
 license {
 	exclude '**/loom/util/DownloadUtil.java'
+	exclude '**/loom/util/ArtifactInfo.java'
 	exclude '**/loom/task/RemappingJar.java'
 	exclude '**/loom/util/AccessTransformerHelper.java'
 	exclude '**/loom/providers/mappings/MappingBlob.java'
