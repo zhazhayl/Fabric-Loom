@@ -41,11 +41,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ModRemapper {
-	public static void remap(RemapJar task) {
+	public static void remap(RemapJar task) throws IOException {
 		remap(task, task.getJar(), task.getDestination(), task.isNestJar(), !task.includeAT);
 	}
 
-	public static void remap(Task task, File modJar, File modBackup, boolean nest, boolean skipATs) {
+	public static void remap(Task task, File modJar, File modBackup, boolean nest, boolean skipATs) throws IOException {
 		Project project = task.getProject();
 
 		if (!modJar.exists()) {
@@ -55,8 +55,6 @@ public class ModRemapper {
 
 		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
 		MappingsProvider mappingsProvider = extension.getMappingsProvider();
-
-		Path mappings = mappingsProvider.MAPPINGS_TINY.toPath();
 
 		String fromM = "named";
 		String toM = "intermediary";
@@ -80,7 +78,8 @@ public class ModRemapper {
 		Path mixinMapPath = mixinMapFile.toPath();
 
 		TinyRemapper.Builder remapperBuilder = TinyRemapper.newRemapper();
-		remapperBuilder = remapperBuilder.withMappings(TinyUtils.createTinyMappingProvider(mappings, fromM, toM));
+		remapperBuilder = remapperBuilder.withMappings(TinyRemapperMappingsHelper.create(mappingsProvider.getMappings(), fromM, toM));
+
 		if (mixinMapFile.exists()) {
 			remapperBuilder = remapperBuilder.withMappings(TinyUtils.createTinyMappingProvider(mixinMapPath, fromM, toM));
 		}

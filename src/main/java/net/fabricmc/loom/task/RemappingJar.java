@@ -24,12 +24,13 @@
 package net.fabricmc.loom.task;
 
 import java.io.File;
+import java.io.IOException;
 
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.OutputFile;
 import org.gradle.api.tasks.bundling.Jar;
-
 import groovy.lang.Closure;
+
 import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.util.AccessTransformerHelper;
 import net.fabricmc.loom.util.ModRemapper;
@@ -53,7 +54,11 @@ public class RemappingJar extends Jar {
 			}
 		});
 		doLast(task -> {
-			ModRemapper.remap(task, getArchivePath(), getDestination(), nestJar, !includeAT);
+			try {
+				ModRemapper.remap(task, getArchivePath(), getDestination(), nestJar, !includeAT);
+			} catch (IOException e) {
+				throw new RuntimeException("Failed to remap jar", e);
+			}
 		});
 	}
 

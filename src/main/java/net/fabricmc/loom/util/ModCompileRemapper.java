@@ -34,6 +34,7 @@ import org.gradle.api.artifacts.dsl.DependencyHandler;
 import org.gradle.api.logging.Logger;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Optional;
 import java.util.function.Consumer;
 
@@ -67,7 +68,11 @@ public class ModCompileRemapper {
 			File output = new File(modStore, remappedFilename + ".jar");
 			if (!output.exists() || input.lastModified() <= 0 || input.lastModified() > output.lastModified()) {
 				//If the output doesn't exist, or appears to be outdated compared to the input we'll remap it
-				ModProcessor.handleMod(input, output, project);
+				try {
+					ModProcessor.handleMod(input, output, project);
+				} catch (IOException e) {
+					throw new RuntimeException("Failed to remap mod", e);
+				}
 
 				if (!output.exists()){
 					throw new RuntimeException("Failed to remap mod");

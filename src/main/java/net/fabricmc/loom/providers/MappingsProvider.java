@@ -36,11 +36,11 @@ import net.fabricmc.loom.providers.mappings.TinyReader;
 import net.fabricmc.loom.providers.mappings.TinyWriter;
 import net.fabricmc.loom.util.Constants;
 import net.fabricmc.loom.util.DependencyProvider;
+import net.fabricmc.loom.util.TinyRemapperMappingsHelper;
 import net.fabricmc.loom.util.Version;
+import net.fabricmc.mappings.Mappings;
 import net.fabricmc.stitch.commands.CommandProposeFieldNames;
 import net.fabricmc.tinyremapper.IMappingProvider;
-import net.fabricmc.tinyremapper.TinyUtils;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.gradle.api.Project;
@@ -51,6 +51,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.IOException;
+import java.lang.ref.SoftReference;
 import java.net.URL;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
@@ -58,14 +60,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.zip.GZIPInputStream;
 
 //TODO fix local mappings
 //TODO possibly use maven for mappings, can fix above at the same time
 public class MappingsProvider extends DependencyProvider {
+	public interface MappingFactory {//IOException throwing BiPredicate<String, String, IMappingProvider>
+		IMappingProvider create(String fromMapping, String toMapping) throws IOException;
+	}
 	public MinecraftMappedProvider mappedProvider;
+	public MappingFactory mcRemappingFactory;
 
 	public String mappingsName;
 	public String minecraftVersion;
@@ -76,9 +81,22 @@ public class MappingsProvider extends DependencyProvider {
 	public File MAPPINGS_TINY;
 	private File intermediaryNames;
 	private File parameterNames;
-	public BiFunction<String, String, IMappingProvider> mcRemappingFactory;
 
 	public File MAPPINGS_MIXIN_EXPORT;
+
+	private SoftReference<Mappings> mappings;
+
+	public Mappings getMappings() throws IOException {
+		if (mappings == null || mappings.get() == null) {
+			try (FileInputStream stream = new FileInputStream(MAPPINGS_TINY)) {
+				mappings = new SoftReference<>(
+						net.fabricmc.mappings.MappingsProvider.readTinyMappings(stream, false)
+				);
+			}
+		}
+
+		return mappings.get();
+	}
 
 	@Override
 	public void provide(DependencyInfo dependency, Project project, LoomGradleExtension extension, Consumer<Runnable> postPopulationScheduler) throws Exception {
@@ -209,7 +227,7 @@ public class MappingsProvider extends DependencyProvider {
 			}
 
 			mcRemappingFactory = (fromM, toM) -> new IMappingProvider() {
-				private final IMappingProvider normal = TinyUtils.createTinyMappingProvider(MAPPINGS_TINY.toPath(), fromM, toM);
+				private final IMappingProvider normal = TinyRemapperMappingsHelper.create(getMappings(), fromM, toM);
 
 				@Override
 				public void load(Map<String, String> classMap, Map<String, String> fieldMap, Map<String, String> methodMap, Map<String, String[]> localMap) {
@@ -228,7 +246,7 @@ public class MappingsProvider extends DependencyProvider {
 				}
 			};
 		} else {
-			mcRemappingFactory = (fromM, toM) -> TinyUtils.createTinyMappingProvider(MAPPINGS_TINY.toPath(), fromM, toM);
+			mcRemappingFactory = (fromM, toM) -> TinyRemapperMappingsHelper.create(getMappings(), fromM, toM);
 		}
 
 		mappedProvider = new MinecraftMappedProvider();
