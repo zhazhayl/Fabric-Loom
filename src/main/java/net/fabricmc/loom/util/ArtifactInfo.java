@@ -124,6 +124,11 @@ public class ArtifactInfo {
 		return Optional.empty();
 	}
 
+	@Override
+	public String toString() {
+		return notation();
+	}
+
 
 	public static class FileArtifactInfo extends ArtifactInfo {
 		public static ArtifactInfo create(SelfResolvingDependency dependency, DependencyHandler depHandler) {
