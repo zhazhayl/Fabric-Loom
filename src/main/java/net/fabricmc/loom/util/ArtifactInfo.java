@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -155,15 +156,15 @@ public class ArtifactInfo {
 				builder.put("", shortest);
 
 				int start = shortestName.length();
-				for (File file : sortedFiles) {
+				sortedFiles.stream().collect(Collectors.collectingAndThen(Collectors.toMap(file -> {
 					//Now we just have to work out what classifier type the other files are, this shouldn't even return an empty string
 					String classifier = FilenameUtils.removeExtension(file.getName()).substring(start);
 
 					//The classifier could well be separated with a dash (thing name.jar and name-sources.jar), we don't want that leading dash
-					if (builder.put(classifier.charAt(0) == '-' ? classifier.substring(1) : classifier, file) != null) {
-						throw new InvalidUserDataException("Duplicate classifiers for " + dependency + " (\"" + file.getName().substring(start) + "\" in " + files + ')');
-					}
-				}
+					return classifier.charAt(0) == '-' ? classifier.substring(1) : classifier;
+				}, Function.identity(), (keyA, keyB) -> {
+					throw new InvalidUserDataException("Duplicate classifiers " + keyA.getName() + " and " + keyB.getName());
+				}), builder::putAll));
 			}
 
 			Map<String, File> classifierToFile = builder.build();
