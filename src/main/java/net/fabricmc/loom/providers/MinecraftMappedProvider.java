@@ -52,7 +52,7 @@ public class MinecraftMappedProvider {
             throw new RuntimeException("mappings file not found");
         }
 
-        if (!minecraftProvider.jarProvider.getMergedJar().exists()) {
+        if (!minecraftProvider.getMergedJar().exists()) {
             throw new RuntimeException("input merged jar not found");
         }
 
@@ -100,7 +100,7 @@ public class MinecraftMappedProvider {
             if (getIntermediaryJar().exists()) {
                 getIntermediaryJar().delete();
             }
-            new MapJarsTiny().mapJars(minecraftProvider.jarProvider, this, project);
+            new MapJarsTiny().mapJars(minecraftProvider, this, project);
             if (!targets.isEmpty()) MapJarsTiny.transform(project, targets, this, mappingsProvider);
         }
 

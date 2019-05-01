@@ -26,8 +26,8 @@ package net.fabricmc.loom.util;
 
 
 import net.fabricmc.loom.LoomGradleExtension;
-import net.fabricmc.loom.providers.MinecraftJarProvider;
 import net.fabricmc.loom.providers.MinecraftMappedProvider;
+import net.fabricmc.loom.providers.MinecraftProvider;
 import net.fabricmc.loom.providers.mappings.MappingSplat;
 import net.fabricmc.loom.util.AccessTransformerHelper.ZipEntryAT;
 import net.fabricmc.mappings.ClassEntry;
@@ -62,7 +62,7 @@ import java.util.stream.Collectors;
 
 public class MapJarsTiny {
 
-	public void mapJars(MinecraftJarProvider jarProvider, MinecraftMappedProvider mapProvider, Project project) throws IOException {
+	public void mapJars(MinecraftProvider jarProvider, MinecraftMappedProvider mapProvider, Project project) throws IOException {
 		String fromM = "official";
 
 		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);

@@ -34,11 +34,15 @@ import org.gradle.api.Project;
 import org.gradle.api.UnknownDomainObjectException;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.Dependency;
+import org.gradle.api.artifacts.component.ComponentIdentifier;
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier;
+import org.gradle.api.artifacts.result.ResolvedArtifactResult;
 
 import javax.annotation.Nullable;
 import java.io.File;
 import java.util.*;
 import java.util.function.BiPredicate;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 public class LoomGradleExtension {
@@ -136,23 +140,12 @@ public class LoomGradleExtension {
 	}
 
 	@Nullable
-	private Dependency findDependency(Collection<String> configs, BiPredicate<String, String> groupNameFilter) {
-		for (String s : configs) {
-			for (Dependency dependency : project.getConfigurations().getByName(s).getDependencies()) {
-				if (groupNameFilter.test(dependency.getGroup(), dependency.getName())) {
-					return dependency;
-				}
-			}
-		}
-
-		return null;
-	}
-
-	@Nullable
-	private Dependency findBuildscriptDependency(BiPredicate<String, String> groupNameFilter) {
-		for (Configuration config : project.getBuildscript().getConfigurations().getAsMap().values()) {
+	private static Dependency findDependency(Collection<Configuration> configs, BiPredicate<String, String> groupNameFilter) {
+		for (Configuration config : configs) {
 			for (Dependency dependency : config.getDependencies()) {
-				if (groupNameFilter.test(dependency.getGroup(), dependency.getName())) {
+				String group = dependency.getGroup();
+				String name = dependency.getName();
+				if (groupNameFilter.test(group, name)) {
 					return dependency;
 				}
 			}
@@ -162,54 +155,40 @@ public class LoomGradleExtension {
 	}
 
 	@Nullable
-	public String getLoomVersion() {
-		Dependency dependency = findBuildscriptDependency((group, name) -> {
-			if (name.equalsIgnoreCase("fabric-loom")) {
-				return group.equalsIgnoreCase("net.fabricmc") || group.equalsIgnoreCase("com.github.Chocohead");
+	private <T> T recurseProjects(Function<Project, T> projectTFunction) {
+		Project p = this.project;
+		T result;
+		while (!AbstractPlugin.isRootProject(p)) {
+			if ((result = projectTFunction.apply(p)) != null) {
+				return result;
 			}
-
-			if (name.equalsIgnoreCase("fabric-loom.gradle.plugin")) {
-				return group.equalsIgnoreCase("fabric-loom");
-			}
-
-			return false;
-		});
-
-		if(dependency == null && !AbstractPlugin.isRootProject(project)){
-			try {
-				return project.getRootProject().getExtensions().getByType(LoomGradleExtension.class).getLoomVersion();
-			} catch (UnknownDomainObjectException e){
-				return null;
-			}
+			p = p.getRootProject();
 		}
-
-		//Loom 0.2.x-SNAPSHOT => 0.2.x-SNAPSHOT
-		return dependency != null ? LoomGradleExtension.class.getPackage().getImplementationTitle().substring(5) : null;
+		result = projectTFunction.apply(p);
+		return result;
 	}
 
 	@Nullable
 	private Dependency getMixinDependency() {
-		return findDependency(Collections.singletonList("compile"), (group, name) -> {
-			if (name.equalsIgnoreCase("mixin") && group.equalsIgnoreCase("org.spongepowered")) {
-				return true;
-			}
+		return recurseProjects((p) -> {
+			List<Configuration> configs = new ArrayList<>();
+			// check compile first
+			configs.add(p.getConfigurations().getByName("compile"));
+			// failing that, buildscript
+			configs.addAll(p.getBuildscript().getConfigurations());
 
-			if (name.equalsIgnoreCase("sponge-mixin") && group.equalsIgnoreCase("net.fabricmc")) {
-				return true;
-			}
+			return findDependency(configs, (group, name) -> {
+				if (name.equalsIgnoreCase("mixin") && group.equalsIgnoreCase("org.spongepowered")) {
+					return true;
+				}
 
-			return false;
+				if (name.equalsIgnoreCase("sponge-mixin") && group.equalsIgnoreCase("net.fabricmc")) {
+					return true;
+				}
+
+				return false;
+			});
 		});
-	}
-
-	@Nullable
-	public String getMixinVersion() {
-		Dependency dependency = getMixinDependency();
-		if (dependency != null) {
-			return dependency.getVersion();
-		} else {
-			return null;
-		}
 	}
 
 	@Nullable
