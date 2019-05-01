@@ -39,7 +39,7 @@ plugins {
 	//Old/normal Loom plugin
 	//id 'fabric-loom' version '0.2.1-SNAPSHOT'
 	//Sin² Edition Loom
-	id 'fabric-loom' version '87b10e9'
+	id 'fabric-loom' version 'de18565'
 	...
 }
 ```
@@ -53,7 +53,7 @@ buildscript {
 		//Old/normal Loom plugin
 		//classpath 'net.fabricmc:fabric-loom:0.2.1-SNAPSHOT'
 		//Sin² Edition Loom
-		classpath 'com.github.Chocohead:fabric-loom:87b10e9'
+		classpath 'com.github.Chocohead:fabric-loom:de18565'
 	}
 }
 ```
@@ -111,10 +111,4 @@ The example source set will now produce a seperate jar which doesn't include the
 
 
 ## What's broken?
-Ideally not much, although there are a few things to be aware of whilst using Sin²:
-
-#### Propagation warnings during Minecraft jar remapping with Enigma
-Parameter names aren't consistently added to methods in Engima, so as a result most methods don't have any parameter names even when they are applied. To try work around this slightly the names are propagated about to extended methods in case they don't have them, but being parameters there's nothing that says they should match. As a result there are several mismatches where extensions of methods have different (or no) names for some (or all) parameters which are logged by Tiny Remapper. This is not a necessarily bad thing, just a result of the mapping situation with Yarn.
-
-#### Decompile error for `Structure#process(IWorld, BlockPos, StructurePlacementData, List)`
-ForgeFlower appears to have a bug in [`MergeHelper#drillNots`](https://github.com/MinecraftForge/ForgeFlower/blob/master/FernFlower-Patches/0009-LVT-Fixes-and-Support-for-Enhanced-For-loop-detectio.patch#L1341-L1360) which causes it to return null when a while loop null checks as a break condition before testing for `hasNext`. It's the only method as of 19w13a which has this issue, and decompiling `Structure` using Procyon, stock FernFlower, CFR or any other decompiler you might have/want should give you an interpretation of the source if you so need it.
+Ideally nothing, right now there is nothing Sin² knowingly breaks out right. Any issues running the game out of an IDE when using Enigma or gz compressed Yarn mappings are likely down to the `runtimeOnly` configuration being missed and can be fixed as specified above in the [Enigma section](#running-with-enigma-mappings).
