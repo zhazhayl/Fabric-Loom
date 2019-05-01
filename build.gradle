@@ -50,7 +50,7 @@ dependencies {
 	implementation ('com.github.Chocohead:tiny-remapper:ddc99f7') {
 		transitive = false
 	}
-	implementation ('net.minecraftforge:forgeflower:1.5.380.26')
+	implementation ('net.minecraftforge:forgeflower:1.5.380.30')
 	implementation ('net.fabricmc:fabric-mixin-compile-extensions:0.1.0.+')
 
 	implementation ('org.cadixdev:mercury:0.1.0.fabric-SNAPSHOT')
