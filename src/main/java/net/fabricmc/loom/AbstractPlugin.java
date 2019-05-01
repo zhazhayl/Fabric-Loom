@@ -42,8 +42,13 @@ import org.gradle.api.*;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.Dependency;
 import org.gradle.api.artifacts.ModuleDependency;
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier;
 import org.gradle.api.artifacts.dsl.DependencyHandler;
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
+import org.gradle.api.artifacts.result.DependencyResult;
+import org.gradle.api.artifacts.result.ResolvedArtifactResult;
+import org.gradle.api.artifacts.result.ResolvedComponentResult;
+import org.gradle.api.artifacts.result.ResolvedDependencyResult;
 import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.plugins.JavaPluginConvention;
 import org.gradle.api.publish.Publication;
@@ -62,6 +67,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 
 public class AbstractPlugin implements Plugin<Project> {
 	protected Project project;
@@ -197,6 +203,39 @@ public class AbstractPlugin implements Plugin<Project> {
 		EclipseModel eclipseModel = (EclipseModel) project.getExtensions().getByName("eclipse");
 	}
 
+	private void addModule(Project proj, String configuration, DependencyResult module) {
+		if (module instanceof ResolvedDependencyResult) {
+			if (module.getFrom().getId() instanceof ModuleComponentIdentifier) {
+				ModuleComponentIdentifier mci = ((ModuleComponentIdentifier) module.getFrom().getId());
+				proj.getDependencies().add(configuration, proj.getDependencies().module(mci.getGroup() + ":" + mci.getModule() + ":" + mci.getVersion()));
+			}
+
+			for (DependencyResult child : ((ResolvedDependencyResult) module).getSelected().getDependencies()) {
+				addModule(proj, configuration, child);
+			}
+		}
+	}
+
+	private boolean findAndAddModule(Project project, String configuration, DependencyResult dep, Predicate<ModuleComponentIdentifier> predicate) {
+		boolean found = false;
+
+		if (dep instanceof ResolvedDependencyResult) {
+			if (dep.getFrom().getId() instanceof ModuleComponentIdentifier) {
+				ModuleComponentIdentifier mci = ((ModuleComponentIdentifier) dep.getFrom().getId());
+				if (predicate.test(mci)) {
+					addModule(project, configuration, dep);
+					found = true;
+				}
+			}
+
+			for (DependencyResult child : ((ResolvedDependencyResult) dep).getSelected().getDependencies()) {
+				findAndAddModule(project, configuration, child, predicate);
+			}
+		}
+
+		return found;
+	}
+
 	public static class JarSettings {
 		public boolean includeAT = true;
 
@@ -221,6 +260,17 @@ public class AbstractPlugin implements Plugin<Project> {
 		try {
 			project.getTasks().getByName("sourcesJar").getExtensions().create("AT", JarSettings.class);
 		} catch (UnknownTaskException e) {
+		}
+
+		// Add Mixin dependencies
+		Project p = project;
+		while (true) {
+			boolean found = false;
+			for (DependencyResult dep : p.getBuildscript().getConfigurations().getByName("classpath").getIncoming().getResolutionResult().getRoot().getDependencies()) {
+				found = findAndAddModule(project, "annotationProcessor", dep, (mci) -> ("net.fabricmc".equals(mci.getGroup()) && "fabric-mixin-compile-extensions".equals(mci.getModule())));
+			}
+			if (found || AbstractPlugin.isRootProject(p)) break;
+			p = p.getRootProject();
 		}
 
 		project.afterEvaluate(project1 -> {
@@ -274,11 +324,6 @@ public class AbstractPlugin implements Plugin<Project> {
 			if(extension.autoGenIDERuns && isRootProject(project1)){
 				SetupIntelijRunConfigs.setup(project1);
 			}
-
-			// add dependencies for mixin annotation processor
-			DependencyHandler handler = project1.getDependencies();
-			handler.add("annotationProcessor", "net.fabricmc:sponge-mixin:" + extension.getMixinVersion());
-			((ModuleDependency) handler.add("annotationProcessor", "net.fabricmc:fabric-loom:" + extension.getLoomVersion())).setTransitive(false);
 
 			// Enables the default mod remapper
 			if (extension.remapMod) {
