@@ -30,7 +30,9 @@ import net.fabricmc.loom.util.ConsumingOutputStream;
 import org.gradle.api.file.FileCollection;
 import org.gradle.api.internal.project.ProjectInternal;
 import org.gradle.api.logging.LogLevel;
-import org.gradle.api.tasks.Input;
+import org.gradle.api.tasks.InputFile;
+import org.gradle.api.tasks.InputFiles;
+import org.gradle.api.tasks.Internal;
 import org.gradle.api.tasks.OutputFile;
 import org.gradle.api.tasks.TaskAction;
 import org.gradle.internal.logging.progress.ProgressLogger;
@@ -137,12 +139,12 @@ public class FernFlowerTask extends DefaultLoomTask implements ForkingJavaExecTa
     }
 
     //@formatter:off
-    @Input public File getInput() { return getProject().file(input); }
+    @InputFile public File getInput() { return getProject().file(input); }
     @OutputFile public File getOutput() { return getProject().file(output); }
     @OutputFile public File getLineMapFile() { return getProject().file(lineMapFile); }
-    @Input public FileCollection getLibraries() { return getProject().files(libraries); }
-    @Input public int getNumThreads() { return numThreads; }
-    public boolean isNoFork() { return noFork; }
+    @InputFiles public FileCollection getLibraries() { return getProject().files(libraries); }
+    @Internal public int getNumThreads() { return numThreads; }
+    @Internal public boolean isNoFork() { return noFork; }
     public void setInput(Object input) { this.input = input; }
     public void setOutput(Object output) { this.output = output; }
     public void setLineMapFile(Object lineMapFile) { this.lineMapFile = lineMapFile; }
