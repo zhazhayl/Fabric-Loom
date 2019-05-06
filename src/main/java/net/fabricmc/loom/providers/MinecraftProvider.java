@@ -69,31 +69,19 @@ public class MinecraftProvider extends DependencyProvider {
 			versionInfo = gson.fromJson(reader, MinecraftVersionInfo.class);
 		}
 
-        if (offline) {
-        	if (MINECRAFT_CLIENT_JAR.exists() && MINECRAFT_SERVER_JAR.exists()) {
-        		project.getLogger().debug("Found client and server jars, presuming up-to-date");
-        	} else if (MINECRAFT_MERGED_JAR.exists()) {
-        		//Strictly we don't need the split jars if the merged one exists, let's try go on
-        		project.getLogger().warn("Missing game jar but merged jar present, things might end badly");
-        	} else {
-        		throw new GradleException("Missing jar(s); Client: " + MINECRAFT_CLIENT_JAR.exists() + ", Server: " + MINECRAFT_SERVER_JAR.exists());
-        	}
-        } else {
-        	downloadJars(project.getLogger());
-        }
+		if (offline) {
+			if (MINECRAFT_CLIENT_JAR.exists() && MINECRAFT_SERVER_JAR.exists()) {
+				project.getLogger().debug("Found client and server jars, presuming up-to-date");
+			} else if (MINECRAFT_MERGED_JAR.exists()) {
+				//Strictly we don't need the split jars if the merged one exists, let's try go on
+				project.getLogger().warn("Missing game jar but merged jar present, things might end badly");
+			} else {
+				throw new GradleException("Missing jar(s); Client: " + MINECRAFT_CLIENT_JAR.exists() + ", Server: " + MINECRAFT_SERVER_JAR.exists());
+			}
+		} else {
+			downloadJars(project.getLogger());
+		}
 
-        if (offline) {
-        	if (MINECRAFT_CLIENT_JAR.exists() && MINECRAFT_SERVER_JAR.exists()) {
-        		project.getLogger().debug("Found client and server jars, presuming up-to-date");
-        	} else if (MINECRAFT_MERGED_JAR.exists()) {
-        		//Strictly we don't need the split jars if the merged one exists, let's try go on
-        		project.getLogger().warn("Missing game jar but merged jar present, things might end badly");
-        	} else {
-        		throw new GradleException("Missing jar(s); Client: " + MINECRAFT_CLIENT_JAR.exists() + ", Server: " + MINECRAFT_SERVER_JAR.exists());
-        	}
-        } else {
-        	downloadJars(project.getLogger());
-        }
 		libraryProvider = new MinecraftLibraryProvider();
 		libraryProvider.provide(this, project, postPopulationScheduler);
 
