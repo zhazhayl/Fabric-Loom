@@ -27,6 +27,7 @@ import java.io.File;
 import java.io.IOException;
 
 import org.gradle.api.tasks.Input;
+import org.gradle.api.tasks.InputFile;
 import org.gradle.api.tasks.OutputFile;
 import org.gradle.api.tasks.bundling.Jar;
 import groovy.lang.Closure;
@@ -36,6 +37,7 @@ import net.fabricmc.loom.util.AccessTransformerHelper;
 import net.fabricmc.loom.util.ModRemapper;
 
 public class RemappingJar extends Jar {
+	@InputFile
 	public File destination;
 	public boolean nestJar = true;
 	@Input
