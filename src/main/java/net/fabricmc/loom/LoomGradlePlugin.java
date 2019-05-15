@@ -26,13 +26,12 @@ package net.fabricmc.loom;
 
 import net.fabricmc.loom.providers.MappingsProvider;
 import net.fabricmc.loom.providers.MinecraftLibraryProvider;
+import net.fabricmc.loom.providers.MinecraftMappedProvider;
 import net.fabricmc.loom.task.*;
 import net.fabricmc.loom.task.fernflower.FernFlowerTask;
-import net.fabricmc.loom.util.LineNumberRemapper;
-import net.fabricmc.loom.util.progress.ProgressLogger;
-import net.fabricmc.stitch.util.StitchUtil;
 
 import org.gradle.api.Action;
+import org.gradle.api.DefaultTask;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.tasks.TaskContainer;
@@ -67,16 +66,20 @@ public class LoomGradlePlugin extends AbstractPlugin {
 		tasks.register("cleanLoomBinaries", CleanLoomBinaries.class);
 		tasks.register("cleanLoomMappings", CleanLoomMappings.class);
 
+		tasks.register("migrateMappings", MigrateMappingsTask.class, t -> {
+			t.getOutputs().upToDateWhen((o) -> false);
+		});
+
 		tasks.register("remapJar", RemapJar.class);
 
-		register(project, "genSources", FernFlowerTask.class, t -> {
+		TaskProvider<FernFlowerTask> decompileTask = register("genSourcesDecompile", FernFlowerTask.class, t -> {
 			t.getOutputs().upToDateWhen((o) -> false);
 		}, (project, task) -> {
 			LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
 			MinecraftLibraryProvider libraryProvider = extension.getMinecraftProvider().libraryProvider;
-			MappingsProvider mappingsProvider = extension.getMappingsProvider();
-			File mappedJar = mappingsProvider.mappedProvider.getMappedJar();
-			File linemappedJarTmp = getMappedByproduct(project, "-linemapped.jar.tmp");
+			MinecraftMappedProvider minecraftProvider = extension.getMinecraftMappedProvider();
+
+			File mappedJar = minecraftProvider.getMappedJar();
 			File sourcesJar = getMappedByproduct(project, "-sources.jar");
 			File linemapFile = getMappedByproduct(project, "-sources.lmap");
 
@@ -84,31 +87,33 @@ public class LoomGradlePlugin extends AbstractPlugin {
 			task.setOutput(sourcesJar);
 			task.setLineMapFile(linemapFile);
 			task.setLibraries(libraryProvider.getLibraries());
+		});
+
+		TaskProvider<RemapLineNumbersTask> remapLineNumbersTask = register("genSourcesRemapLineNumbers", RemapLineNumbersTask.class, t -> {
+			t.getOutputs().upToDateWhen((o) -> false);
+		}, (project, task) -> {
+			task.dependsOn(decompileTask);
+
+			AbstractDecompileTask decompile = decompileTask.get();
+			task.setInput(decompile.getInput());
+			task.setLineMapFile(decompile.getLineMapFile());
+			task.setOutput(getMappedByproduct(project, "-linemapped.jar"));
+		});
+
+		register("genSources", DefaultTask.class, t -> {
+			t.getOutputs().upToDateWhen((o) -> false);
+		}, (project, task) -> {
+			task.dependsOn(remapLineNumbersTask);
+
+			RemapLineNumbersTask lineNumbers = remapLineNumbersTask.get();
+			Path mappedJarPath = lineNumbers.getInput().toPath();
+			Path linemappedJarPath = lineNumbers.getOutput().toPath();
 
 			task.doLast(t -> {
-				project.getLogger().lifecycle(":adjusting line numbers");
-				LineNumberRemapper remapper = new LineNumberRemapper();
-				remapper.readMappings(linemapFile);
-
-				ProgressLogger progressLogger = ProgressLogger.getProgressFactory(project, FernFlowerTask.class.getName());
-				progressLogger.start("Adjusting line numbers", "linemap");
-
-				try (StitchUtil.FileSystemDelegate inFs = StitchUtil.getJarFileSystem(mappedJar, true);
-				     StitchUtil.FileSystemDelegate outFs = StitchUtil.getJarFileSystem(linemappedJarTmp, true)) {
-					remapper.process(progressLogger, inFs.get().getPath("/"), outFs.get().getPath("/"));
-				} catch (IOException e) {
-					throw new RuntimeException(e);
-				}
-
-				progressLogger.completed();
-
-				Path mappedJarPath = mappedJar.toPath();
-				Path linemappedJarTmpPath = linemappedJarTmp.toPath();
-
-				if (Files.exists(linemappedJarTmpPath)) {
+				if (Files.exists(linemappedJarPath)) {
 					try {
 						Files.deleteIfExists(mappedJarPath);
-						Files.move(linemappedJarTmpPath, mappedJarPath);
+						Files.copy(linemappedJarPath, mappedJarPath);
 					} catch (IOException e) {
 						throw new RuntimeException(e);
 					}
@@ -149,9 +154,8 @@ public class LoomGradlePlugin extends AbstractPlugin {
 	}
 
 	/**
-	 * Adds the given task to the given project, running the first configuration immediately, and the second on {@link Project#afterEvaluate(Action)}
+	 * Adds the given task to the project, running the first configuration immediately, and the second on {@link Project#afterEvaluate(Action)}
 	 *
-	 * @param project The project to add the task to
 	 * @param name The name of the task to be added
 	 * @param taskClass The type of the task to be added
 	 * @param configuration Any configuration to be done on the task immediately
@@ -159,7 +163,7 @@ public class LoomGradlePlugin extends AbstractPlugin {
 	 *
 	 * @return The created task provider from {@link TaskContainer#register(String, Class, Action)}
 	 */
-	private static <T extends Task> TaskProvider<T> register(Project project, String name, Class<T> taskClass, Action<? super T> configuration, BiConsumer<? super Project, ? super T> postConfiguration) {
+	private <T extends Task> TaskProvider<T> register(String name, Class<T> taskClass, Action<? super T> configuration, BiConsumer<? super Project, ? super T> postConfiguration) {
 		TaskProvider<T> task = project.getTasks().register(name, taskClass, configuration);
 		project.afterEvaluate(p -> task.configure(t -> postConfiguration.accept(p, t)));
 		return task;

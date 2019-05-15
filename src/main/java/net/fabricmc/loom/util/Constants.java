@@ -42,5 +42,6 @@ public class Constants {
 	public static final String MINECRAFT_DEPENDENCIES = "minecraftLibraries";
 	public static final String MINECRAFT_INTERMEDIARY = "minecraftIntermediary";
 	public static final String MINECRAFT_NAMED = "minecraftNamed";
+	public static final String MINECRAFT_LINEMAPPED = "minecraftLinemapped";
 	public static final String MAPPINGS = "mappings";
 }

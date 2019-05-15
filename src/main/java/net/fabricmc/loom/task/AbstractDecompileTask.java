@@ -24,10 +24,26 @@
 
 package net.fabricmc.loom.task;
 
-import net.fabricmc.loom.util.RunConfig;
+import org.gradle.api.file.FileCollection;
+import org.gradle.api.tasks.Input;
+import org.gradle.api.tasks.OutputFile;
 
-public class RunClientTask extends AbstractRunTask {
-	public RunClientTask() {
-		super(RunConfig::clientRunConfig);
-	}
+import java.io.File;
+
+public abstract class AbstractDecompileTask extends AbstractLoomTask {
+    private Object input;
+    private Object output;
+    private Object lineMapFile;
+    private Object libraries;
+
+    //@formatter:off
+    @Input public File getInput() { return getProject().file(input); }
+    @OutputFile public File getOutput() { return getProject().file(output); }
+    @OutputFile public File getLineMapFile() { return getProject().file(lineMapFile); }
+    @Input public FileCollection getLibraries() { return getProject().files(libraries); }
+    public void setInput(Object input) { this.input = input; }
+    public void setOutput(Object output) { this.output = output; }
+    public void setLineMapFile(Object lineMapFile) { this.lineMapFile = lineMapFile; }
+    public void setLibraries(Object libraries) { this.libraries = libraries; }
+    //@formatter:on
 }
