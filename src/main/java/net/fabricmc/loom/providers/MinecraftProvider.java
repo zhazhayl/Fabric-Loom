@@ -42,6 +42,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.zip.ZipError;
 
 public class MinecraftProvider extends DependencyProvider {
 
@@ -86,7 +87,15 @@ public class MinecraftProvider extends DependencyProvider {
 		libraryProvider.provide(this, project, postPopulationScheduler);
 
 		if (!MINECRAFT_MERGED_JAR.exists()) {
-			mergeJars(project.getLogger());
+			try {
+				mergeJars(project.getLogger());
+			} catch (ZipError e) {
+				DownloadUtil.delete(MINECRAFT_CLIENT_JAR);
+				DownloadUtil.delete(MINECRAFT_SERVER_JAR);
+
+				project.getLogger().error("Could not merge JARs! Deleting source JARs - please re-run the command and move on.", e);
+				throw new RuntimeException();
+			}
 		}
 	}
 
