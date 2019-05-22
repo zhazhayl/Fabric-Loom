@@ -29,7 +29,6 @@ import net.fabricmc.loom.util.LineNumberRemapper;
 import net.fabricmc.loom.util.progress.ProgressLogger;
 import net.fabricmc.stitch.util.StitchUtil;
 import org.gradle.api.Project;
-import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.InputFile;
 import org.gradle.api.tasks.OutputFile;
 import org.gradle.api.tasks.TaskAction;
@@ -64,7 +63,7 @@ public class RemapLineNumbersTask extends AbstractLoomTask {
     }
 
     //@formatter:off
-    @Input public File getInput() { return getProject().file(input); }
+    @InputFile public File getInput() { return getProject().file(input); }
     @InputFile public File getLineMapFile() { return getProject().file(lineMapFile); }
     @OutputFile public File getOutput() { return getProject().file(output); }
     public void setInput(Object input) { this.input = input; }
