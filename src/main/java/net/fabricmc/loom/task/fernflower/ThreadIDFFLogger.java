@@ -45,7 +45,7 @@ public class ThreadIDFFLogger extends IFernflowerLogger {
     private ThreadLocal<Stack<String>> line = ThreadLocal.withInitial(Stack::new);
 
     public ThreadIDFFLogger() {
-        this(System.err, System.out);
+        this(System.out, System.err);
     }
 
     public ThreadIDFFLogger(PrintStream stdOut, PrintStream stdErr) {
@@ -55,24 +55,24 @@ public class ThreadIDFFLogger extends IFernflowerLogger {
 
     @Override
     public void writeMessage(String message, Severity severity) {
-        System.err.println(message);
+        stdOut.println(message);
     }
 
     @Override
     public void writeMessage(String message, Severity severity, Throwable t) {
-        System.err.println(message);
-        t.printStackTrace(System.err);
+        stdErr.println(message);
+        t.printStackTrace(stdErr);
     }
 
     private void print() {
         Thread thread = Thread.currentThread();
         long id = thread.getId();
         if (line.get().isEmpty()) {
-            System.out.println(MessageFormat.format("{0} :: waiting", id));
+            stdOut.println(MessageFormat.format("{0} :: waiting", id));
             return;
         }
         String line = this.line.get().peek();
-        System.out.println(MessageFormat.format("{0} :: {1}", id, line).trim());
+        stdOut.println(MessageFormat.format("{0} :: {1}", id, line).trim());
     }
 
     @Override

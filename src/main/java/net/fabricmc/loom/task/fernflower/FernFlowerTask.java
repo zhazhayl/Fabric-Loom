@@ -27,13 +27,9 @@ package net.fabricmc.loom.task.fernflower;
 import net.fabricmc.loom.task.AbstractDecompileTask;
 import net.fabricmc.loom.task.ForkingJavaExecTask;
 import net.fabricmc.loom.util.ConsumingOutputStream;
-import org.gradle.api.file.FileCollection;
 import org.gradle.api.internal.project.ProjectInternal;
 import org.gradle.api.logging.LogLevel;
-import org.gradle.api.tasks.InputFile;
-import org.gradle.api.tasks.InputFiles;
 import org.gradle.api.tasks.Internal;
-import org.gradle.api.tasks.OutputFile;
 import org.gradle.api.tasks.TaskAction;
 import org.gradle.internal.logging.progress.ProgressLogger;
 import org.gradle.internal.logging.progress.ProgressLoggerFactory;
@@ -41,7 +37,6 @@ import org.gradle.internal.service.ServiceRegistry;
 import org.gradle.process.ExecResult;
 import org.jetbrains.java.decompiler.main.extern.IFernflowerPreferences;
 
-import java.io.File;
 import java.util.*;
 import java.util.function.Supplier;
 
@@ -103,6 +98,10 @@ public class FernFlowerTask extends AbstractDecompileTask implements ForkingJava
                 }
 
                 int sepIdx = line.indexOf("::");
+                if (sepIdx < 1) {
+                	getLogger().warn(line);
+                	return;
+                }
                 String id = line.substring(0, sepIdx).trim();
                 String data = line.substring(sepIdx + 2).trim();
 
