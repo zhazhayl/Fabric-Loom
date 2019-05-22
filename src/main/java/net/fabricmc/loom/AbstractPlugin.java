@@ -253,12 +253,6 @@ public class AbstractPlugin implements Plugin<Project> {
 				task.getExtensions().create("AT", JarSettings.class);
 				//Only include the AT by default to the main sources task
 				if (!"sourcesJar".equals(task.getName())) task.getExtensions().getByType(JarSettings.class).setInclude(false);
-
-				task.doFirst(t -> {
-					if (t.getExtensions().getByType(JarSettings.class).includeAT) {
-						AccessTransformerHelper.copyInAT(project.getExtensions().getByType(LoomGradleExtension.class), (AbstractArchiveTask) t);
-					}
-				});
 			}
 		});
 
@@ -296,9 +290,6 @@ public class AbstractPlugin implements Plugin<Project> {
 			// Enables the default mod remapper
 			if (extension.remapMod) {
 				AbstractArchiveTask jarTask = (AbstractArchiveTask) project1.getTasks().getByName("jar");
-				if (jarTask.getExtensions().getByType(JarSettings.class).includeAT) {
-					AccessTransformerHelper.copyInAT(extension, jarTask);
-				}
 
 				RemapJar remapJarTask = (RemapJar) project1.getTasks().findByName("remapJar");
 				if (remapJarTask.jar == null) {
@@ -316,6 +307,12 @@ public class AbstractPlugin implements Plugin<Project> {
 						if (task instanceof RemapJar && ((RemapJar) task).isNestJar()) {
 							//Run all the sub project remap jars tasks before the root projects jar, this is to allow us to include projects
 							NestedJars.getRequiredTasks(project1).forEach(task::dependsOn);
+						}
+
+						if (task instanceof AbstractArchiveTask && task.getExtensions().findByType(JarSettings.class) != null) {
+							if (task.getExtensions().getByType(JarSettings.class).includeAT) {
+								AccessTransformerHelper.copyInAT(extension, (AbstractArchiveTask) task);
+							}
 						}
 					}
 				}
