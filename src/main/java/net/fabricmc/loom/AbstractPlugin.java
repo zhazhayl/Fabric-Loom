@@ -40,14 +40,10 @@ import net.fabricmc.loom.util.SetupIntelijRunConfigs;
 import org.gradle.api.*;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.Dependency;
-import org.gradle.api.artifacts.ModuleDependency;
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier;
-import org.gradle.api.artifacts.dsl.DependencyHandler;
 import org.gradle.api.artifacts.repositories.FlatDirectoryArtifactRepository;
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
 import org.gradle.api.artifacts.result.DependencyResult;
-import org.gradle.api.artifacts.result.ResolvedArtifactResult;
-import org.gradle.api.artifacts.result.ResolvedComponentResult;
 import org.gradle.api.artifacts.result.ResolvedDependencyResult;
 import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.plugins.JavaPluginConvention;
@@ -252,10 +248,19 @@ public class AbstractPlugin implements Plugin<Project> {
 		javadoc.setClasspath(main.getOutput().plus(main.getCompileClasspath()));
 
 		project.getTasks().getByName("jar").getExtensions().create("AT", JarSettings.class);
-		try {
-			project.getTasks().getByName("sourcesJar").getExtensions().create("AT", JarSettings.class);
-		} catch (UnknownTaskException e) {
-		}
+		project.getTasks().whenTaskAdded(task -> {
+			if (task instanceof AbstractArchiveTask) {
+				task.getExtensions().create("AT", JarSettings.class);
+				//Only include the AT by default to the main sources task
+				if (!"sourcesJar".equals(task.getName())) task.getExtensions().getByType(JarSettings.class).setInclude(false);
+
+				task.doFirst(t -> {
+					if (t.getExtensions().getByType(JarSettings.class).includeAT) {
+						AccessTransformerHelper.copyInAT(project.getExtensions().getByType(LoomGradleExtension.class), (AbstractArchiveTask) t);
+					}
+				});
+			}
+		});
 
 		// Add Mixin dependencies
 		Project p = project;
@@ -317,10 +322,6 @@ public class AbstractPlugin implements Plugin<Project> {
 
 				try {
 					AbstractArchiveTask sourcesTask = (AbstractArchiveTask) project1.getTasks().getByName("sourcesJar");
-					if (sourcesTask.getExtensions().getByType(JarSettings.class).includeAT) {
-						AccessTransformerHelper.copyInAT(extension, sourcesTask);
-					}
-
 					RemapSourcesJar remapSourcesJarTask = (RemapSourcesJar) project1.getTasks().findByName("remapSourcesJar");
 					remapSourcesJarTask.jar = sourcesTask.getArchivePath();
 					remapSourcesJarTask.doLast(task -> project1.getArtifacts().add("archives", remapSourcesJarTask.jar));
