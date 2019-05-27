@@ -25,19 +25,21 @@ package net.fabricmc.loom.task;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+
+import org.apache.commons.io.FilenameUtils;
 
 import org.gradle.api.tasks.Input;
-import org.gradle.api.tasks.InputFile;
 import org.gradle.api.tasks.OutputFile;
 import org.gradle.api.tasks.bundling.Jar;
 import groovy.lang.Closure;
 
 import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.util.AccessTransformerHelper;
-import net.fabricmc.loom.util.ModRemapper;
 
 public class RemappingJar extends Jar {
-	@InputFile
 	public File destination;
 	public boolean nestJar = true;
 	@Input
@@ -46,18 +48,22 @@ public class RemappingJar extends Jar {
 	public RemappingJar() {
 		setGroup("fabric");
 
-		configure(new Closure<RemapJar>(this, this) {
+		configure(new Closure<RemappingJar>(this, this) {
 			private static final long serialVersionUID = -5294178679681444341L;
 
 			@Override
-			public RemapJar call() {
+			public RemappingJar call() {
 				AccessTransformerHelper.copyInAT(getProject().getExtensions().getByType(LoomGradleExtension.class), RemappingJar.this);
 				return null;
 			}
 		});
 		doLast(task -> {
 			try {
-				ModRemapper.remap(task, getArchivePath(), getDestination(), nestJar, !includeAT);
+				Path input = getUnmappedJar().toPath();
+				Files.move(getArchivePath().toPath(), input, StandardCopyOption.REPLACE_EXISTING);
+
+				RemapJarTask.remap(task, input, getArchivePath().toPath(), nestJar, !includeAT);
+				getProject().getExtensions().getByType(LoomGradleExtension.class).addUnmappedMod(input);
 			} catch (IOException e) {
 				throw new RuntimeException("Failed to remap jar", e);
 			}
@@ -65,10 +71,10 @@ public class RemappingJar extends Jar {
 	}
 
 	@OutputFile
-	public File getDestination() {
+	public File getUnmappedJar() {
 		if (destination == null) {
 			String s = getArchivePath().getAbsolutePath();
-			return new File(s.substring(0, s.length() - 4) + "-dev.jar");
+			return new File(FilenameUtils.removeExtension(s) + "-dev.jar");
 		}
 
 		return destination;

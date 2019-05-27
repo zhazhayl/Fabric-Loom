@@ -213,7 +213,7 @@ public class ArtifactInfo {
 				version = json.get("version").getAsString();
 			} else {
 				//Not a Fabric mod, just have to make something up
-				name = FilenameUtils.removeExtension(root.getName());
+				name = FilenameUtils.removeExtension(root.getName()).replace(" :", "-");
 				version = "1.0";
 			}
 

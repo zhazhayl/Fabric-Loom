@@ -70,7 +70,7 @@ public class LoomGradlePlugin extends AbstractPlugin {
 			t.getOutputs().upToDateWhen((o) -> false);
 		});
 
-		tasks.register("remapJar", RemapJar.class);
+		tasks.register("remapJar", RemapJarTask.class);
 
 		TaskProvider<FernFlowerTask> decompileTask = register("genSourcesDecompile", FernFlowerTask.class, t -> {
 			t.getOutputs().upToDateWhen((o) -> false);
@@ -140,7 +140,7 @@ public class LoomGradlePlugin extends AbstractPlugin {
 			t.setGroup("ide");
 		});
 
-		tasks.register("remapSourcesJar", RemapSourcesJar.class);
+		tasks.register("remapSourcesJar", RemapSourcesJarTask.class);
 
 		tasks.register("runClient", RunClientTask.class, t -> {
 			t.dependsOn("buildNeeded", "downloadAssets");
