@@ -266,6 +266,7 @@ public class AbstractPlugin implements Plugin<Project> {
 			if (found || AbstractPlugin.isRootProject(p)) break;
 			p = p.getRootProject();
 		}
+		p.getDependencies().add(JavaPlugin.IMPLEMENTATION_CONFIGURATION_NAME, "net.fabricmc:sponge-mixin:0.7.11.36+");
 
 		project.afterEvaluate(project1 -> {
 			LoomGradleExtension extension = project1.getExtensions().getByType(LoomGradleExtension.class);
