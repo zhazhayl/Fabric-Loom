@@ -30,6 +30,7 @@ import net.fabricmc.loom.providers.MinecraftMappedProvider;
 import net.fabricmc.loom.providers.MinecraftProvider;
 import net.fabricmc.loom.util.LoomDependencyManager;
 import org.cadixdev.lorenz.MappingSet;
+import org.cadixdev.mercury.Mercury;
 import org.gradle.api.Project;
 import org.gradle.api.UnknownDomainObjectException;
 import org.gradle.api.artifacts.Configuration;
@@ -63,9 +64,14 @@ public class LoomGradleExtension {
 	private JsonObject installerJson;
 	private int installerJsonPriority = Integer.MAX_VALUE; // 0+, higher = less prioritized
 	private MappingSet[] srcMappingCache = new MappingSet[2];
+	private Mercury[] srcMercuryCache = new Mercury[2];
 
 	public MappingSet getOrCreateSrcMappingCache(int id, Supplier<MappingSet> factory) {
 		return srcMappingCache[id] != null ? srcMappingCache[id] : (srcMappingCache[id] = factory.get());
+	}
+
+	public Mercury getOrCreateSrcMercuryCache(int id, Supplier<Mercury> factory) {
+		return srcMercuryCache[id] != null ? srcMercuryCache[id] : (srcMercuryCache[id] = factory.get());
 	}
 
 	public LoomGradleExtension(Project project) {
@@ -140,12 +146,13 @@ public class LoomGradleExtension {
 	}
 
 	@Nullable
-	private static Dependency findDependency(Collection<Configuration> configs, BiPredicate<String, String> groupNameFilter) {
+	private static Dependency findDependency(Project p, Collection<Configuration> configs, BiPredicate<String, String> groupNameFilter) {
 		for (Configuration config : configs) {
 			for (Dependency dependency : config.getDependencies()) {
 				String group = dependency.getGroup();
 				String name = dependency.getName();
 				if (groupNameFilter.test(group, name)) {
+					p.getLogger().debug("Loom findDependency found: " + group + ":" + name + ":" + dependency.getVersion());
 					return dependency;
 				}
 			}
@@ -172,12 +179,12 @@ public class LoomGradleExtension {
 	private Dependency getMixinDependency() {
 		return recurseProjects((p) -> {
 			List<Configuration> configs = new ArrayList<>();
-			// check compile first
-			configs.add(p.getConfigurations().getByName("compile"));
+			// check compile classpath first
+			configs.add(p.getConfigurations().getByName("compileClasspath"));
 			// failing that, buildscript
 			configs.addAll(p.getBuildscript().getConfigurations());
 
-			return findDependency(configs, (group, name) -> {
+			return findDependency(p, configs, (group, name) -> {
 				if (name.equalsIgnoreCase("mixin") && group.equalsIgnoreCase("org.spongepowered")) {
 					return true;
 				}

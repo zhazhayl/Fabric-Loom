@@ -110,20 +110,24 @@ public class LoomDependencyManager {
 			});
 		}
 
-		ModCompileRemapper.remapDependencies(
-				project,
-				mappingsProvider.mappingsName + "." + mappingsProvider.mappingsVersion,
-				extension,
-				project.getConfigurations().getByName(Constants.COMPILE_MODS),
-				project.getConfigurations().getByName(Constants.COMPILE_MODS_MAPPED),
-				project.getConfigurations().getByName("compile"),
-				afterTasks::add
-		);
+		{
+			String mappingsKey = mappingsProvider.mappingsName + "." + mappingsProvider.mappingsVersion;
+
+			for (RemappedConfigurationEntry entry : Constants.MOD_COMPILE_ENTRIES) {
+				ModCompileRemapper.remapDependencies(
+						project, mappingsKey, extension,
+						project.getConfigurations().getByName(entry.getSourceConfiguration()),
+						project.getConfigurations().getByName(entry.getRemappedConfiguration()),
+						project.getConfigurations().getByName(entry.getTargetConfiguration(project.getConfigurations())),
+						afterTasks::add
+				);
+			}
+		}
 
 		if (extension.getInstallerJson() == null) {
 			//If we've not found the installer JSON we've probably skipped remapping Fabric loader, let's go looking
-			project.getLogger().info("Didn't find installer JSON, searching through compileMods");
-			Configuration configuration = project.getConfigurations().getByName(Constants.COMPILE_MODS);
+			project.getLogger().info("Didn't find installer JSON, searching through modCompileClasspath");
+			Configuration configuration = project.getConfigurations().getByName(Constants.MOD_COMPILE_CLASSPATH);
 
 			Set<File> seenFiles = new HashSet<>();
 
@@ -154,13 +158,18 @@ public class LoomDependencyManager {
 
 	private static void handleInstallerJson(JsonObject jsonObject, Project project){
 		JsonObject libraries = jsonObject.get("libraries").getAsJsonObject();
+		Configuration mcDepsConfig = project.getConfigurations().getByName(Constants.MINECRAFT_DEPENDENCIES);
+		Configuration apDepsConfig = project.getConfigurations().getByName("annotationProcessor");
+
 		libraries.get("common").getAsJsonArray().forEach(jsonElement -> {
 			String name = jsonElement.getAsJsonObject().get("name").getAsString();
 
-			Configuration configuration = project.getConfigurations().getByName(Constants.MINECRAFT_DEPENDENCIES);
 			ExternalModuleDependency modDep = (ExternalModuleDependency) project.getDependencies().create(name);
 			modDep.setTransitive(false);
-			configuration.getDependencies().add(modDep);
+			mcDepsConfig.getDependencies().add(modDep);
+			apDepsConfig.getDependencies().add(modDep);
+
+			project.getLogger().debug("Loom adding " + name + " from installer JSON");
 
 			if(jsonElement.getAsJsonObject().has("url")){
 				String url = jsonElement.getAsJsonObject().get("url").getAsString();

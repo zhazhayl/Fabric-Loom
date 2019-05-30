@@ -35,6 +35,7 @@ import net.fabricmc.loom.util.Constants;
 import net.fabricmc.loom.util.GroovyXmlUtil;
 import net.fabricmc.loom.util.LoomDependencyManager;
 import net.fabricmc.loom.util.NestedJars;
+import net.fabricmc.loom.util.RemappedConfigurationEntry;
 import net.fabricmc.loom.util.SetupIntelijRunConfigs;
 
 import org.gradle.api.*;
@@ -96,10 +97,11 @@ public class AbstractPlugin implements Plugin<Project> {
 		target.getRepositories().jcenter();
 
 		// Create default configurations
-		Configuration compileModsConfig = project.getConfigurations().maybeCreate(Constants.COMPILE_MODS);
-		compileModsConfig.setTransitive(true);
-		Configuration compileModsMappedConfig = project.getConfigurations().maybeCreate(Constants.COMPILE_MODS_MAPPED);
-		compileModsMappedConfig.setTransitive(false); // Don't get transitive deps of already remapped mods
+		Configuration modCompileClasspathConfig = project.getConfigurations().maybeCreate(Constants.MOD_COMPILE_CLASSPATH);
+		modCompileClasspathConfig.setTransitive(true);
+		Configuration modCompileClasspathMappedConfig = project.getConfigurations().maybeCreate(Constants.MOD_COMPILE_CLASSPATH_MAPPED);
+		modCompileClasspathMappedConfig.setTransitive(false);
+
 		Configuration minecraftNamedConfig = project.getConfigurations().maybeCreate(Constants.MINECRAFT_NAMED);
 		minecraftNamedConfig.setTransitive(false); // The launchers do not recurse dependencies
 		Configuration minecraftIntermediaryConfig = project.getConfigurations().maybeCreate(Constants.MINECRAFT_INTERMEDIARY);
@@ -114,17 +116,31 @@ public class AbstractPlugin implements Plugin<Project> {
 
 		project.getConfigurations().maybeCreate(Constants.MAPPINGS);
 
-		configureIDEs();
-		configureCompile();
+		for (RemappedConfigurationEntry entry : Constants.MOD_COMPILE_ENTRIES) {
+			Configuration compileModsConfig = project.getConfigurations().maybeCreate(entry.getSourceConfiguration());
+			compileModsConfig.setTransitive(true);
+			Configuration compileModsMappedConfig = project.getConfigurations().maybeCreate(entry.getRemappedConfiguration());
+			compileModsMappedConfig.setTransitive(false); // Don't get transitive deps of already remapped mods
+
+			extendsFrom(entry.getTargetConfiguration(project.getConfigurations()), entry.getRemappedConfiguration());
+			if (entry.isOnModCompileClasspath()) {
+				extendsFrom(Constants.MOD_COMPILE_CLASSPATH, entry.getSourceConfiguration());
+				extendsFrom(Constants.MOD_COMPILE_CLASSPATH_MAPPED, entry.getRemappedConfiguration());
+			}
+		}
+
+		extendsFrom("compile", Constants.MINECRAFT_NAMED);
+		extendsFrom("annotationProcessor", Constants.MINECRAFT_NAMED);
+		extendsFrom("annotationProcessor", Constants.MOD_COMPILE_CLASSPATH_MAPPED);
 
 		extendsFrom(Constants.MINECRAFT_NAMED, Constants.MINECRAFT_DEPENDENCIES);
 		extendsFrom(Constants.MINECRAFT_INTERMEDIARY, Constants.MINECRAFT_DEPENDENCIES);
 
-        extendsFrom(Constants.COMPILE_MODS_MAPPED, Constants.MINECRAFT_NAMED);
-        extendsFrom("compile", Constants.COMPILE_MODS_MAPPED);
         extendsFrom("compile", Constants.MAPPINGS);
-        extendsFrom("annotationProcessor", Constants.COMPILE_MODS_MAPPED);
         extendsFrom("annotationProcessor", Constants.MAPPINGS);
+
+		configureIDEs();
+		configureCompile();
 
 		Map<Project, Set<Task>> taskMap = project.getAllTasks(true);
 		for (Map.Entry<Project, Set<Task>> entry : taskMap.entrySet()) {
@@ -198,7 +214,9 @@ public class AbstractPlugin implements Plugin<Project> {
 		if (module instanceof ResolvedDependencyResult) {
 			if (module.getFrom().getId() instanceof ModuleComponentIdentifier) {
 				ModuleComponentIdentifier mci = ((ModuleComponentIdentifier) module.getFrom().getId());
-				proj.getDependencies().add(configuration, proj.getDependencies().module(mci.getGroup() + ":" + mci.getModule() + ":" + mci.getVersion()));
+				String moduleId = mci.getGroup() + ":" + mci.getModule() + ":" + mci.getVersion();
+				proj.getDependencies().add(configuration, proj.getDependencies().module(moduleId));
+				proj.getLogger().debug("Loom addModule " + moduleId + " to " + configuration);
 			}
 
 			for (DependencyResult child : ((ResolvedDependencyResult) module).getSelected().getDependencies()) {
@@ -340,45 +358,51 @@ public class AbstractPlugin implements Plugin<Project> {
 
 	protected void configureMaven() {
 		project.afterEvaluate((p) -> {
-			Configuration compileModsConfig = p.getConfigurations().getByName(Constants.COMPILE_MODS);
+			for (RemappedConfigurationEntry entry : Constants.MOD_COMPILE_ENTRIES) {
+				if (!entry.hasMavenScope()) {
+					continue;
+				}
 
-			// add modsCompile to maven-publish
-			PublishingExtension mavenPublish = p.getExtensions().findByType(PublishingExtension.class);
-			if (mavenPublish != null) {
-				mavenPublish.publications((publications) -> {
-					for (Publication publication : publications) {
-						if (publication instanceof MavenPublication) {
-							((MavenPublication) publication).pom((pom) -> {
-								pom.withXml((xml) -> {
-									Node dependencies = GroovyXmlUtil.getOrCreateNode(xml.asNode(), "dependencies");
-									Set<String> foundArtifacts = new HashSet<>();
+				Configuration compileModsConfig = p.getConfigurations().getByName(entry.getSourceConfiguration());
 
-									GroovyXmlUtil.childrenNodesStream(dependencies)
-											.filter((n) -> "dependency".equals(n.name()))
-											.forEach((n) -> {
-												Optional<Node> groupId = GroovyXmlUtil.getNode(n, "groupId");
-												Optional<Node> artifactId = GroovyXmlUtil.getNode(n, "artifactId");
-												if (groupId.isPresent() && artifactId.isPresent()) {
-													foundArtifacts.add(groupId.get().text() + ":" + artifactId.get().text());
-												}
-											});
+				// add modsCompile to maven-publish
+				PublishingExtension mavenPublish = p.getExtensions().findByType(PublishingExtension.class);
+				if (mavenPublish != null) {
+					mavenPublish.publications((publications) -> {
+						for (Publication publication : publications) {
+							if (publication instanceof MavenPublication) {
+								((MavenPublication) publication).pom((pom) -> {
+									pom.withXml((xml) -> {
+										Node dependencies = GroovyXmlUtil.getOrCreateNode(xml.asNode(), "dependencies");
+										Set<String> foundArtifacts = new HashSet<>();
 
-									for (Dependency dependency : compileModsConfig.getAllDependencies()) {
-										if (foundArtifacts.contains(dependency.getGroup() + ":" + dependency.getName())) {
-											continue;
+										GroovyXmlUtil.childrenNodesStream(dependencies)
+												.filter((n) -> "dependency".equals(n.name()))
+												.forEach((n) -> {
+													Optional<Node> groupId = GroovyXmlUtil.getNode(n, "groupId");
+													Optional<Node> artifactId = GroovyXmlUtil.getNode(n, "artifactId");
+													if (groupId.isPresent() && artifactId.isPresent()) {
+														foundArtifacts.add(groupId.get().text() + ":" + artifactId.get().text());
+													}
+												});
+
+										for (Dependency dependency : compileModsConfig.getAllDependencies()) {
+											if (foundArtifacts.contains(dependency.getGroup() + ":" + dependency.getName())) {
+												continue;
+											}
+
+											Node depNode = dependencies.appendNode("dependency");
+											depNode.appendNode("groupId", dependency.getGroup());
+											depNode.appendNode("artifactId", dependency.getName());
+											depNode.appendNode("version", dependency.getVersion());
+											depNode.appendNode("scope", entry.getMavenScope());
 										}
-
-										Node depNode = dependencies.appendNode("dependency");
-										depNode.appendNode("groupId", dependency.getGroup());
-										depNode.appendNode("artifactId", dependency.getName());
-										depNode.appendNode("version", dependency.getVersion());
-										depNode.appendNode("scope", "compile");
-									}
+									});
 								});
-							});
+							}
 						}
-					}
-				});
+					});
+				}
 			}
 		});
 	}

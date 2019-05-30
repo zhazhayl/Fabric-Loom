@@ -40,7 +40,6 @@ import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.Dependency;
 import org.gradle.api.artifacts.ModuleDependency;
-import org.gradle.api.artifacts.ResolvableDependencies;
 import org.gradle.api.artifacts.SelfResolvingDependency;
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier;
 import org.gradle.api.artifacts.dsl.DependencyHandler;
@@ -61,15 +60,15 @@ public class ArtifactInfo {
 	/**
 	 * Process the artifacts for the given configuration into {@link ArtifactInfo}s
 	 *
-	 * @param configuration The dependencies to resolve, typically from {@link Configuration#getIncoming()}
+	 * @param configuration The configuration to resolve dependencies for
 	 * @param depHandler The dependency handler for a project, typically from {@link Project#getDependencies()}
 	 *
 	 * @return The artifacts for the given configuration as ArtifactInfos
 	 */
-	public static Set<ArtifactInfo> resolve(ResolvableDependencies configuration, DependencyHandler depHandler) {
+	public static Set<ArtifactInfo> resolve(Configuration configuration, DependencyHandler depHandler) {
 		//We need to get all of the file based dependencies that aren't transitive, and shouldn't be applied over the top of each other
 		Builder<File, SelfResolvingDependency> builder = new Builder<>();
-		configuration.getDependencies().stream().filter(dependency -> dependency instanceof SelfResolvingDependency).map(SelfResolvingDependency.class::cast).forEach(dependency -> {
+		configuration.getIncoming().getDependencies().stream().filter(dependency -> dependency instanceof SelfResolvingDependency).map(SelfResolvingDependency.class::cast).forEach(dependency -> {
 			for (File file : dependency.resolve()) {
 				builder.put(file, dependency);
 			}
@@ -77,10 +76,10 @@ public class ArtifactInfo {
 		Map<File, SelfResolvingDependency> fileDependencies = builder.build();
 
 		//Need to filter out the file dependencies, then merge the disjoint sets of artifacts together
-		return Stream.concat(configuration.getArtifacts().getArtifacts().stream().filter(artifact -> !fileDependencies.containsKey(artifact.getFile())).map(artifact -> {
+		return Stream.concat(configuration.getResolvedConfiguration().getResolvedArtifacts().stream().filter(artifact -> !fileDependencies.containsKey(artifact.getFile())).map(artifact -> {
 			if (artifact.getId().getComponentIdentifier() instanceof ModuleComponentIdentifier) {
 				//It's a normal module dependency, keep it as an artifact so the transitives can carry over
-				return new ArtifactInfo((ModuleComponentIdentifier) artifact.getId().getComponentIdentifier(), artifact.getFile(), depHandler);
+				return new ArtifactInfo((ModuleComponentIdentifier) artifact.getId().getComponentIdentifier(), artifact.getClassifier(), artifact.getFile(), depHandler);
 			} else {
 				//If it's not a file nor a module identifier goodness knows what it is
 				throw new RuntimeException("Unable to handle " + artifact.getFile() + ", identified as " + artifact.getId().getComponentIdentifier());
@@ -89,27 +88,28 @@ public class ArtifactInfo {
 	}
 
 
-	public final String group, name, version;
+	public final String group, name, version, classifier;
 	public final File artifact;
 	protected final DependencyHandler depHandler;
 	private ModuleComponentIdentifier identifier;
 
-	public ArtifactInfo(ModuleComponentIdentifier identifier, File artifact, DependencyHandler depHandler) {
-		this(identifier.getGroup(), identifier.getModule(), identifier.getVersion(), artifact, depHandler);
+	public ArtifactInfo(ModuleComponentIdentifier identifier, String classifier, File artifact, DependencyHandler depHandler) {
+		this(identifier.getGroup(), identifier.getModule(), identifier.getVersion(), classifier, artifact, depHandler);
 
 		this.identifier = identifier;
 	}
 
-	protected ArtifactInfo(String group, String name, String version, File artifact, DependencyHandler depHandler) {
+	protected ArtifactInfo(String group, String name, String version, String classifier, File artifact, DependencyHandler depHandler) {
 		this.group = group;
 		this.name = name;
 		this.version = version;
+		this.classifier = classifier == null ? "" : ':' + classifier;
 		this.artifact = artifact;
 		this.depHandler = depHandler;
 	}
 
 	public String notation() {
-		return group + ':' + name + ':' + version;
+		return group + ':' + name + ':' + version + classifier;
 	}
 
 	public File getFile() {
@@ -225,7 +225,7 @@ public class ArtifactInfo {
 		protected final boolean isFabricMod;
 
 		public FileArtifactInfo(SelfResolvingDependency dependency, String name, String version, Map<String, File> artifacts, boolean isFabricMod, DependencyHandler depHandler) {
-			super("net.fabricmc.synthetic", name, version, artifacts.get(""), depHandler);
+			super("net.fabricmc.synthetic", name, version, null, artifacts.get(""), depHandler);
 
 			this.dependency = dependency;
 			classifierToFile = artifacts;

@@ -43,24 +43,23 @@ public class ModCompileRemapper {
 		Logger logger = project.getLogger();
 		DependencyHandler dependencies = project.getDependencies();
 
-		for (ArtifactInfo artifact : ArtifactInfo.resolve(modCompile.getIncoming(), dependencies)) {
+		for (ArtifactInfo artifact : ArtifactInfo.resolve(modCompile, dependencies)) {
 			String group = artifact.group;
 			String name = artifact.name;
 			String version = artifact.version;
-
-			String notation = group + ":" + name + ":" + version;
+			String classifier = artifact.classifier;
 
 			File input = artifact.getFile();
 
 			if (!artifact.isFabricMod()) {
-				logger.lifecycle(":providing " + notation);
+				logger.lifecycle(":providing " + artifact.notation());
 				dependencies.add(regularCompile.getName(), artifact.asNonTransitiveDependency());
 				continue;
 			}
 
-			String remappedLog = group + ":" + name + ":" + version + " (" + mappingsPrefix + ")";
-			String remappedNotation = "net.fabricmc.mapped:" + mappingsPrefix + "." + group + "." + name + ":" + version;
-			String remappedFilename = mappingsPrefix + "." + group + "." + name + "-" + version;
+			String remappedLog = group + ':' + name + ':' + version + classifier + " (" + mappingsPrefix + ")";
+			String remappedNotation = "net.fabricmc.mapped:" + mappingsPrefix + '.' + group + '.' + name + ':' + version + classifier;
+			String remappedFilename = mappingsPrefix + '.' + group + '.' + name + '-' + version + classifier.replace(':', '-');
 			logger.lifecycle(":providing " + remappedLog);
 
 			File modStore = extension.getRemappedModCache();
@@ -69,7 +68,7 @@ public class ModCompileRemapper {
 			if (!output.exists() || input.lastModified() <= 0 || input.lastModified() > output.lastModified()) {
 				//If the output doesn't exist, or appears to be outdated compared to the input we'll remap it
 				try {
-					ModProcessor.handleMod(input, output, project);
+					ModProcessor.processMod(input, output, project, modCompileRemapped);
 				} catch (IOException e) {
 					throw new RuntimeException("Failed to remap mod", e);
 				}

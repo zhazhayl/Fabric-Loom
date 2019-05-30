@@ -88,9 +88,9 @@ public class MinecraftMappedProvider {
         	targets = Collections.emptySet();
         }
 
-        String intermediaryJar = minecraftProvider.minecraftVersion + "-intermediary" + atOffset;
+        String intermediaryJar = minecraftProvider.minecraftVersion + "-intermediary" + atOffset + '-' + mappingsProvider.mappingsName;
         MINECRAFT_INTERMEDIARY_JAR = new File(cache, "minecraft-" + intermediaryJar + ".jar");
-        String mappedJar = minecraftProvider.minecraftVersion + "-mapped" + atOffset + '-' + mappingsProvider.mappingsVersion;
+        String mappedJar = minecraftProvider.minecraftVersion + "-mapped" + atOffset + '-' + mappingsProvider.mappingsName + '-' + mappingsProvider.mappingsVersion;
         MINECRAFT_MAPPED_JAR = new File(cache, "minecraft-" + mappedJar + ".jar");
 
         if (!getMappedJar().exists() || !getIntermediaryJar().exists() || atChange) {
