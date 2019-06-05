@@ -25,6 +25,7 @@
 package net.fabricmc.loom.providers;
 
 import net.fabricmc.loom.LoomGradleExtension;
+import net.fabricmc.loom.providers.openfine.Openfine;
 import net.fabricmc.loom.util.AccessTransformerHelper;
 import net.fabricmc.loom.util.Constants;
 import net.fabricmc.loom.util.MapJarsTiny;
@@ -100,6 +101,7 @@ public class MinecraftMappedProvider {
             if (getIntermediaryJar().exists()) {
                 getIntermediaryJar().delete();
             }
+            if (extension.hasOptiFine()) Openfine.applyBonusMappings(mappingsProvider.MAPPINGS_TINY);
             new MapJarsTiny().mapJars(minecraftProvider, this, project);
             if (!targets.isEmpty()) MapJarsTiny.transform(project, targets, this, mappingsProvider);
         }

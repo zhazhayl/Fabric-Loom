@@ -28,6 +28,7 @@ import com.google.common.io.Files;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import net.fabricmc.loom.LoomGradleExtension;
+import net.fabricmc.loom.providers.openfine.Openfine;
 import net.fabricmc.loom.util.*;
 import net.fabricmc.stitch.merge.JarMerger;
 
@@ -96,6 +97,10 @@ public class MinecraftProvider extends DependencyProvider {
 				project.getLogger().error("Could not merge JARs! Deleting source JARs - please re-run the command and move on.", e);
 				throw new RuntimeException();
 			}
+		}
+
+		if (extension.hasOptiFine()) {
+			MINECRAFT_MERGED_JAR = Openfine.process(project.getLogger(), minecraftVersion, MINECRAFT_MERGED_JAR, extension.getOptiFine());
 		}
 	}
 

@@ -89,12 +89,8 @@ license {
 	exclude '**/loom/util/ArtifactInfo.java'
 	exclude '**/loom/task/RemappingJar.java'
 	exclude '**/loom/util/AccessTransformerHelper.java'
-	exclude '**/loom/providers/mappings/MappingBlob.java'
-	exclude '**/loom/providers/mappings/IMappingAcceptor.java'
-	exclude '**/loom/providers/mappings/MappingSplat.java'
-	exclude '**/loom/providers/mappings/EnigmaReader.java'
-	exclude '**/loom/providers/mappings/TinyReader.java'
-	exclude '**/loom/providers/mappings/TinyWriter.java'
+	exclude '**/loom/providers/mappings/*.java'
+	exclude '**/loom/providers/openfine/*.java'
 }
 
 task wrapper(type: Wrapper) {
