@@ -2,8 +2,20 @@ package net.fabricmc.loom.providers.openfine;
 
 import org.objectweb.asm.Opcodes;
 
+import com.chocohead.optisine.AccessChange.Access;
+
 public enum AccessChange {
-	NONE, PRIVATE, PACKAGE, PROTECTED, PUBLIC;
+	NONE(null), PRIVATE(Access.PRIVATE), PACKAGE(Access.PACKAGE), PROTECTED(Access.PROTECTED), PUBLIC(Access.PUBLIC);
+
+	private AccessChange(Access access) {
+		this.access = access;
+	}
+
+	private final Access access;
+	public Access toAccess() {
+		if (access == null) throw new UnsupportedOperationException("Cannot convert AccessChange#" + name() + " to Access!");
+		return access;
+	}
 
 	public static AccessChange forAccess(int original, int access) {
 		if ((original & ACCESSES) != (access & ACCESSES)) {

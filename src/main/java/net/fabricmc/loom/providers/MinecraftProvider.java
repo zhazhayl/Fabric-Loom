@@ -101,6 +101,7 @@ public class MinecraftProvider extends DependencyProvider {
 
 		if (extension.hasOptiFine()) {
 			MINECRAFT_MERGED_JAR = Openfine.process(project.getLogger(), minecraftVersion, MINECRAFT_MERGED_JAR, extension.getOptiFine());
+			project.getDependencies().add(Constants.MINECRAFT_DEPENDENCIES, project.getDependencies().module("com.github.Chocohead:OptiSine:cc6da75"));
 		}
 	}
 
