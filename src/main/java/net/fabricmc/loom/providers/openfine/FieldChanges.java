@@ -41,4 +41,8 @@ public class FieldChanges {
 		lostFields.sort(Comparator.comparingInt(original::indexOf));
 		gainedFields.sort(Comparator.comparingInt(patched::indexOf));
 	}
+
+	public void annotate() {
+
+	}
 }

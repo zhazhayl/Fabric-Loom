@@ -12,6 +12,7 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.MethodNode;
@@ -101,5 +102,13 @@ public class MethodChanges {
 
 	private void addFix(Map<String, String> fixes, MethodNode from, MethodNode to) {
 		fixes.put(className + '#' + from.name + from.desc, className + '#' + to.name + to.desc);
+	}
+
+	public Stream<MethodNode> modifiedMethods() {
+		return modifiedMethods.stream().map(method -> method.node);
+	}
+
+	public void annotate() {
+
 	}
 }

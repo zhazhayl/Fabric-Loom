@@ -57,7 +57,7 @@ public class MethodComparison {
 			equal = compare(original.instructions, patched.instructions);
 		} else {
 			equal = false;
-			findLambads(patched.instructions, 0, this::logLambda);
+			findHandles(patched.instructions, 0, this::logLambda);
 		}
 	}
 
@@ -69,7 +69,7 @@ public class MethodComparison {
 			AbstractInsnNode insnB = listB.get(i);
 
 			if (!compare(listA, listB, insnA, insnB)) {
-				findLambads(listB, i + 1, this::logLambda);
+				findHandles(listB, i + 1, this::logLambda);
 				return false;
 			}
 		}
@@ -247,11 +247,30 @@ public class MethodComparison {
 
 	public static List<String> lambdas(InsnList instructions) {
 		List<String> lambdas = new ArrayList<>();
-		findLambads(instructions, 0, handle -> lambdas.add(handle.getOwner() + '#' + handle.getName() + handle.getDesc()));
+		findHandles(instructions, 0, handle -> lambdas.add(handle.getOwner() + '#' + handle.getName() + handle.getDesc()));
 		return Collections.unmodifiableList(lambdas);
 	}
 
-	public static void findLambads(InsnList instructions, int from, Consumer<Handle> lambdaEater) {
+	public static void findHandles(InsnList instructions, int from, Consumer<Handle> lambdaEater) {
+		findLambdas(instructions, from, idin -> {
+			Handle impl = (Handle) idin.bsmArgs[1];
+
+			switch (impl.getTag()) {
+			case Opcodes.H_INVOKEVIRTUAL:
+			case Opcodes.H_INVOKESTATIC:
+			case Opcodes.H_INVOKESPECIAL:
+			case Opcodes.H_NEWINVOKESPECIAL:
+			case Opcodes.H_INVOKEINTERFACE:
+				lambdaEater.accept(impl);
+				break;
+
+			default:
+				throw new IllegalStateException("Unexpected impl tag: " + impl.getTag());
+			}
+		});
+	}
+
+	public static void findLambdas(InsnList instructions, int from, Consumer<InvokeDynamicInsnNode> instructionEater) {
 		for (; from < instructions.size(); from++) {
 			AbstractInsnNode insn = instructions.get(from);
 
@@ -259,20 +278,7 @@ public class MethodComparison {
 				InvokeDynamicInsnNode idin = (InvokeDynamicInsnNode) insn;
 
 				if (isJavaLambdaMetafactory(idin.bsm)) {
-					Handle impl = (Handle) idin.bsmArgs[1];
-
-					switch (impl.getTag()) {
-					case Opcodes.H_INVOKEVIRTUAL:
-					case Opcodes.H_INVOKESTATIC:
-					case Opcodes.H_INVOKESPECIAL:
-					case Opcodes.H_NEWINVOKESPECIAL:
-					case Opcodes.H_INVOKEINTERFACE:
-						lambdaEater.accept(impl);
-						break;
-
-					default:
-						throw new IllegalStateException("Unexpected impl tag: " + impl.getTag());
-					}
+					instructionEater.accept(idin);
 				} else {
 					throw new IllegalStateException(String.format("Unknown invokedynamic bsm: %s/%s%s (tag=%d iif=%b)", idin.bsm.getOwner(), idin.bsm.getName(), idin.bsm.getDesc(), idin.bsm.getTag(), idin.bsm.isInterface()));
 				}
