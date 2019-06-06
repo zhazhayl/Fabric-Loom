@@ -108,7 +108,7 @@ public class MapJarsTiny {
 			mappings = net.fabricmc.mappings.MappingsProvider.readTinyMappings(in, false);
 		}
 
-		project.getLogger().info("Read in " + mappings.getClassEntries() + " classes");
+		project.getLogger().info("Read in " + mappings.getClassEntries().size() + " classes");
 		project.getLogger().info("Working out what we have to do");
 
 		final String wildcard = "<*>"; //Special marker for the class itself rather than a method
