@@ -17,4 +17,12 @@ public class FieldComparison {
 		access = AccessChange.forAccess(original.access, patched.access);
 		finality = FinalityChange.forAccess(original.access, patched.access);
 	}
+
+	public boolean hasChanged() {
+		return access != AccessChange.NONE || finality != FinalityChange.NONE;
+	}
+
+	public ChangeSet toChangeSet() {
+		return new ChangeSet(access, finality);
+	}
 }

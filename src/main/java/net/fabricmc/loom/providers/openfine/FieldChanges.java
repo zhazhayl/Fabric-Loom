@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.FieldNode;
 
 import com.google.common.collect.Sets;
@@ -42,7 +43,9 @@ public class FieldChanges {
 		gainedFields.sort(Comparator.comparingInt(patched::indexOf));
 	}
 
-	public void annotate() {
-
+	public void annotate(Annotator annotator) {
+		lostFields.stream().map(field -> Type.getType(field.desc).getClassName() + ' ' + field.name).forEach(annotator::dropField);
+		gainedFields.stream().map(field -> field.name + ";;" + field.desc).forEach(annotator::addField);
+		modifiedFields.stream().filter(FieldComparison::hasChanged).collect(Collectors.toMap(comparison -> comparison.node.name + ";;" + comparison.node.desc, FieldComparison::toChangeSet)).forEach(annotator::addChangedField);
 	}
 }

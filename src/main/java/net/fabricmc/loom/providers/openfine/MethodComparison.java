@@ -297,4 +297,12 @@ public class MethodComparison {
 	public List<String> getLambads() {
 		return Collections.unmodifiableList(lambdaHandles);
 	}
+
+	public boolean hasChanged() {
+		return access != AccessChange.NONE || finality != FinalityChange.NONE || !equal;
+	}
+
+	public ChangeSet toChangeSet() {
+		return new ChangeSet(access, finality);
+	}
 }

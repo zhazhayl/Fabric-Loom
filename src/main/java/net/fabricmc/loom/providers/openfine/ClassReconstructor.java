@@ -2,11 +2,10 @@ package net.fabricmc.loom.providers.openfine;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Stream;
-
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Handle;
@@ -43,20 +42,21 @@ public class ClassReconstructor {
 		assert Objects.equals(originalClass.nestHostClass, patchedClass.nestHostClass);
 		assert Objects.equals(originalClass.nestMembers, patchedClass.nestMembers);
 
-		annotate(patchedClass, accessChange, finalityChange, gainedInterfaces, lostInterfaces);
+		Annotator annotator = new Annotator(accessChange, finalityChange, gainedInterfaces, lostInterfaces);
 
 		MethodChanges methodChanges = new MethodChanges(originalClass.name, originalClass.methods, patchedClass.methods);
 		if (methodChanges.couldNeedLambdasFixing()) {
 			Map<String, String> lambdaFixes = new HashMap<>();
 			methodChanges.tryFixLambdas(lambdaFixes);
 
-			if (!lambdaFixes.isEmpty()) fixLambdas(lambdaFixes, methodChanges.modifiedMethods());
+			if (!lambdaFixes.isEmpty()) fixLambdas(lambdaFixes, originalClass.methods, methodChanges);
 		}
-		methodChanges.annotate();
+		methodChanges.annotate(annotator);
 
 		FieldChanges fieldChanges = new FieldChanges(originalClass.name, originalClass.fields, patchedClass.fields);
-		fieldChanges.annotate();
+		fieldChanges.annotate(annotator);
 
+		annotator.apply(patchedClass);
 		return write(patchedClass);
 	}
 
@@ -66,26 +66,8 @@ public class ClassReconstructor {
 		return node;
 	}
 
-	private static void annotate(ClassNode node, AccessChange accessChange, FinalityChange finalityChange, Set<String> gainedInterfaces, Set<String> lostInterfaces) {
-		if (accessChange != AccessChange.NONE) {
-
-		}
-
-		if (finalityChange != FinalityChange.NONE) {
-
-		}
-
-		if (!gainedInterfaces.isEmpty()) {
-
-		}
-
-		if (!lostInterfaces.isEmpty()) {
-
-		}
-	}
-
-	private static void fixLambdas(Map<String, String> fixes, Stream<MethodNode> methods) {
-		methods.forEach(method -> MethodComparison.findLambdas(method.instructions, 0, idin -> {
+	private static void fixLambdas(Map<String, String> fixes, List<MethodNode> originalMethods, MethodChanges changes) {
+		changes.modifiedMethods().forEach(method -> MethodComparison.findLambdas(method.instructions, 0, idin -> {
 			Handle handle = (Handle) idin.bsmArgs[1];
 			String remap = fixes.get(handle.getOwner() + '#' + handle.getName() + handle.getDesc());
 
@@ -101,6 +83,7 @@ public class ClassReconstructor {
 				idin.bsmArgs[1] = new Handle(handle.getTag(), owner, name, desc, handle.isInterface());
 			}
 		}));
+		changes.refreshChanges(originalMethods);
 	}
 
 	private static byte[] write(ClassNode node) {
