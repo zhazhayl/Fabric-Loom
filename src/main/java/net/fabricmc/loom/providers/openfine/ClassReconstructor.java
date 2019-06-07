@@ -62,7 +62,7 @@ public class ClassReconstructor {
 
 	private static ClassNode read(byte[] data) {
 		ClassNode node = new ClassNode();
-		new ClassReader(data).accept(node, ClassReader.EXPAND_FRAMES);
+		new ClassReader(data).accept(node, 0/*ClassReader.EXPAND_FRAMES*/);
 		return node;
 	}
 
@@ -87,7 +87,7 @@ public class ClassReconstructor {
 	}
 
 	private static byte[] write(ClassNode node) {
-		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+		ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS | 0/*ClassWriter.COMPUTE_FRAMES*/);
 		node.accept(writer);
 		return writer.toByteArray();
 	}
