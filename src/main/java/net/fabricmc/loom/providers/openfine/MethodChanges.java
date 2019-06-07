@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Objects;
+import java.util.Set;
 import java.util.StringJoiner;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -78,29 +78,26 @@ public class MethodChanges {
 			}
 		}
 
-		Map<String, MethodNode> descToLambda = gainedLambdas.stream().collect(Collectors.groupingBy(lambda -> lambda.desc)).entrySet().stream().filter(entry -> entry.getValue().size() == 1).collect(Collectors.toMap(Entry::getKey, entry -> Iterables.getOnlyElement(entry.getValue())));
-		if (!descToLambda.isEmpty()) {
-			Map<String, MethodNode> lambdaToHandle = modifiedMethods.stream().flatMap(comparison -> comparison.getLambads().stream().filter(lambda -> className.equals(lambda.substring(0, lambda.indexOf('#'))))).collect(Collectors.toMap(Function.identity(), lambda -> descToLambda.get(lambda.substring(lambda.indexOf('(')))));
-			boolean complete = !lambdaToHandle.values().removeIf(Objects::isNull);
+		Map<String, MethodNode> newDescToLambda = gainedLambdas.stream().collect(Collectors.groupingBy(lambda -> lambda.desc)).entrySet().stream().filter(entry -> entry.getValue().size() == 1).collect(Collectors.toMap(Entry::getKey, entry -> Iterables.getOnlyElement(entry.getValue())));
+		Map<String, MethodNode> oldDescToMethod = lostMethods.stream().collect(Collectors.groupingBy(lambda -> lambda.desc)).entrySet().stream().filter(entry -> entry.getValue().size() == 1).collect(Collectors.toMap(Entry::getKey, entry -> Iterables.getOnlyElement(entry.getValue())));
+		if (!newDescToLambda.isEmpty() && !oldDescToMethod.isEmpty()) {
+			Set<String> possibleLambdas = gainedLambdas.stream().map(method -> method.name + method.desc).collect(Collectors.toSet()); //The collection of lambdas we're looking to fix, any others are irrelevant from the point of view that they're probably fine
+			boolean complete = modifiedMethods.stream().flatMap(comparison -> comparison.getLambads().stream().filter(lambda -> className.equals(lambda.substring(0, lambda.indexOf('#'))))).filter(lambda -> possibleLambdas.contains(lambda.substring(lambda.indexOf('#') + 1))).allMatch(lambda -> newDescToLambda.containsKey(lambda.substring(lambda.indexOf('('))));
 
-			if (!lambdaToHandle.isEmpty()) {
-				Map<String, MethodNode> nameToLostMethod = lostMethods.stream().collect(Collectors.toMap(method -> method.name + method.desc, Function.identity()));
-
-				Map<MethodNode, MethodNode> lostToGained = lambdaToHandle.entrySet().stream().collect(Collectors.toMap(entry -> nameToLostMethod.get(entry.getKey().substring(entry.getKey().indexOf('#') + 1)), Entry::getValue));
-				assert !lostToGained.containsKey(null); //Should find all these
-
-				lostToGained.forEach((lost, gained) -> addFix(fixes, gained, lost));
-				lostMethods.removeAll(lostToGained.keySet());
-				gainedMethods.removeAll(lostToGained.values());
-			} else {
-				assert !complete; //Unfortunate
+			Map<MethodNode, MethodNode> lostToGained = newDescToLambda.entrySet().stream().collect(Collectors.toMap(entry -> oldDescToMethod.get(entry.getKey()), Entry::getValue));
+			if (lostToGained.containsKey(null)) {//Should find all these
+				throw new IllegalStateException("Unable to find lostMethod from " + newDescToLambda.keySet() + " => " + oldDescToMethod.keySet());
 			}
+
+			lostToGained.forEach((lost, gained) -> addFix(fixes, gained, lost));
+			lostMethods.removeAll(lostToGained.keySet());
+			gainedMethods.removeAll(lostToGained.values());
 
 			if (complete) return; //Caught all the lambdas
 		}
 
 		//If we can't directly match up the lost and gained lambda like methods, nor match by description more creative solutions will be needed
-		throw new IllegalStateException("Unable to resolve " + gainedLambdas.size() + " lambdas in " + className);
+		throw new IllegalStateException("Unable to resolve " + gainedLambdas.size() + " lambda(s) in " + className + ": " + gainedLambdas.stream().map(method -> method.name + method.desc).collect(Collectors.joining(", ", "[", "]")) + " from " + lostMethods.stream().map(method -> method.name + method.desc).collect(Collectors.joining(", ", "[", "]")) + " having found " + fixes);
 	}
 
 	private void addFix(Map<String, String> fixes, MethodNode from, MethodNode to) {
