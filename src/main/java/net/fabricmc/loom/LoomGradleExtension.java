@@ -265,6 +265,6 @@ public class LoomGradleExtension {
 	}
 
 	public File getOptiFine() {
-		return atFile;
+		return optifine;
 	}
 }

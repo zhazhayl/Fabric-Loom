@@ -87,6 +87,11 @@ public class MinecraftProvider extends DependencyProvider {
 		libraryProvider = new MinecraftLibraryProvider();
 		libraryProvider.provide(this, project, postPopulationScheduler);
 
+		if (extension.hasOptiFine()) {
+			MINECRAFT_CLIENT_JAR = Openfine.process(project.getLogger(), minecraftVersion, MINECRAFT_CLIENT_JAR, extension.getOptiFine());
+			project.getDependencies().add(Constants.MINECRAFT_DEPENDENCIES, project.getDependencies().module("com.github.Chocohead:OptiSine:cc6da75"));
+		}
+
 		if (!MINECRAFT_MERGED_JAR.exists()) {
 			try {
 				mergeJars(project.getLogger());
@@ -97,11 +102,6 @@ public class MinecraftProvider extends DependencyProvider {
 				project.getLogger().error("Could not merge JARs! Deleting source JARs - please re-run the command and move on.", e);
 				throw new RuntimeException();
 			}
-		}
-
-		if (extension.hasOptiFine()) {
-			MINECRAFT_MERGED_JAR = Openfine.process(project.getLogger(), minecraftVersion, MINECRAFT_MERGED_JAR, extension.getOptiFine());
-			project.getDependencies().add(Constants.MINECRAFT_DEPENDENCIES, project.getDependencies().module("com.github.Chocohead:OptiSine:cc6da75"));
 		}
 	}
 

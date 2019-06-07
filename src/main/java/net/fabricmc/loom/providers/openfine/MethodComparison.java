@@ -224,6 +224,7 @@ public class MethodComparison {
 			return a.dims == b.dims && Objects.equals(a.desc, b.desc);
 		}
 
+		case AbstractInsnNode.INSN:
 		case AbstractInsnNode.LABEL:
 		case AbstractInsnNode.LINE:
 		case AbstractInsnNode.FRAME: {

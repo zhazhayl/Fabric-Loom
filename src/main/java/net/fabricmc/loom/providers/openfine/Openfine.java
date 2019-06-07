@@ -46,13 +46,16 @@ public class Openfine {
 			throw new InvalidUserDataException("Incompatible OptiFine version, requires " + optifine.minecraftVersion + " rather than " + mcVersion);
 		}
 
+		File optiCache = new File(minecraft.getParentFile(), "optifine");
+		optiCache.mkdirs();
+
 		if (optifine.isInstaller) {
 			File installer = optifineJar;
-			optifineJar = new File(minecraft.getParentFile(), "optifine" + File.pathSeparator + FilenameUtils.removeExtension(optifineJar.getName()) + "-extract.jar");
+			optifineJar = new File(optiCache, FilenameUtils.removeExtension(optifineJar.getName()) + "-extract.jar");
 			if (!optifineJar.exists()) extract(logger, minecraft, installer, optifineJar);
 		}
 
-		File merged = optifineJar = new File(minecraft.getParentFile(), "optifine" + File.pathSeparator + FilenameUtils.removeExtension(minecraft.getName()) + "-optifined.jar");
+		File merged = new File(optiCache, FilenameUtils.removeExtension(minecraft.getName()) + "-optifined.jar");
 		if (!merged.exists()) merge(logger, minecraft, optifineJar, merged);
 
 		return merged;
@@ -94,11 +97,11 @@ public class Openfine {
 		try (FileSystemDelegate mcFS = StitchUtil.getJarFileSystem(minecraft, false);
 				FileSystemDelegate ofFS = StitchUtil.getJarFileSystem(optifine, false);
 				FileSystemDelegate outputFS = StitchUtil.getJarFileSystem(to, true)) {
-			for (String entry : mcEntries) {
+			for (String entry : Sets.difference(mcEntries, optifineEntries)) {
 				copy(mcFS.get(), outputFS.get(), entry);
 			}
 
-			for (String entry : optifineEntries) {
+			for (String entry : Sets.difference(optifineEntries, mcEntries)) {
 				copy(ofFS.get(), outputFS.get(), entry);
 			}
 
@@ -112,6 +115,7 @@ public class Openfine {
 			            Files.createDirectories(pathOut.getParent());
 			        }
 
+			        logger.info("Reconstructing " + entry);
 			        byte[] data = ClassReconstructor.reconstruct(Files.readAllBytes(pathRawIn), Files.readAllBytes(pathPatchedIn));
 
 			        //BasicFileAttributes touchTime = Files.readAttributes(pathIn, BasicFileAttributes.class);

@@ -180,7 +180,7 @@ public class Annotator {
 		}
 
 		if (!changedFields.isEmpty()) {
-			on: for (Entry<String, ChangeSet> entry : changedMethods.entrySet()) {
+			on: for (Entry<String, ChangeSet> entry : changedFields.entrySet()) {
 				String fieldTarget = entry.getKey();
 
 				for (FieldNode field : node.fields) {
