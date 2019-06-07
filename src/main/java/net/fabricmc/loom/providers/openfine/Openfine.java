@@ -127,6 +127,10 @@ public class Openfine {
 					copy(ofFS.get(), outputFS.get(), entry);
 				}
 			}
+		} catch (IllegalStateException e) {
+			//If an ISE is thrown something has clearly gone wrong with the merging of the jars, thus we don't want to keep the corrupted output
+			if (!to.delete()) to.deleteOnExit();
+			throw e;
 		}
 	}
 
