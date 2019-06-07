@@ -65,8 +65,10 @@ public class MethodChanges {
 		List<MethodNode> gainedLambdas = gainedMethods.stream().filter(method -> (method.access & Opcodes.ACC_STATIC) != 0 && method.name.startsWith("lambda$")).collect(Collectors.toList());
 		if (gainedLambdas.isEmpty()) return; //Nothing looks like a lambda
 
+		Set<String> possibleLambdas = gainedLambdas.stream().map(method -> className + '#' + method.name + method.desc).collect(Collectors.toSet()); //The collection of lambdas we're looking to fix, any others are irrelevant from the point of view that they're probably fine
+
 		if (gainedLambdas.size() == lostMethods.size()) {
-			int[] lambdaDemand = modifiedMethods.stream().mapToLong(comparison -> comparison.getLambads().stream().map(lambda -> lambda.substring(0, lambda.indexOf('#'))).filter(className::equals).count()).filter(count -> count > 0).mapToInt(Math::toIntExact).toArray();
+			int[] lambdaDemand = modifiedMethods.stream().mapToLong(comparison -> comparison.getLambads().stream().filter(possibleLambdas::contains).count()).filter(count -> count > 0).mapToInt(Math::toIntExact).toArray();
 			Pattern regex = Pattern.compile("lambda\\$(\\w+)\\$(\\d+)");
 			int[] lambdaSupply = gainedLambdas.stream().map(method -> regex.matcher(method.name)).filter(Matcher::matches).sorted(Comparator.comparingInt(matcher -> Integer.parseInt(matcher.group(2)))).collect(Collectors.groupingBy(matcher -> matcher.group(1), LinkedHashMap::new, Collectors.counting())).values().stream().mapToInt(Long::intValue).toArray();
 
@@ -81,8 +83,7 @@ public class MethodChanges {
 		Map<String, MethodNode> newDescToLambda = gainedLambdas.stream().collect(Collectors.groupingBy(lambda -> lambda.desc)).entrySet().stream().filter(entry -> entry.getValue().size() == 1).collect(Collectors.toMap(Entry::getKey, entry -> Iterables.getOnlyElement(entry.getValue())));
 		Map<String, MethodNode> oldDescToMethod = lostMethods.stream().collect(Collectors.groupingBy(lambda -> lambda.desc)).entrySet().stream().filter(entry -> entry.getValue().size() == 1).collect(Collectors.toMap(Entry::getKey, entry -> Iterables.getOnlyElement(entry.getValue())));
 		if (!newDescToLambda.isEmpty() && !oldDescToMethod.isEmpty()) {
-			Set<String> possibleLambdas = gainedLambdas.stream().map(method -> method.name + method.desc).collect(Collectors.toSet()); //The collection of lambdas we're looking to fix, any others are irrelevant from the point of view that they're probably fine
-			boolean complete = modifiedMethods.stream().flatMap(comparison -> comparison.getLambads().stream().filter(lambda -> className.equals(lambda.substring(0, lambda.indexOf('#'))))).filter(lambda -> possibleLambdas.contains(lambda.substring(lambda.indexOf('#') + 1))).allMatch(lambda -> newDescToLambda.containsKey(lambda.substring(lambda.indexOf('('))));
+			boolean complete = modifiedMethods.stream().flatMap(comparison -> comparison.getLambads().stream().filter(possibleLambdas::contains)).allMatch(lambda -> newDescToLambda.containsKey(lambda.substring(lambda.indexOf('('))));
 
 			Map<MethodNode, MethodNode> lostToGained = newDescToLambda.entrySet().stream().collect(Collectors.toMap(entry -> oldDescToMethod.get(entry.getKey()), Entry::getValue));
 			if (lostToGained.containsKey(null)) {//Should find all these
