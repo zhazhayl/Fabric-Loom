@@ -125,7 +125,7 @@ public class MethodChanges {
 	public void annotate(Annotator annotator) {
 		lostMethods.stream().map(method -> {
 			Type methodType = Type.getType(method.desc);
-			StringJoiner joiner = new StringJoiner(", ");
+			StringJoiner joiner = new StringJoiner(", ", "(", ")");
 			Arrays.stream(methodType.getArgumentTypes()).map(Type::getClassName).forEach(joiner::add);
 			return method.name + joiner.toString() + methodType.getReturnType();
 		}).forEach(annotator::dropMethod);
