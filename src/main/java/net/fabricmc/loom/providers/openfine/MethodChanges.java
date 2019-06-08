@@ -62,7 +62,7 @@ public class MethodChanges {
 	}
 
 	public void tryFixLambdas(Map<String, String> fixes) {//How do you fix lambdas? With dozens of other lambdas of course
-		List<MethodNode> gainedLambdas = gainedMethods.stream().filter(method -> (method.access & Opcodes.ACC_STATIC) != 0 && method.name.startsWith("lambda$")).collect(Collectors.toList());
+		List<MethodNode> gainedLambdas = gainedMethods.stream().filter(method -> (method.access & Opcodes.ACC_SYNTHETIC) != 0 && method.name.startsWith("lambda$")).collect(Collectors.toList());
 		if (gainedLambdas.isEmpty()) return; //Nothing looks like a lambda
 
 		Set<String> possibleLambdas = gainedLambdas.stream().map(method -> className + '#' + method.name + method.desc).collect(Collectors.toSet()); //The collection of lambdas we're looking to fix, any others are irrelevant from the point of view that they're probably fine
@@ -82,10 +82,12 @@ public class MethodChanges {
 
 		Map<String, MethodNode> newDescToLambda = gainedLambdas.stream().collect(Collectors.groupingBy(lambda -> lambda.desc)).entrySet().stream().filter(entry -> entry.getValue().size() == 1).collect(Collectors.toMap(Entry::getKey, entry -> Iterables.getOnlyElement(entry.getValue())));
 		Map<String, MethodNode> oldDescToMethod = lostMethods.stream().collect(Collectors.groupingBy(lambda -> lambda.desc)).entrySet().stream().filter(entry -> entry.getValue().size() == 1).collect(Collectors.toMap(Entry::getKey, entry -> Iterables.getOnlyElement(entry.getValue())));
-		if (!newDescToLambda.isEmpty() && !oldDescToMethod.isEmpty()) {
-			boolean complete = modifiedMethods.stream().flatMap(comparison -> comparison.getLambads().stream().filter(possibleLambdas::contains)).allMatch(lambda -> newDescToLambda.containsKey(lambda.substring(lambda.indexOf('('))));
 
-			Map<MethodNode, MethodNode> lostToGained = newDescToLambda.entrySet().stream().collect(Collectors.toMap(entry -> oldDescToMethod.get(entry.getKey()), Entry::getValue));
+		Set<String> commonDescs = Sets.intersection(newDescToLambda.keySet(), oldDescToMethod.keySet()); //Unique descriptions that are found in both the lost methods and gained lambdas
+		if (!commonDescs.isEmpty()) {
+			boolean complete = modifiedMethods.stream().flatMap(comparison -> comparison.getLambads().stream().filter(possibleLambdas::contains)).allMatch(lambda -> commonDescs.contains(lambda.substring(lambda.indexOf('('))));
+
+			Map<MethodNode, MethodNode> lostToGained = newDescToLambda.entrySet().stream().filter(entry -> oldDescToMethod.containsKey(entry.getKey())).collect(Collectors.toMap(entry -> oldDescToMethod.get(entry.getKey()), Entry::getValue));
 			if (lostToGained.containsKey(null)) {//Should find all these
 				throw new IllegalStateException("Unable to find lostMethod from " + newDescToLambda.keySet() + " => " + oldDescToMethod.keySet());
 			}
@@ -95,6 +97,7 @@ public class MethodChanges {
 			gainedMethods.removeAll(lostToGained.values());
 
 			if (complete) return; //Caught all the lambdas
+			gainedLambdas.removeIf(lambda -> !gainedMethods.contains(lambda));
 		}
 
 		//If we can't directly match up the lost and gained lambda like methods, nor match by description more creative solutions will be needed
