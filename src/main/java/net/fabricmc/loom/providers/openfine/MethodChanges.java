@@ -97,7 +97,7 @@ public class MethodChanges {
 			gainedMethods.removeAll(lostToGained.values());
 
 			if (complete) return; //Caught all the lambdas
-			gainedLambdas.removeIf(lambda -> !gainedMethods.contains(lambda));
+			gainedLambdas.retainAll(gainedMethods);
 		}
 
 		//If we can't directly match up the lost and gained lambda like methods, nor match by description more creative solutions will be needed
