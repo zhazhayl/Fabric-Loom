@@ -27,6 +27,8 @@ package net.fabricmc.loom.providers;
 import com.google.common.io.Files;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+
+import net.fabricmc.loom.AbstractPlugin;
 import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.providers.openfine.Openfine;
 import net.fabricmc.loom.util.*;
@@ -89,7 +91,9 @@ public class MinecraftProvider extends DependencyProvider {
 
 		if (extension.hasOptiFine()) {
 			MINECRAFT_CLIENT_JAR = Openfine.process(project.getLogger(), minecraftVersion, MINECRAFT_CLIENT_JAR, extension.getOptiFine());
+			MINECRAFT_MERGED_JAR = new File(MINECRAFT_CLIENT_JAR.getParentFile(), MINECRAFT_CLIENT_JAR.getName().replace("client", "merged"));
 			project.getDependencies().add(Constants.MINECRAFT_DEPENDENCIES, project.getDependencies().module("com.github.Chocohead:OptiSine:cc6da75"));
+			AbstractPlugin.addMavenRepo(project, "Jitpack", "https://jitpack.io/"); //Needed to fetch OptiSine from
 		}
 
 		if (!MINECRAFT_MERGED_JAR.exists()) {
