@@ -54,7 +54,7 @@ public class MethodChanges {
 		}
 
 		this.className = className;
-		modifiedMethods.sort(Comparator.comparingInt(method -> original.indexOf(method.node)));
+		modifiedMethods.sort(Comparator.comparingInt(method -> !"<clinit>".equals(method.node.name) ? patched.indexOf(method.node) : -1));
 		lostMethods.sort(Comparator.comparingInt(original::indexOf));
 		gainedMethods.sort(Comparator.comparingInt(patched::indexOf));
 	}
@@ -144,6 +144,36 @@ public class MethodChanges {
 				addFix(fixes, gainedLambdas.remove(1), lostMethods.get(0)); //Match lambda$init$1(Lcwq;)V => b(Lcwq;)V
 
 				return; //The init$2 lambda is an OptiFine added button callback
+			}
+
+			case "dix": {//ParticleManager
+				expect("lost methods", lostMethods, "a(Lagh;Ljava/util/Map;Ldui$a;)V");
+				expect("gained lambdas", gainedLambdas, "lambda$reload$5(Lagh;Ljava/util/Map;Ljava/lang/Object;)V");
+
+				expect("new matched lambdas", fixes.keySet(), "dix#lambda$reload$1(Lxe;Ljava/util/Map;Ljava/util/concurrent/Executor;Lqs;)Ljava/util/concurrent/CompletableFuture;", "dix#lambda$reload$3(Lagh;Ljava/util/Map;Lxe;Ljava/lang/Void;)Ldui$a;", "dix#lambda$addBlockDestroyEffects$8(Lev;Lbvk;DDDDDD)V",
+						"dix#lambda$tick$7(Ldiz;)Ljava/util/Queue;", "dix#lambda$null$0(Lxe;Lqs;Ljava/util/Map;)V", "dix#lambda$null$4(Lduj;Lqs;Ljava/util/List;)V", "dix#lambda$reload$2(I)[Ljava/util/concurrent/CompletableFuture;", "dix#lambda$tick$6(Ldiz;Ljava/util/Queue;)V");
+				expect("old matched lambdas", fixes.values(), "dix#a(Lxe;Ljava/util/Map;Ljava/util/concurrent/Executor;Lqs;)Ljava/util/concurrent/CompletableFuture;", "dix#a(Lagh;Ljava/util/Map;Lxe;Ljava/lang/Void;)Ldui$a;", "dix#a(Lev;Lbvk;DDDDDD)V", "dix#a(Ldiz;)Ljava/util/Queue;",
+						"dix#b(Lxe;Lqs;Ljava/util/Map;)V", "dix#a(Lduj;Lqs;Ljava/util/List;)V", "dix#a(I)[Ljava/util/concurrent/CompletableFuture;", "dix#a(Ldiz;Ljava/util/Queue;)V");
+
+				return; //The reload$5 lambda does match the single lost method, but has a signature change (apparently for no reason)
+			}
+
+			case "dwa": {//ModelLoader
+				expect("lost methods", lostMethods, "a(Lxd;)Lcom/mojang/datafixers/util/Pair;", "a(Ldlm;)V", "b(Ldlm;)V");
+				expect("gained lambdas", gainedLambdas, "lambda$loadBlockstate$11(Lqs;Lxd;)Lcom/mojang/datafixers/util/Pair;", "lambda$static$1(Ldlm;)V", "lambda$static$0(Ldlm;)V");
+
+				expect("new matched lambdas", fixes.keySet(), "dwa#lambda$null$13(Ldwg;Ljava/util/Map$Entry;)Z", "dwa#lambda$null$14(Ljava/util/Map;Ldlv;Ldwg;Ldln;Lbvk;)V", "dwa#lambda$loadBlockstate$10(Ljava/util/Map;Lqs;Lbvk;)V", "dwa#lambda$null$2(Lqs;Lbvk;)V",
+						"dwa#lambda$loadBlockstate$15(Lcom/google/common/collect/ImmutableList;Lbvl;Ljava/util/Map;Ldwg;Ldln;Lqs;Lcom/mojang/datafixers/util/Pair;Ljava/lang/String;Ldlv;)V", "dwa#lambda$parseVariantKey$8(Lbmm;Ljava/util/Map;Lbvk;)Z", "dwa#lambda$func_217844_a$7(Lqs;)V",
+						"dwa#lambda$new$4(Lbvk;)V", "dwa#lambda$new$5(Ljava/util/Set;Ldwg;)Ljava/util/stream/Stream;", "dwa#lambda$new$3(Lqs;Lbvl;)V", "dwa#lambda$new$6(Ljava/lang/String;)V", "dwa#lambda$loadBlockstate$12(Ljava/util/Map;Ldwg;Lbvk;)V", "dwa#lambda$loadBlockstate$9(Lqs;)Lbvl;");
+				expect("old matched lambdas", fixes.values(), "dwa#a(Ldwg;Ljava/util/Map$Entry;)Z", "dwa#a(Ljava/util/Map;Ldlv;Ldwg;Ldln;Lbvk;)V", "dwa#a(Ljava/util/Map;Lqs;Lbvk;)V", "dwa#a(Lqs;Lbvk;)V",
+						"dwa#a(Lcom/google/common/collect/ImmutableList;Lbvl;Ljava/util/Map;Ldwg;Ldln;Lqs;Lcom/mojang/datafixers/util/Pair;Ljava/lang/String;Ldlv;)V", "dwa#a(Lbmm;Ljava/util/Map;Lbvk;)Z", "dwa#e(Lqs;)V", "dwa#a(Lbvk;)V", "dwa#a(Ljava/util/Set;Ldwg;)Ljava/util/stream/Stream;",
+						"dwa#a(Lqs;Lbvl;)V", "dwa#a(Ljava/lang/String;)V", "dwa#a(Ljava/util/Map;Ldwg;Lbvk;)V", "dwa#d(Lqs;)Lbvl;");
+
+				addFix(fixes, gainedLambdas.remove(1), lostMethods.get(1)); //Match lambda$static$1(Ldlm;)V => a(Ldlm;)V
+				addFix(fixes, gainedLambdas.remove(1), lostMethods.get(1)); //Match lambda$static$0(Ldlm;)V => b(Ldlm;)V
+				//The loadBlockstate$11 lambda matches the remaining lost method, but gains a parameter for Forge blockstate support
+
+				return;
 			}
 		}
 
