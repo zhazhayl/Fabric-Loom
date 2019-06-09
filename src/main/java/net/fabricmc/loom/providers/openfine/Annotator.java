@@ -65,18 +65,22 @@ public class Annotator {
 	}
 
 	public void apply(ClassNode node) {
-		boolean useAccessChange = false, useFinalityChange = false;
+		boolean hasChanged = false, useAccessChange = false, useFinalityChange = false;
 
 		if (accessChange != AccessChange.NONE) {
 			AnnotationVisitor av = node.visitAnnotation(Type.getDescriptor(com.chocohead.optisine.AccessChange.class), false);
 			av.visitEnum("was", Type.getDescriptor(Access.class), accessChange.toAccess().name());
 			av.visitEnd();
+
+			hasChanged = true;
 		}
 
 		if (finalityChange != FinalityChange.NONE) {
 			AnnotationVisitor av = node.visitAnnotation(Type.getDescriptor(com.chocohead.optisine.FinalityChange.class), false);
 			av.visitEnum("change", Type.getDescriptor(Finality.class), finalityChange.toFinality().name());
 			av.visitEnd();
+
+			hasChanged = true;
 		}
 
 		if (!gainedInterfaces.isEmpty()) {
@@ -97,6 +101,8 @@ public class Annotator {
 				value.visitEnd();
 				av.visitEnd();
 			}
+
+			hasChanged = true;
 		}
 
 		if (!lostInterfaces.isEmpty() || !lostMethods.isEmpty() || !lostFields.isEmpty()) {
@@ -147,6 +153,7 @@ public class Annotator {
 			}
 
 			addInnerAccess(node, OptiFineRemoved.Type.class);
+			hasChanged = true;
 		}
 
 		if (!changedMethods.isEmpty()) {
@@ -177,6 +184,7 @@ public class Annotator {
 				throw new IllegalStateException("Cannot find " + methodTarget + " in " + node.name);
 			}
 
+			hasChanged = true;
 		}
 
 		if (!changedFields.isEmpty()) {
@@ -205,6 +213,8 @@ public class Annotator {
 
 				throw new IllegalStateException("Cannot find " + fieldTarget + " in " + node.name);
 			}
+
+			hasChanged = true;
 		}
 
 		if (!gainedMethods.isEmpty()) {
@@ -218,6 +228,8 @@ public class Annotator {
 
 				throw new IllegalStateException("Cannot find " + gainedMethod + " in " + node.name);
 			}
+
+			hasChanged = true;
 		}
 
 		if (!gainedFields.isEmpty()) {
@@ -231,9 +243,11 @@ public class Annotator {
 
 				throw new IllegalStateException("Cannot find " + gainedField + " in " + node.name);
 			}
+
+			hasChanged = true;
 		}
 
-		node.visitAnnotation(Type.getDescriptor(OptiFineChanged.class), false).visitEnd();
+		if (hasChanged) node.visitAnnotation(Type.getDescriptor(OptiFineChanged.class), false).visitEnd();
 		if (useAccessChange) addInnerAccess(node, Access.class);
 		if (useFinalityChange) addInnerAccess(node, Finality.class);
 	}
