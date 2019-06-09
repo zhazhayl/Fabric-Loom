@@ -54,7 +54,7 @@ public class MethodChanges {
 		}
 
 		this.className = className;
-		modifiedMethods.sort(Comparator.comparingInt(method -> !"<clinit>".equals(method.node.name) ? patched.indexOf(method.node) : -1));
+		modifiedMethods.sort(Comparator.comparingInt(method -> !"<clinit>".equals(method.node.name) ? patched.indexOf(method.node) : "com/mojang/blaze3d/platform/GLX".equals(className) ? patched.size() : -1));
 		lostMethods.sort(Comparator.comparingInt(original::indexOf));
 		gainedMethods.sort(Comparator.comparingInt(patched::indexOf));
 	}

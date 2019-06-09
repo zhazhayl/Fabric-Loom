@@ -81,6 +81,12 @@ public class ClassReconstructor {
 				String desc = remap.substring(split);
 
 				idin.bsmArgs[1] = new Handle(handle.getTag(), owner, name, desc, handle.isInterface());
+
+				if (!desc.equals(handle.getDesc())) {//Shouldn't ever do this, the methods aren't really equal if the descriptions are different
+					System.err.println("Description changed remapping lambda handle: " + handle + " => " + idin.bsmArgs[1]);
+					idin.bsmArgs[1] = handle; //Snap change back
+					//throw new IllegalStateException("Description changed remapping lambda handle: " + handle + " => " + idin.bsmArgs[1]);
+				}
 			}
 		}));
 		changes.refreshChanges(originalMethods);
