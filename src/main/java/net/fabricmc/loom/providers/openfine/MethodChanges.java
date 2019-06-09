@@ -2,6 +2,7 @@ package net.fabricmc.loom.providers.openfine;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -21,6 +22,7 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.MethodNode;
 
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Streams;
 
@@ -100,8 +102,65 @@ public class MethodChanges {
 			gainedLambdas.retainAll(gainedMethods);
 		}
 
+		switch (className) {//Special case classes which can't be easily automatically resolved or have misses that cannot be avoided
+			case "cvi": {//ItemRenderer
+				expect("lost methods", lostMethods, "a(Lcxm;CI)V", "a(Lcxm;II)V", "a(I[ZLcxl;III)V", "a(Ljm;)V", "b(Ljm;)V");
+				expect("gained lambdas", gainedLambdas, "lambda$onCharEvent$6(CILcxm;)V", "lambda$onCharEvent$5(IILcxm;)V", "lambda$onKeyEvent$4(I[ZIIILcxl;)V", "lambda$onKeyEvent$3(Ljm;)V", "lambda$null$2(Ljm;)V");
+
+				expect("new matched lambdas", fixes.keySet(), "cvi#lambda$getClipboardString$7(IJ)V", "cvi#lambda$copyHoveredObject$1(Lqs;Lcrx;Lib;)V", "cvi#lambda$copyHoveredObject$0(Lbvk;Lev;Lib;)V");
+				expect("old matched lambdas", fixes.values(), "cvi#a(IJ)V", "cvi#b(Lqs;Lcrx;Lib;)V", "cvi#b(Lbvk;Lev;Lib;)V");
+
+				List<MethodNode> reversedLostMethods = Lists.reverse(lostMethods); //Not strictly necessary, just makes grabbing the final elements a little nicer looking
+				List<MethodNode> reversedGainedLambdas = Lists.reverse(gainedLambdas);
+
+				addFix(fixes, reversedGainedLambdas.remove(0), reversedLostMethods.remove(0)); //Match lambda$null$2(Ljm;)V => b(Ljm;)V
+				addFix(fixes, reversedGainedLambdas.remove(0), reversedLostMethods.remove(0)); //Match lambda$onKeyEvent$3(Ljm;)V => a(Ljm;)V
+				//The remaining 3 lambdas are technically still in the class, but have completely different signatures due to the way they've changed to account for Forge event support
+
+				return; //Manually checked and corrected everything
+			}
+
+			case "cwd": {//InGameHud
+				expect("lost methods", lostMethods, "a(FIILduj;)V");
+				expect("gained lambdas", gainedLambdas, "lambda$renderPotionEffects$1(FIILduj;)V", "lambda$renderPotionEffects$0(FIILduj;)V");
+
+				expect("new matched lambdas", fixes.keySet(), "cwd#lambda$renderScoreboard$2(Lcsw;)Z");
+				expect("old matched lambdas", fixes.values(), "cwd#a(Lcsw;)Z");
+
+				//The single lost lambda is effectively duplicated by the two gained ones, owing to Forge event support using a duplicated (but different) code path
+				addFix(fixes, gainedLambdas.remove(0), lostMethods.remove(0)); //Match lambda$renderPotionEffects$1(FIILduj;)V => a(FIILduj;)V as it is the vanilla code path version
+
+				return;
+			}
+
+			case "czv": {//SkinOptionsScreen
+				expect("lost methods", lostMethods, "a(Lcwq;)V", "b(Lcwq;)V");
+				expect("gained lambdas", gainedLambdas, "lambda$init$3(Lcwq;)V", "lambda$init$2(Lcwq;)V", "lambda$init$1(Lcwq;)V");
+
+				expect("new matched lambdas", fixes.keySet(), "czv#lambda$init$0(Lavz;Lcwq;)V");
+				expect("old matched lambdas", fixes.values(), "czv#a(Lavz;Lcwq;)V");
+
+				addFix(fixes, gainedLambdas.remove(0), lostMethods.get(0)); //Match lambda$init$3(Lcwq;)V => a(Lcwq;)V
+				addFix(fixes, gainedLambdas.remove(1), lostMethods.get(0)); //Match lambda$init$1(Lcwq;)V => b(Lcwq;)V
+
+				return; //The init$2 lambda is an OptiFine added button callback
+			}
+		}
+
 		//If we can't directly match up the lost and gained lambda like methods, nor match by description more creative solutions will be needed
 		throw new IllegalStateException("Unable to resolve " + gainedLambdas.size() + " lambda(s) in " + className + ": " + gainedLambdas.stream().map(method -> method.name + method.desc).collect(Collectors.joining(", ", "[", "]")) + " from " + lostMethods.stream().map(method -> method.name + method.desc).collect(Collectors.joining(", ", "[", "]")) + " having found " + fixes);
+	}
+
+	private static void expect(String type, List<MethodNode> methods, String... names) {
+		if (!Arrays.equals(methods.stream().map(method -> method.name + method.desc).toArray(String[]::new), names)) {
+			throw new IllegalStateException("Mismatch with " + type + ", expected " + Arrays.toString(names) + " but had " + methods.stream().map(method -> method.name + method.desc).collect(Collectors.joining(", ", "[", "]")));
+		}
+	}
+
+	private static void expect(String type, Collection<String> methods, String... names) {
+		if (methods.size() != names.length || !methods.containsAll(Arrays.asList(names))) {
+			throw new IllegalStateException("Mismatch with " + type + ", expected " + Arrays.toString(names) + " but had " + methods);
+		}
 	}
 
 	private void addFix(Map<String, String> fixes, MethodNode from, MethodNode to) {
