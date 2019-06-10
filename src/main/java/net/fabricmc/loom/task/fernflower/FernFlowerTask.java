@@ -35,6 +35,7 @@ import org.gradle.internal.logging.progress.ProgressLogger;
 import org.gradle.internal.logging.progress.ProgressLoggerFactory;
 import org.gradle.internal.service.ServiceRegistry;
 import org.gradle.process.ExecResult;
+import org.jetbrains.java.decompiler.main.extern.IFernflowerLogger.Severity;
 import org.jetbrains.java.decompiler.main.extern.IFernflowerPreferences;
 
 import java.util.*;
@@ -99,7 +100,7 @@ public class FernFlowerTask extends AbstractDecompileTask implements ForkingJava
 
                 int sepIdx = line.indexOf("::");
                 if (sepIdx < 1) {
-                	getLogger().warn(line);
+                	getLogger().error("Unprefixed line: " + line);
                 	return;
                 }
                 String id = line.substring(0, sepIdx).trim();
@@ -123,7 +124,16 @@ public class FernFlowerTask extends AbstractDecompileTask implements ForkingJava
                         }
                         inUseLoggers.put(id, logger);
                     }
-                    logger.progress(data);
+
+                    if (data.startsWith(Severity.INFO.prefix)) {
+                    	logger.progress(data.substring(Severity.INFO.prefix.length()));
+                    } else if (data.startsWith(Severity.TRACE.prefix)) {
+                    	logger.progress(data.substring(Severity.TRACE.prefix.length()));
+                    } else if (data.startsWith(Severity.WARN.prefix)) {
+                    	getLogger().warn(data.substring(Severity.WARN.prefix.length()));
+                    } else {
+                    	getLogger().error(data.substring(Severity.ERROR.prefix.length()));
+                    }
                 }
             }));
         });

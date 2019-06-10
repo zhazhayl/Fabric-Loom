@@ -55,7 +55,8 @@ public class ThreadIDFFLogger extends IFernflowerLogger {
 
     @Override
     public void writeMessage(String message, Severity severity) {
-        stdOut.println(message);
+    	line.get().push(severity.prefix + message);
+    	print();
     }
 
     @Override
@@ -78,22 +79,19 @@ public class ThreadIDFFLogger extends IFernflowerLogger {
     @Override
     public void startReadingClass(String className) {
         workingClass.get().push(className);
-        line.get().push("Decompiling " + className);
-        print();
+        writeMessage("Reading " + className, Severity.INFO);
     }
 
     @Override
     public void startClass(String className) {
         workingClass.get().push(className);
-        line.get().push("Decompiling " + className);
-        print();
+        writeMessage("Decompiling " + className, Severity.INFO);
     }
 
     @Override
     public void startMethod(String methodName) {
         String className = workingClass.get().peek();
-        line.get().push("Decompiling " + className + "." + methodName.substring(0, methodName.indexOf(" ")));
-        print();
+        writeMessage("Decompiling " + className + '.' + methodName.substring(0, methodName.indexOf(' ')), Severity.INFO);
     }
 
     @Override
@@ -111,8 +109,7 @@ public class ThreadIDFFLogger extends IFernflowerLogger {
 
     @Override
     public void startWriteClass(String className) {
-        line.get().push("Writing " + className);
-        print();
+    	writeMessage("Writing " + className, Severity.INFO);
     }
 
     @Override
