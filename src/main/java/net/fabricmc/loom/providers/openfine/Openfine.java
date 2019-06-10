@@ -38,7 +38,7 @@ import net.fabricmc.stitch.util.StitchUtil;
 import net.fabricmc.stitch.util.StitchUtil.FileSystemDelegate;
 
 public class Openfine {
-	public static File process(Logger logger, String mcVersion, File minecraft, File optifineJar) throws IOException {
+	public static File process(Logger logger, String mcVersion, File client, File server, File optifineJar) throws IOException {
 		OptiFineVersion optifine = new OptiFineVersion(optifineJar);
 		logger.info("Loaded OptiFine " + optifine.version);
 
@@ -46,17 +46,17 @@ public class Openfine {
 			throw new InvalidUserDataException("Incompatible OptiFine version, requires " + optifine.minecraftVersion + " rather than " + mcVersion);
 		}
 
-		File optiCache = new File(minecraft.getParentFile(), "optifine");
+		File optiCache = new File(client.getParentFile(), "optifine");
 		optiCache.mkdirs();
 
 		if (optifine.isInstaller) {
 			File installer = optifineJar;
 			optifineJar = new File(optiCache, FilenameUtils.removeExtension(optifineJar.getName()) + "-extract.jar");
-			if (!optifineJar.exists()) extract(logger, minecraft, installer, optifineJar);
+			if (!optifineJar.exists()) extract(logger, client, installer, optifineJar);
 		}
 
-		File merged = new File(optiCache, FilenameUtils.removeExtension(minecraft.getName()) + "-optifined.jar");
-		if (!merged.exists()) merge(logger, minecraft, optifineJar, merged);
+		File merged = new File(optiCache, FilenameUtils.removeExtension(client.getName()) + "-optifined.jar");
+		if (!merged.exists()) merge(logger, client, optifineJar, server, merged);
 
 		return merged;
 	}
@@ -78,11 +78,11 @@ public class Openfine {
 		}
 	}
 
-	private static void merge(Logger logger, File minecraft, File optifine, File to) throws IOException {
+	private static void merge(Logger logger, File client, File optifine, File server, File to) throws IOException {
 		logger.info("Merging OptiFine into " + to);
 
 		Set<String> mcEntries, optifineEntries, intersection;
-		try (JarFile mcJar = new JarFile(minecraft); JarFile optifineJar = new JarFile(optifine)) {
+		try (JarFile mcJar = new JarFile(client); JarFile optifineJar = new JarFile(optifine)) {
 			//Comparison on ZipEntries is poorly defined so we'll use the entry names for equality
 			mcEntries = ImmutableSet.copyOf(Iterators.transform(Iterators.forEnumeration(mcJar.entries()), JarEntry::getName));
 			optifineEntries = ImmutableSet.copyOf(Iterators.transform(Iterators.forEnumeration(optifineJar.entries()), JarEntry::getName));
@@ -94,8 +94,9 @@ public class Openfine {
 			}
 		}
 
-		try (FileSystemDelegate mcFS = StitchUtil.getJarFileSystem(minecraft, false);
+		try (FileSystemDelegate mcFS = StitchUtil.getJarFileSystem(client, false);
 				FileSystemDelegate ofFS = StitchUtil.getJarFileSystem(optifine, false);
+				FileSystemDelegate serverFS = StitchUtil.getJarFileSystem(server, false);
 				FileSystemDelegate outputFS = StitchUtil.getJarFileSystem(to, true)) {
 			for (String entry : Sets.difference(mcEntries, optifineEntries)) {
 				copy(mcFS.get(), outputFS.get(), entry);
@@ -115,8 +116,11 @@ public class Openfine {
 			            Files.createDirectories(pathOut.getParent());
 			        }
 
+			        Path pathStichFix = serverFS.get().getPath(entry);
+			        byte[] stitchFix = Files.isReadable(pathStichFix) ? Files.readAllBytes(pathStichFix) : null;
+
 			        logger.info("Reconstructing " + entry);
-			        byte[] data = ClassReconstructor.reconstruct(Files.readAllBytes(pathRawIn), Files.readAllBytes(pathPatchedIn));
+			        byte[] data = ClassReconstructor.reconstruct(Files.readAllBytes(pathRawIn), Files.readAllBytes(pathPatchedIn), stitchFix);
 
 			        //BasicFileAttributes touchTime = Files.readAttributes(pathIn, BasicFileAttributes.class);
 			        Files.write(pathOut, data, StandardOpenOption.CREATE_NEW);
