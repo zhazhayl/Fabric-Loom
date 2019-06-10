@@ -54,9 +54,13 @@ public class MethodChanges {
 		}
 
 		this.className = className;
-		modifiedMethods.sort(Comparator.comparingInt(method -> !"<clinit>".equals(method.node.name) ? patched.indexOf(method.node) : "com/mojang/blaze3d/platform/GLX".equals(className) ? patched.size() : -1));
+		sortModifiedMethods(patched);
 		lostMethods.sort(Comparator.comparingInt(original::indexOf));
 		gainedMethods.sort(Comparator.comparingInt(patched::indexOf));
+	}
+
+	void sortModifiedMethods(List<MethodNode> patched) {
+		modifiedMethods.sort(Comparator.comparingInt(method -> !"<clinit>".equals(method.node.name) ? patched.indexOf(method.node) : "com/mojang/blaze3d/platform/GLX".equals(className) ? patched.size() : -1));
 	}
 
 	public boolean couldNeedLambdasFixing() {
@@ -113,8 +117,8 @@ public class MethodChanges {
 				List<MethodNode> reversedLostMethods = Lists.reverse(lostMethods); //Not strictly necessary, just makes grabbing the final elements a little nicer looking
 				List<MethodNode> reversedGainedLambdas = Lists.reverse(gainedLambdas);
 
-				addFix(fixes, reversedGainedLambdas.remove(0), reversedLostMethods.remove(0)); //Match lambda$null$2(Ljm;)V => b(Ljm;)V
-				addFix(fixes, reversedGainedLambdas.remove(0), reversedLostMethods.remove(0)); //Match lambda$onKeyEvent$3(Ljm;)V => a(Ljm;)V
+				applyFix(fixes, reversedGainedLambdas.remove(0), reversedLostMethods.remove(0)); //Match lambda$null$2(Ljm;)V => b(Ljm;)V
+				applyFix(fixes, reversedGainedLambdas.remove(0), reversedLostMethods.remove(0)); //Match lambda$onKeyEvent$3(Ljm;)V => a(Ljm;)V
 				//The remaining 3 lambdas are technically still in the class, but have completely different signatures due to the way they've changed to account for Forge event support
 
 				return; //Manually checked and corrected everything
@@ -128,7 +132,7 @@ public class MethodChanges {
 				expect("old matched lambdas", fixes.values(), "cwd#a(Lcsw;)Z");
 
 				//The single lost lambda is effectively duplicated by the two gained ones, owing to Forge event support using a duplicated (but different) code path
-				addFix(fixes, gainedLambdas.remove(0), lostMethods.remove(0)); //Match lambda$renderPotionEffects$1(FIILduj;)V => a(FIILduj;)V as it is the vanilla code path version
+				applyFix(fixes, gainedLambdas.remove(0), lostMethods.remove(0)); //Match lambda$renderPotionEffects$1(FIILduj;)V => a(FIILduj;)V as it is the vanilla code path version
 
 				return;
 			}
@@ -140,8 +144,8 @@ public class MethodChanges {
 				expect("new matched lambdas", fixes.keySet(), "czv#lambda$init$0(Lavz;Lcwq;)V");
 				expect("old matched lambdas", fixes.values(), "czv#a(Lavz;Lcwq;)V");
 
-				addFix(fixes, gainedLambdas.remove(0), lostMethods.get(0)); //Match lambda$init$3(Lcwq;)V => a(Lcwq;)V
-				addFix(fixes, gainedLambdas.remove(1), lostMethods.get(0)); //Match lambda$init$1(Lcwq;)V => b(Lcwq;)V
+				applyFix(fixes, gainedLambdas.remove(0), lostMethods.get(0)); //Match lambda$init$3(Lcwq;)V => a(Lcwq;)V
+				applyFix(fixes, gainedLambdas.remove(1), lostMethods.get(0)); //Match lambda$init$1(Lcwq;)V => b(Lcwq;)V
 
 				return; //The init$2 lambda is an OptiFine added button callback
 			}
@@ -169,8 +173,8 @@ public class MethodChanges {
 						"dwa#a(Lcom/google/common/collect/ImmutableList;Lbvl;Ljava/util/Map;Ldwg;Ldln;Lqs;Lcom/mojang/datafixers/util/Pair;Ljava/lang/String;Ldlv;)V", "dwa#a(Lbmm;Ljava/util/Map;Lbvk;)Z", "dwa#e(Lqs;)V", "dwa#a(Lbvk;)V", "dwa#a(Ljava/util/Set;Ldwg;)Ljava/util/stream/Stream;",
 						"dwa#a(Lqs;Lbvl;)V", "dwa#a(Ljava/lang/String;)V", "dwa#a(Ljava/util/Map;Ldwg;Lbvk;)V", "dwa#d(Lqs;)Lbvl;");
 
-				addFix(fixes, gainedLambdas.remove(1), lostMethods.get(1)); //Match lambda$static$1(Ldlm;)V => a(Ldlm;)V
-				addFix(fixes, gainedLambdas.remove(1), lostMethods.get(1)); //Match lambda$static$0(Ldlm;)V => b(Ldlm;)V
+				applyFix(fixes, gainedLambdas.remove(1), lostMethods.get(1)); //Match lambda$static$1(Ldlm;)V => a(Ldlm;)V
+				applyFix(fixes, gainedLambdas.remove(1), lostMethods.get(1)); //Match lambda$static$0(Ldlm;)V => b(Ldlm;)V
 				//The loadBlockstate$11 lambda matches the remaining lost method, but gains a parameter for Forge blockstate support
 
 				return;
@@ -193,8 +197,24 @@ public class MethodChanges {
 		}
 	}
 
-	private void addFix(Map<String, String> fixes, MethodNode from, MethodNode to) {
+	private void applyFix(Map<String, String> fixes, MethodNode from, MethodNode to) {
+		if (addFix(fixes, from, to)) {
+			gainedMethods.remove(from);
+			lostMethods.remove(to);
+		}
+	}
+
+	private boolean addFix(Map<String, String> fixes, MethodNode from, MethodNode to) {
+		if (!from.desc.equals(to.desc)) {
+			System.err.println("Description changed remapping lambda handle: " + className + '#' + from.name + from.desc + " => " + className + '#' + to.name + to.desc);
+			return false; //Don't add the fix if it is wrong
+		}
+
 		fixes.put(className + '#' + from.name + from.desc, className + '#' + to.name + to.desc);
+
+		from.name = to.name; //Apply the rename to the actual method node too
+		modifiedMethods.add(new MethodComparison(to, from));
+		return true;
 	}
 
 	public Stream<MethodNode> modifiedMethods() {

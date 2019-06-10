@@ -53,7 +53,7 @@ public class ClassReconstructor {
 			Map<String, String> lambdaFixes = new HashMap<>();
 			methodChanges.tryFixLambdas(lambdaFixes);
 
-			if (!lambdaFixes.isEmpty()) fixLambdas(lambdaFixes, originalClass.methods, methodChanges);
+			if (!lambdaFixes.isEmpty()) fixLambdas(lambdaFixes, originalClass.methods, patchedClass.methods, methodChanges);
 		}
 		methodChanges.annotate(annotator);
 
@@ -71,7 +71,8 @@ public class ClassReconstructor {
 		return node;
 	}
 
-	private static void fixLambdas(Map<String, String> fixes, List<MethodNode> originalMethods, MethodChanges changes) {
+	private static void fixLambdas(Map<String, String> fixes, List<MethodNode> originalMethods, List<MethodNode> patchedMethods, MethodChanges changes) {
+		changes.sortModifiedMethods(patchedMethods);
 		changes.modifiedMethods().forEach(method -> MethodComparison.findLambdas(method.instructions, 0, idin -> {
 			Handle handle = (Handle) idin.bsmArgs[1];
 			String remap = fixes.get(handle.getOwner() + '#' + handle.getName() + handle.getDesc());
@@ -88,9 +89,7 @@ public class ClassReconstructor {
 				idin.bsmArgs[1] = new Handle(handle.getTag(), owner, name, desc, handle.isInterface());
 
 				if (!desc.equals(handle.getDesc())) {//Shouldn't ever do this, the methods aren't really equal if the descriptions are different
-					System.err.println("Description changed remapping lambda handle: " + handle + " => " + idin.bsmArgs[1]);
-					idin.bsmArgs[1] = handle; //Snap the change back
-					//throw new IllegalStateException("Description changed remapping lambda handle: " + handle + " => " + idin.bsmArgs[1]);
+					throw new IllegalStateException("Description changed remapping lambda handle: " + handle + " => " + idin.bsmArgs[1]);
 				}
 			}
 		}));
