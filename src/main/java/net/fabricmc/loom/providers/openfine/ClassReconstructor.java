@@ -73,7 +73,7 @@ public class ClassReconstructor {
 
 	private static void fixLambdas(Map<String, String> fixes, List<MethodNode> originalMethods, List<MethodNode> patchedMethods, MethodChanges changes) {
 		changes.sortModifiedMethods(patchedMethods);
-		changes.modifiedMethods().forEach(method -> MethodComparison.findLambdas(method.instructions, 0, idin -> {
+		patchedMethods.forEach(method -> MethodComparison.findLambdas(method.instructions, 0, idin -> {
 			Handle handle = (Handle) idin.bsmArgs[1];
 			String remap = fixes.get(handle.getOwner() + '#' + handle.getName() + handle.getDesc());
 
