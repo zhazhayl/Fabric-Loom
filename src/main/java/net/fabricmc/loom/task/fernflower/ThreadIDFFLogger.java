@@ -44,10 +44,6 @@ public class ThreadIDFFLogger extends IFernflowerLogger {
     private ThreadLocal<Stack<String>> workingClass = ThreadLocal.withInitial(Stack::new);
     private ThreadLocal<Stack<String>> line = ThreadLocal.withInitial(Stack::new);
 
-    public ThreadIDFFLogger() {
-        this(System.out, System.err);
-    }
-
     public ThreadIDFFLogger(PrintStream stdOut, PrintStream stdErr) {
         this.stdOut = stdOut;
         this.stdErr = stdErr;

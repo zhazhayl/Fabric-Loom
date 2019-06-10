@@ -27,6 +27,7 @@ package net.fabricmc.loom.task.fernflower;
 import net.fabricmc.loom.task.AbstractDecompileTask;
 import net.fabricmc.loom.task.ForkingJavaExecTask;
 import net.fabricmc.loom.util.ConsumingOutputStream;
+
 import org.gradle.api.internal.project.ProjectInternal;
 import org.gradle.api.logging.LogLevel;
 import org.gradle.api.tasks.Internal;
@@ -35,13 +36,19 @@ import org.gradle.internal.logging.progress.ProgressLogger;
 import org.gradle.internal.logging.progress.ProgressLoggerFactory;
 import org.gradle.internal.service.ServiceRegistry;
 import org.gradle.process.ExecResult;
+
 import org.jetbrains.java.decompiler.main.extern.IFernflowerLogger.Severity;
 import org.jetbrains.java.decompiler.main.extern.IFernflowerPreferences;
 
-import java.util.*;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.text.MessageFormat;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Stack;
 import java.util.function.Supplier;
-
-import static java.text.MessageFormat.format;
 
 /**
  * Created by covers1624 on 9/02/19.
@@ -63,7 +70,7 @@ public class FernFlowerTask extends AbstractDecompileTask implements ForkingJava
 
         List<String> args = new ArrayList<>();
 
-        options.forEach((k, v) -> args.add(format("-{0}={1}", k, v)));
+        options.forEach((k, v) -> args.add(MessageFormat.format("-{0}={1}", k, v)));
         args.add(getInput().getAbsolutePath());
         args.add("-o=" + getOutput().getAbsolutePath());
         if (getLineMapFile() != null) {
@@ -86,63 +93,74 @@ public class FernFlowerTask extends AbstractDecompileTask implements ForkingJava
         Stack<ProgressLogger> freeLoggers = new Stack<>();
         Map<String, ProgressLogger> inUseLoggers = new HashMap<>();
 
-        progressGroup.started();
-        ExecResult result = javaexec(spec -> {
-            spec.setMain(ForkedFFExecutor.class.getName());
-            spec.jvmArgs("-Xms200m", "-Xmx3G");
-            spec.setArgs(args);
-            spec.setErrorOutput(System.err);
-            spec.setStandardOutput(new ConsumingOutputStream(line -> {
-                if (line.startsWith("Listening for transport")) {
-                    System.out.println(line);
-                    return;
+        OutputStream stdOutput = new ConsumingOutputStream(line -> {
+            if (line.startsWith("Listening for transport")) {
+                System.out.println(line);
+                return;
+            }
+
+            int sepIdx = line.indexOf("::");
+            if (sepIdx < 1) {
+            	getLogger().error("Unprefixed line: " + line);
+            	return;
+            }
+            String id = line.substring(0, sepIdx).trim();
+            String data = line.substring(sepIdx + 2).trim();
+
+            ProgressLogger logger = inUseLoggers.get(id);
+
+            String[] segs = data.split(" ");
+            if (segs[0].equals("waiting")) {
+                if (logger != null) {
+                    logger.progress("Idle..");
+                    inUseLoggers.remove(id);
+                    freeLoggers.push(logger);
                 }
-
-                int sepIdx = line.indexOf("::");
-                if (sepIdx < 1) {
-                	getLogger().error("Unprefixed line: " + line);
-                	return;
-                }
-                String id = line.substring(0, sepIdx).trim();
-                String data = line.substring(sepIdx + 2).trim();
-
-                ProgressLogger logger = inUseLoggers.get(id);
-
-                String[] segs = data.split(" ");
-                if (segs[0].equals("waiting")) {
-                    if (logger != null) {
-                        logger.progress("Idle..");
-                        inUseLoggers.remove(id);
-                        freeLoggers.push(logger);
-                    }
-                } else {
-                    if (logger == null) {
-                        if (!freeLoggers.isEmpty()) {
-                            logger = freeLoggers.pop();
-                        } else {
-                            logger = loggerFactory.get();
-                        }
-                        inUseLoggers.put(id, logger);
-                    }
-
-                    if (data.startsWith(Severity.INFO.prefix)) {
-                    	logger.progress(data.substring(Severity.INFO.prefix.length()));
-                    } else if (data.startsWith(Severity.TRACE.prefix)) {
-                    	logger.progress(data.substring(Severity.TRACE.prefix.length()));
-                    } else if (data.startsWith(Severity.WARN.prefix)) {
-                    	getLogger().warn(data.substring(Severity.WARN.prefix.length()));
+            } else {
+                if (logger == null) {
+                    if (!freeLoggers.isEmpty()) {
+                        logger = freeLoggers.pop();
                     } else {
-                    	getLogger().error(data.substring(Severity.ERROR.prefix.length()));
+                        logger = loggerFactory.get();
                     }
+                    inUseLoggers.put(id, logger);
                 }
-            }));
-        });
-        inUseLoggers.values().forEach(ProgressLogger::completed);
-        freeLoggers.forEach(ProgressLogger::completed);
-        progressGroup.completed();
 
-        result.rethrowFailure();
-        result.assertNormalExitValue();
+                if (data.startsWith(Severity.INFO.prefix)) {
+                	logger.progress(data.substring(Severity.INFO.prefix.length()));
+                } else if (data.startsWith(Severity.TRACE.prefix)) {
+                	logger.progress(data.substring(Severity.TRACE.prefix.length()));
+                } else if (data.startsWith(Severity.WARN.prefix)) {
+                	getLogger().warn(data.substring(Severity.WARN.prefix.length()));
+                } else {
+                	getLogger().error(data.substring(Severity.ERROR.prefix.length()));
+                }
+            }
+        });
+        OutputStream errOutput = System.err;
+
+        try {
+	        progressGroup.started();
+
+	        if (!isNoFork()) {
+		        ExecResult result = javaexec(spec -> {
+		            spec.setMain(ForkedFFExecutor.class.getName());
+		            spec.jvmArgs("-Xms200m", "-Xmx3G");
+		            spec.setArgs(args);
+		            spec.setErrorOutput(errOutput);
+		            spec.setStandardOutput(stdOutput);
+		        });
+
+		        result.rethrowFailure();
+		        result.assertNormalExitValue();
+	        } else {
+	        	ForkedFFExecutor.main(args.toArray(new String[0]), new PrintStream(stdOutput, true), new PrintStream(errOutput, true));
+	        }
+        } finally {
+	        inUseLoggers.values().forEach(ProgressLogger::completed);
+	        freeLoggers.forEach(ProgressLogger::completed);
+	        progressGroup.completed();
+        }
     }
 
     //@formatter:off
@@ -150,7 +168,7 @@ public class FernFlowerTask extends AbstractDecompileTask implements ForkingJava
     @Internal public boolean isNoFork() { return noFork; }
     public void setNoFork(boolean noFork) { this.noFork = noFork; }
     public void setNumThreads(int numThreads) { this.numThreads = numThreads;
-    if (numThreads > 1) getProject().getLogger().warn("Using multiple threads is unsupported with ForgeFlower");
+    if (numThreads > 1) getLogger().warn("Using multiple threads is unsupported with ForgeFlower");
     }
     //@formatter:on
 }

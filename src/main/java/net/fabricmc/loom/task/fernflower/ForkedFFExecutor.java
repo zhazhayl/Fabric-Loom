@@ -30,6 +30,7 @@ import org.jetbrains.java.decompiler.main.extern.IResultSaver;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.util.*;
 
 /**
@@ -43,6 +44,10 @@ import java.util.*;
 public class ForkedFFExecutor {
 
     public static void main(String[] args) throws IOException {
+    	main(args, System.out, System.err);
+    }
+
+	public static void main(String[] args, PrintStream stdOut, PrintStream errOut) throws IOException {
         Map<String, Object> options = new HashMap<>();
         File input = null;
         File output = null;
@@ -89,12 +94,12 @@ public class ForkedFFExecutor {
         Objects.requireNonNull(input, "Input not set.");
         Objects.requireNonNull(output, "Output not set.");
 
-        runFF(options, libraries, input, output, lineMap);
+        runFF(options, libraries, input, output, lineMap, stdOut, errOut);
     }
 
-    public static void runFF(Map<String, Object> options, List<File> libraries, File input, File output, File lineMap) {
+    public static void runFF(Map<String, Object> options, List<File> libraries, File input, File output, File lineMap, PrintStream stdOut, PrintStream stdErr) {
         IResultSaver saver = new ThreadSafeResultSaver(() -> output, () -> lineMap);
-        IFernflowerLogger logger = new ThreadIDFFLogger();
+        IFernflowerLogger logger = new ThreadIDFFLogger(stdOut, stdErr);
         Fernflower ff = new Fernflower(FernFlowerUtils::getBytecode, saver, options, logger);
         for (File library : libraries) {
             ff.getStructContext().addSpace(library, false);
