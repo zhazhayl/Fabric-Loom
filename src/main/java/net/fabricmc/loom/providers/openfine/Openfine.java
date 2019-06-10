@@ -38,6 +38,8 @@ import net.fabricmc.stitch.util.StitchUtil;
 import net.fabricmc.stitch.util.StitchUtil.FileSystemDelegate;
 
 public class Openfine {
+	public static final String VERSION = "cc6da75";
+
 	public static File process(Logger logger, String mcVersion, File client, File server, File optifineJar) throws IOException {
 		OptiFineVersion optifine = new OptiFineVersion(optifineJar);
 		logger.info("Loaded OptiFine " + optifine.version);

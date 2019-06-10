@@ -49,7 +49,7 @@ dependencies {
 	implementation ('net.fabricmc:stitch:0.1.2.50') {
 		exclude module: 'enigma'
 	}
-	implementation 'com.github.Chocohead:OptiSine:cc6da75'
+	implementation 'com.github.Chocohead:OptiSine:cc6da75' //Keep consistent with Openfine.VERSION
 
 	// tinyfile management
 	implementation ('com.github.Chocohead:tiny-remapper:ddc99f7') {
