@@ -43,10 +43,10 @@ dependencies {
 	implementation ('commons-io:commons-io:2.6')
 	implementation ('org.zeroturnaround:zt-zip:1.13')
 	implementation ('com.google.code.gson:gson:2.8.5')
-	implementation ('com.google.guava:guava:27.1-jre')
+	implementation ('com.google.guava:guava:28.0-jre')
 
 	// game handling utils
-	implementation ('net.fabricmc:stitch:0.1.2.50') {
+	implementation ('net.fabricmc:stitch:0.2.1.60') {
 		exclude module: 'enigma'
 	}
 	implementation 'com.github.Chocohead:OptiSine:cc6da75' //Keep consistent with Openfine.VERSION
@@ -58,8 +58,8 @@ dependencies {
 	implementation ('net.fabricmc:fabric-mixin-compile-extensions:0.1.0.+')
 
 	// decompilers
-	implementation ('net.fabricmc:procyon-fabric-compilertools:0.5.33.+')
-	implementation ('net.minecraftforge:forgeflower:1.5.380.32')
+	implementation ('net.fabricmc:procyon-fabric-compilertools:0.5.35.+')
+	implementation ('net.minecraftforge:forgeflower:1.5.380.34')
 
 	// source code remapping
 	implementation ('org.cadixdev:mercury:0.1.0.fabric-SNAPSHOT')
