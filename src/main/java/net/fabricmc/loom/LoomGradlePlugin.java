@@ -101,6 +101,7 @@ public class LoomGradlePlugin extends AbstractPlugin {
 		});
 
 		register("genSources", DefaultTask.class, t -> {
+			t.setGroup("fabric");
 			t.getOutputs().upToDateWhen((o) -> false);
 		}, (project, task) -> {
 			task.dependsOn(remapLineNumbersTask);
