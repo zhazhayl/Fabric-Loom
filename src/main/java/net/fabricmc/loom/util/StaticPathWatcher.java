@@ -24,13 +24,14 @@
 
 package net.fabricmc.loom.util;
 
-import net.fabricmc.mappings.Mappings;
-import org.gradle.api.logging.Logging;
-
 import java.io.IOException;
-import java.io.InputStream;
-import java.lang.ref.SoftReference;
-import java.nio.file.*;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
 import java.util.HashMap;
 import java.util.Map;
 

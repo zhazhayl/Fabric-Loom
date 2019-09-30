@@ -24,7 +24,6 @@
 
 package net.fabricmc.loom.util;
 
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -36,21 +35,13 @@ import org.gradle.api.InvalidUserDataException;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.Dependency;
-import org.gradle.api.artifacts.ResolvedArtifact;
 import org.gradle.api.artifacts.ResolvedDependency;
 import org.gradle.api.artifacts.SelfResolvingDependency;
-import org.gradle.api.artifacts.query.ArtifactResolutionQuery;
-import org.gradle.api.artifacts.result.ArtifactResult;
-import org.gradle.api.artifacts.result.ComponentArtifactsResult;
-import org.gradle.api.artifacts.result.ResolvedArtifactResult;
-import org.gradle.internal.component.external.model.DefaultModuleComponentIdentifier;
-import org.gradle.jvm.JvmLibrary;
-import org.gradle.language.base.artifact.SourcesArtifact;
+
 import org.zeroturnaround.zip.ZipUtil;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -124,8 +115,6 @@ public abstract class DependencyProvider {
 			return sourceConfiguration;
 		}
 
-		// TODO: Can this be done with stable APIs only?
-		@SuppressWarnings("UnstableApiUsage")
 		public Set<File> resolve() {
 			return sourceConfiguration.files(dependency);
 		}

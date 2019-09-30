@@ -24,31 +24,29 @@
 
 package net.fabricmc.loom.util;
 
-import com.google.common.collect.ImmutableMap;
-import net.fabricmc.loom.LoomGradleExtension;
-import net.fabricmc.loom.providers.MappingsProvider;
-import net.fabricmc.mappings.*;
-import net.fabricmc.stitch.util.Pair;
-import net.fabricmc.stitch.util.StitchUtil;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 import org.cadixdev.lorenz.MappingSet;
 import org.cadixdev.lorenz.io.MappingsReader;
-import org.cadixdev.lorenz.io.TextMappingsReader;
-import org.cadixdev.lorenz.model.Mapping;
 import org.cadixdev.mercury.Mercury;
 import org.cadixdev.mercury.remapper.MercuryRemapper;
+
 import org.gradle.api.Project;
-import org.gradle.internal.impldep.aQute.bnd.build.Run;
-import org.objectweb.asm.commons.Remapper;
+
 import org.zeroturnaround.zip.ZipUtil;
 
-import java.io.*;
-import java.net.URI;
-import java.nio.file.*;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import net.fabricmc.loom.LoomGradleExtension;
+import net.fabricmc.loom.providers.MappingsProvider;
+import net.fabricmc.mappings.ClassEntry;
+import net.fabricmc.mappings.EntryTriple;
+import net.fabricmc.mappings.FieldEntry;
+import net.fabricmc.mappings.Mappings;
+import net.fabricmc.mappings.MethodEntry;
+import net.fabricmc.stitch.util.StitchUtil;
+
 
 public class SourceRemapper {
 	public static void remapSources(Project project, File source, File destination, boolean toNamed) throws Exception {
@@ -61,6 +59,7 @@ public class SourceRemapper {
 		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
 		MappingsProvider mappingsProvider = extension.getMappingsProvider();
 
+		@SuppressWarnings("resource") //Doesn't need closing as TinyRemapper doesn't do anything in Closeable#close
 		MappingSet mappings = extension.getOrCreateSrcMappingCache(toNamed ? 1 : 0, () -> {
 			try {
 				Mappings m = mappingsProvider.getMappings();

@@ -24,17 +24,30 @@
 
 package net.fabricmc.loom.util;
 
-import net.fabricmc.loom.util.progress.ProgressLogger;
-import org.gradle.api.logging.Logger;
-import org.objectweb.asm.*;
+import static java.text.MessageFormat.format;
 
-import java.io.*;
-import java.nio.file.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashMap;
 import java.util.Map;
 
-import static java.text.MessageFormat.format;
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
+
+import net.fabricmc.loom.util.progress.ProgressLogger;
 
 /**
  * TODO, Move to stitch.
@@ -136,7 +149,7 @@ public class LineNumberRemapper {
                         super.visitLineNumber(rClass.maxLineDest, start);
                     } else {
                         Integer matchedLine = null;
-                        while (tLine <= rClass.maxLine && ((matchedLine = rClass.lineMap.get(tLine)) == null)) {
+                        while (tLine <= rClass.maxLine && (matchedLine = rClass.lineMap.get(tLine)) == null) {
                             tLine++;
                         }
                         super.visitLineNumber(matchedLine != null ? matchedLine : rClass.maxLineDest, start);
@@ -147,11 +160,11 @@ public class LineNumberRemapper {
     }
 
     private static class RClass {
-
-        private final String name;
+        @SuppressWarnings("unused")
+		private final String name;
         private int maxLine;
         private int maxLineDest;
-        private Map<Integer, Integer> lineMap = new HashMap<>();
+        private final Map<Integer, Integer> lineMap = new HashMap<>();
 
         private RClass(String name) {
             this.name = name;

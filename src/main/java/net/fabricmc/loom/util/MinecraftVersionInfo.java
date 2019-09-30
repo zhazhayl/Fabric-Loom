@@ -26,8 +26,6 @@ package net.fabricmc.loom.util;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import net.fabricmc.loom.LoomGradleExtension;
-import net.fabricmc.loom.providers.MinecraftLibraryProvider;
 
 import java.io.File;
 import java.util.List;
@@ -164,6 +162,7 @@ public class MinecraftVersionInfo {
 				return ret;
 			}
 
+			@SuppressWarnings("unused")
 			public String getClassifier() {
 				return classifier;
 			}
