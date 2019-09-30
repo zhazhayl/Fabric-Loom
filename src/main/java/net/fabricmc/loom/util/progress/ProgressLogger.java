@@ -200,7 +200,7 @@ public class ProgressLogger {
 	 * @param status The initial status message. Can be null or empty.
 	 */
 	public void started(String status) {
-		invoke(started, status);
+		invoke(startedArg, status);
 	}
 
 	/**
@@ -225,6 +225,6 @@ public class ProgressLogger {
 	 * @param status The final status message. Can be null or empty.
 	 */
 	public void completed(String status) {
-		invoke(completed, status);
+		invoke(completedArg, status);
 	}
 }
