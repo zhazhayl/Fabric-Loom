@@ -45,6 +45,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.gradle.api.Project;
 
+import com.google.common.net.UrlEscapers;
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -128,7 +130,7 @@ public class MappingsProvider extends DependencyProvider {
 					project.getLogger().lifecycle(":loading " + intermediaryNames.getName());
 					MappingBlob tiny = new MappingBlob();
 					if (!intermediaryNames.exists()) {//Grab intermediary mappings (which aren't in the enigma file)
-						FileUtils.copyURLToFile(new URL("https://github.com/FabricMC/intermediary/raw/master/mappings/" + minecraftVersion.replace(" ", "%20") + ".tiny"), intermediaryNames);
+						FileUtils.copyURLToFile(new URL("https://github.com/FabricMC/intermediary/raw/master/mappings/" + UrlEscapers.urlPathSegmentEscaper().escape(minecraftVersion + ".tiny")), intermediaryNames);
 					}
 					TinyReader.readTiny(intermediaryNames.toPath(), tiny);
 
