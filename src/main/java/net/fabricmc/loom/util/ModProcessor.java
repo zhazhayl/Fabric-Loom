@@ -47,8 +47,6 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.zip.ZipEntry;
@@ -144,19 +142,17 @@ public class ModProcessor {
 		Path[] mcDeps = mappedProvider.getMapperPaths().stream()
 			.map(File::toPath)
 			.toArray(Path[]::new);
-		Set<Path> modCompiles = new HashSet<>();
-		for (RemappedConfigurationEntry entry : Constants.MOD_COMPILE_ENTRIES) {
-			project.getConfigurations().getByName(entry.getSourceConfiguration()).getFiles().stream()
-					.filter((f) -> !f.equals(input))
-					.map(p -> {
-						if (p.equals(input)) {
-							return inputPath;
-						} else {
-							return p.toPath();
-						}
-					})
-					.forEach(modCompiles::add);
-		}
+		Path[] modCompiles = Constants.MOD_COMPILE_ENTRIES.stream().map(RemappedConfigurationEntry::getSourceConfiguration).flatMap(sourceConfig -> {
+			return project.getConfigurations().getByName(sourceConfig).getFiles().stream()
+				.filter(f -> !f.equals(input))
+				.map(p -> {
+					if (p.equals(input)) {
+						return inputPath;
+					} else {
+						return p.toPath();
+					}
+				});
+		}).distinct().toArray(Path[]::new);
 
 
 		project.getLogger().lifecycle(":remapping " + input.getName() + " (TinyRemapper, " + fromM + " -> " + toM + ")");
@@ -167,7 +163,7 @@ public class ModProcessor {
 
 		try (OutputConsumerPath outputConsumer = new OutputConsumerPath(Paths.get(output.getAbsolutePath()))) {
 			outputConsumer.addNonClassFiles(inputPath);
-			remapper.readClassPath(modCompiles.toArray(new Path[0]));
+			remapper.readClassPath(modCompiles);
 			remapper.readClassPath(mc);
 			remapper.readClassPath(mcDeps);
 			remapper.readInputs(inputPath);

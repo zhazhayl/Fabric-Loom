@@ -26,7 +26,6 @@ package net.fabricmc.loom.util;
 
 import groovy.util.Node;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -37,28 +36,26 @@ public final class GroovyXmlUtil {
 	}
 
 	public static Node getOrCreateNode(Node parent, String name) {
-		for (Object object : parent.children()) {
-			if (object instanceof Node && name.equals(((Node) object).name())) {
-				return (Node) object;
-			}
-		}
-
-		return parent.appendNode(name);
+		return getNode(parent, name).orElseGet(() -> parent.appendNode(name));
 	}
 
 	public static Optional<Node> getNode(Node parent, String name) {
-		for (Object object : parent.children()) {
-			if (object instanceof Node && name.equals(((Node) object).name())) {
-				return Optional.of((Node) object);
-			}
-		}
-
-		return Optional.empty();
+		return childrenNodesStream(parent).filter(node -> name.equals(node.name())).findFirst();
 	}
 
 	public static Stream<Node> childrenNodesStream(Node node) {
-		//noinspection unchecked
-		return (Stream<Node>) (Stream) (((List<Object>) node.children()).stream().filter((i) -> i instanceof Node));
+		return fishForNodes(node.children().stream());
+	}
+
+	/**
+	 * Type safe casting a raw type {@link Stream} to a {@link Stream<Node>}
+	 *
+	 * @param stuff A raw stream of objects, potentially containing {@link Node}s
+	 *
+	 * @return The given raw stream with a filter and mapping operation on return only Nodes
+	 */
+	private static Stream<Node> fishForNodes(Stream<?> stuff) {
+		return stuff.filter(o -> o instanceof Node).map(Node.class::cast);
 	}
 
 	public static Iterable<Node> childrenNodes(Node node) {
