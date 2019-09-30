@@ -62,7 +62,7 @@ public abstract class AbstractRunTask extends JavaExec {
         MappingsProvider mappingsProvider = extension.getMappingsProvider();
 
         List<String> libs = new ArrayList<>();
-        for (File file : getProject().getConfigurations().getByName("compile").getFiles()) {
+        for (File file : getProject().getConfigurations().getByName("runtimeClasspath").getFiles()) {
             libs.add(file.getAbsolutePath());
         }
         for (Path file : extension.getUnmappedMods()) {

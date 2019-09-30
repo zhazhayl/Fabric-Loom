@@ -36,29 +36,30 @@ import net.fabricmc.tinyremapper.TinyUtils;
 
 import org.gradle.api.Project;
 import org.gradle.api.Task;
+import org.gradle.api.file.RegularFileProperty;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.InputFile;
-import org.gradle.api.tasks.OutputFile;
 import org.gradle.api.tasks.TaskAction;
+import org.gradle.jvm.tasks.Jar;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
-public class RemapJarTask extends AbstractLoomTask {
-	private Object input;
-	private Object output;
+public class RemapJarTask extends Jar {
+	private final RegularFileProperty input = getProject().getLayout().fileProperty();
 	private boolean addNestedDependencies;
 	@Input
 	public boolean includeAT = true;
 
 	@TaskAction
 	public void doTask() throws Throwable {
-		Path input = getInput().toPath();
-		Path output = getOutput().toPath();
+		Path input = getInput().getAsFile().get().toPath();
+		Path output = getArchivePath().toPath();
 
 		remap(this, input, output, addNestedDependencies, includeAT);
 		getProject().getExtensions().getByType(LoomGradleExtension.class).addUnmappedMod(input);
@@ -76,9 +77,9 @@ public class RemapJarTask extends AbstractLoomTask {
 		String fromM = "named";
 		String toM = "intermediary";
 
-		Set<File> classpathFiles = new LinkedHashSet<>();
-		//noinspection CollectionAddAllCanBeReplacedWithConstructor
-		classpathFiles.addAll(project.getConfigurations().getByName("compileClasspath").getFiles());
+		Set<File> classpathFiles = new LinkedHashSet<>(
+				project.getConfigurations().getByName("compileClasspath").getFiles()
+		);
 		Path[] classpath = classpathFiles.stream().map(File::toPath).filter((p) -> !input.equals(p)).toArray(Path[]::new);
 
 		File mixinMapFile = mappingsProvider.MAPPINGS_MIXIN_EXPORT;
@@ -123,20 +124,22 @@ public class RemapJarTask extends AbstractLoomTask {
 			project.getLogger().debug("Transformed mixin reference maps in output JAR!");
 		}
 
-		if (addNestedDependencies) {
-			if (NestedJars.addNestedJars(project, output)) {
-				project.getLogger().debug("Added nested jar paths to mod json");
-			}
+		if (addNestedDependencies && NestedJars.addNestedJars(project, output)) {
+			project.getLogger().debug("Added nested jar paths to mod json");
 		}
 	}
 
-	//@formatter:off
-	// the null-check in getInput() is done to allow reconfiguration by AbstractPlugin
-	@InputFile public File getInput() { return input == null ? null : getProject().file(input); }
-	@OutputFile public File getOutput() { return getProject().file(output); }
-	@Input public boolean isAddNestedDependencies() { return addNestedDependencies; }
-	public void setAddNestedDependencies(boolean value) { this.addNestedDependencies = value; }
-	public void setInput(Object input) { this.input = input; }
-	public void setOutput(Object output) { this.output = output; }
-	//@formatter:on
+	@InputFile
+	public RegularFileProperty getInput() {
+		return input;
+	}
+
+	@Input
+	public boolean isAddNestedDependencies() {
+		return addNestedDependencies;
+	}
+
+	public void setAddNestedDependencies(boolean value) {
+		addNestedDependencies = value;
+	}
 }

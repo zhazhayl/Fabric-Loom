@@ -49,6 +49,7 @@ public class LoomGradleExtension {
 	public boolean remapMod = true;
 	public boolean autoGenIDERuns = true;
 	public boolean extractJars = false;
+	public String customManifest = null;
 
 	private File atFile;
 	private File optifine;
@@ -102,7 +103,7 @@ public class LoomGradleExtension {
 	}
 
 	public File getRootProjectPersistentCache() {
-		File projectCache = new File(project.file(".gradle"), "loom-cache");
+		File projectCache = new File(project.getRootProject().file(".gradle"), "loom-cache");
 		if(!projectCache.exists()){
 			projectCache.mkdirs();
 		}

@@ -86,18 +86,8 @@ public class MappingsProvider extends DependencyProvider {
 
 	public File MAPPINGS_MIXIN_EXPORT;
 
-	private SoftReference<Mappings> mappings;
-
 	public Mappings getMappings() throws IOException {
-		if (mappings == null || mappings.get() == null) {
-			try (FileInputStream stream = new FileInputStream(MAPPINGS_TINY)) {
-				mappings = new SoftReference<>(
-						net.fabricmc.mappings.MappingsProvider.readTinyMappings(stream, false)
-				);
-			}
-		}
-
-		return mappings.get();
+		return MappingsCache.INSTANCE.get(MAPPINGS_TINY.toPath());
 	}
 
 	@Override

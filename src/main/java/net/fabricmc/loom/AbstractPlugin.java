@@ -38,7 +38,10 @@ import net.fabricmc.loom.util.NestedJars;
 import net.fabricmc.loom.util.RemappedConfigurationEntry;
 import net.fabricmc.loom.util.SetupIntelijRunConfigs;
 
-import org.gradle.api.*;
+import org.gradle.api.Plugin;
+import org.gradle.api.Project;
+import org.gradle.api.Task;
+import org.gradle.api.UnknownTaskException;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.Dependency;
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier;
@@ -55,6 +58,7 @@ import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.bundling.AbstractArchiveTask;
 import org.gradle.api.tasks.compile.JavaCompile;
 import org.gradle.api.tasks.javadoc.Javadoc;
+import org.gradle.api.tasks.scala.ScalaCompile;
 import org.gradle.plugins.ide.eclipse.model.EclipseModel;
 import org.gradle.plugins.ide.idea.model.IdeaModel;
 
@@ -68,6 +72,10 @@ import java.util.function.Predicate;
 
 public class AbstractPlugin implements Plugin<Project> {
 	protected Project project;
+
+	public static boolean isRootProject(Project project) {
+		return project.getRootProject() == project;
+	}
 
 	private void extendsFrom(String a, String b) {
 		project.getConfigurations().getByName(a).extendsFrom(project.getConfigurations().getByName(b));
@@ -136,11 +144,12 @@ public class AbstractPlugin implements Plugin<Project> {
 		extendsFrom(Constants.MINECRAFT_NAMED, Constants.MINECRAFT_DEPENDENCIES);
 		extendsFrom(Constants.MINECRAFT_INTERMEDIARY, Constants.MINECRAFT_DEPENDENCIES);
 
-        extendsFrom("compile", Constants.MAPPINGS);
-        extendsFrom("annotationProcessor", Constants.MAPPINGS);
+		extendsFrom("compile", Constants.MAPPINGS);
+		extendsFrom("annotationProcessor", Constants.MAPPINGS);
 
 		configureIDEs();
 		configureCompile();
+		configureScala();
 
 		Map<Project, Set<Task>> taskMap = project.getAllTasks(true);
 		for (Map.Entry<Project, Set<Task>> entry : taskMap.entrySet()) {
@@ -172,12 +181,30 @@ public class AbstractPlugin implements Plugin<Project> {
 		return project;
 	}
 
+    protected void configureScala() {
+        project.afterEvaluate(proj -> {
+            if (project.getPluginManager().hasPlugin("scala")) {
+                ScalaCompile task = (ScalaCompile) project.getTasks().getByName("compileScala");
+                LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
+                project.getLogger().warn(":configuring scala compilation processing");
+                try {
+                    task.getOptions().getCompilerArgs().add("-AinMapFileNamedIntermediary=" + extension.getMappingsProvider().MAPPINGS_TINY.getCanonicalPath());
+                    task.getOptions().getCompilerArgs().add("-AoutMapFileNamedIntermediary=" + extension.getMappingsProvider().MAPPINGS_MIXIN_EXPORT.getCanonicalPath());
+                    task.getOptions().getCompilerArgs().add("-AoutRefMapFile=" + new File(task.getDestinationDir(), extension.getRefmapName()).getCanonicalPath());
+                    task.getOptions().getCompilerArgs().add("-AdefaultObfuscationEnv=named:intermediary");
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+    }
+
 	/**
 	 * Permit to add a Maven repository to a target project
 	 *
 	 * @param target The garget project
-	 * @param name The name of the repository
-	 * @param url The URL of the repository
+	 * @param name   The name of the repository
+	 * @param url    The URL of the repository
 	 * @return An object containing the name and the URL of the repository that can be modified later
 	 */
 	public static MavenArtifactRepository addMavenRepo(Project target, final String name, final String url) {
@@ -302,7 +329,7 @@ public class AbstractPlugin implements Plugin<Project> {
 			project1.getTasks().getByName("idea").finalizedBy(project1.getTasks().getByName("genIdeaWorkspace"));
 			project1.getTasks().getByName("eclipse").finalizedBy(project1.getTasks().getByName("genEclipseRuns"));
 
-			if(extension.autoGenIDERuns && isRootProject(project1)){
+			if (extension.autoGenIDERuns && isRootProject(project1)) {
 				SetupIntelijRunConfigs.setup(project1);
 			}
 
@@ -311,15 +338,19 @@ public class AbstractPlugin implements Plugin<Project> {
 				AbstractArchiveTask jarTask = (AbstractArchiveTask) project1.getTasks().getByName("jar");
 
 				RemapJarTask remapJarTask = (RemapJarTask) project1.getTasks().findByName("remapJar");
-				if (remapJarTask.getInput() == null) {
-					remapJarTask.setOutput(jarTask.getArchivePath());
+
+				assert remapJarTask != null;
+				if (!remapJarTask.getInput().isPresent()) {
 					jarTask.setClassifier("dev");
-					remapJarTask.setInput(jarTask.getArchivePath());
+					remapJarTask.setClassifier("");
+					remapJarTask.getInput().set(jarTask.getArchivePath());
 					remapJarTask.includeAT = jarTask.getExtensions().getByType(JarSettings.class).includeAT;
 				}
+
 				extension.addUnmappedMod(jarTask.getArchivePath().toPath());
 				remapJarTask.setAddNestedDependencies(true);
-				remapJarTask.doLast(task -> project1.getArtifacts().add("archives", remapJarTask.getOutput()));
+
+				remapJarTask.doLast(task -> project1.getArtifacts().add("archives", remapJarTask.getArchivePath()));
 				remapJarTask.dependsOn(project1.getTasks().getByName("jar"));
 				project1.getTasks().getByName("build").dependsOn(remapJarTask);
 
@@ -407,9 +438,5 @@ public class AbstractPlugin implements Plugin<Project> {
 				}
 			}
 		});
-	}
-
-	public static boolean isRootProject(Project project){
-		return project.getRootProject() == project;
 	}
 }
