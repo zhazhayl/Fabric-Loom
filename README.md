@@ -11,6 +11,8 @@ Usage: `gradlew genSources eclipse/idea/vscode`
 * Support for gz compressed Tiny mappings
 * Access Transformers
 * Easier additional remapped jar tasks
+* Optional non-forking decompiling for `genSources`
+* Guaranteed Gradle 4.9 support
 
 
 ## What do I need to change?
@@ -37,9 +39,9 @@ Second, the Gradle plugin needs to change in order to pull the right version of 
 ```groovy
 plugins {
 	//Old/normal Loom plugin
-	//id 'fabric-loom' version '0.2.1-SNAPSHOT'
+	//id 'fabric-loom' version '0.2.5-SNAPSHOT'
 	//Sin² Edition Loom
-	id 'fabric-loom' version '87b10e9'
+	id 'fabric-loom' version '5784f06'
 	...
 }
 ```
@@ -51,13 +53,27 @@ buildscript {
 	}
 	dependencies {
 		//Old/normal Loom plugin
-		//classpath 'net.fabricmc:fabric-loom:0.2.1-SNAPSHOT'
+		//classpath 'net.fabricmc:fabric-loom:0.2.5-SNAPSHOT'
 		//Sin² Edition Loom
-		classpath 'com.github.Chocohead:fabric-loom:87b10e9'
+		classpath 'com.github.Chocohead:fabric-loom:5784f06'
 	}
 }
 ```
 When using a more stockish Gradle setup.
+
+#### Which branch do I use?
+Each branch is based on an upstream version of Loom (see table below); the most recent commit a branch has is likeliest the best one to use. When swapping between Loom forks, aiming to match like for like versions minimises how much has to change in your `build.gradle` in one go (and thus how much can go wrong). Features are not always backported however so it might prove prudent to update forwards if a feature you need is missing. Any problems or backport requests can be made [here](https://github.com/Chocohead/fabric-loom/issues).
+
+Stock Version | Sin² Branch | Example Sin² Version
+:---: | :---: | :---:
+0.1.0 | [sin](https://github.com/Chocohead/fabric-loom/tree/sin) | **3c39479**
+0.1.1 | *\<None\>* | -
+0.2.0 | [*\<Floating\>*](https://github.com/Chocohead/fabric-loom/compare/3c39479...f7f4a45) | **2665770** to **f7f4a45**
+0.2.1 | [ATs](https://github.com/Chocohead/fabric-loom/tree/ATs) | **89a5973**
+0.2.2 | [sin²](https://github.com/Chocohead/fabric-loom/tree/sin²) | **51f7373**
+0.2.3 | [*\<Floating\>*](https://github.com/Chocohead/fabric-loom/compare/f2fc524...32e0cc5) | **c4551b3** and **32e0cc5**
+0.2.4 | [openfine](https://github.com/Chocohead/fabric-loom/tree/openfine) | **7eb4201**
+0.2.5 | [dust](https://github.com/Chocohead/fabric-loom/tree/dust) | **5784f06**
 
 
 ## How do I use the new things?
