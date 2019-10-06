@@ -25,11 +25,9 @@
 package net.fabricmc.loom.util;
 
 public class Version {
-
-	private String mappingsVersion;
-	private String minecraftVersion;
-
-	private String version;
+	private final String mappingsVersion;
+	private final String minecraftVersion;
+	private final String version;
 
 	public Version(String version) {
 		this.version = version;
