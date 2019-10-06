@@ -208,8 +208,23 @@ public abstract class DependencyProvider {
 				version = json.get("version").getAsString();
 			} else {
 				//Not a Fabric mod, just have to make something up
-				name = FilenameUtils.removeExtension(root.getName());
-				version = "1.0";
+				String name = FilenameUtils.removeExtension(root.getName());
+
+				int split = name.indexOf('-');
+				if (split > 0) {
+					project.getLogger().debug("Inferring versioning from file dependency: " + root);
+
+					this.name = name.substring(0, split);
+					version = name.substring(split + 1);
+
+					project.getLogger().debug("Read dependency as " + this.name + '-' + version + " (from split point " + split + ')');
+				} else {
+					project.getLogger().warn("Unable to infer versioning from file dependency: " + root);
+					project.getLogger().warn("Renaming the file to the format \"name-version." + FilenameUtils.getExtension(name) + "\" would be advisable");
+
+					this.name = name;
+					version = "1.0";
+				}
 			}
 		}
 
