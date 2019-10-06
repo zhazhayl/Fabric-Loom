@@ -123,6 +123,7 @@ public class AbstractPlugin implements Plugin<Project> {
 		includeConfig.setTransitive(false); // Dont get transitive deps
 
 		project.getConfigurations().maybeCreate(Constants.MAPPINGS);
+		project.getConfigurations().maybeCreate(Constants.MAPPINGS_RAW);
 
 		for (RemappedConfigurationEntry entry : Constants.MOD_COMPILE_ENTRIES) {
 			Configuration compileModsConfig = project.getConfigurations().maybeCreate(entry.getSourceConfiguration());

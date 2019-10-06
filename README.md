@@ -91,14 +91,10 @@ In order to use the compressed form, it would need to be changed to
 mappings "net.fabricmc:yarn:19w13a.2:enigma@zip"
 ```
 Nothing else is required, when the project is next evaluated the change will be detected by the lack of a method parameters file and thus the mappings rebuilt. In theory at least, it's normally quite good at behaving.  
-<br />
-When running Minecraft, Fabric Loader expects the jar distribution of Yarn rather than Enigma. This causes some trouble as the Mixin remapping will fail and cause sad times to be had. If using `runClient` this should be automatically handled from the jar distribution being added as a `runtimeOnly` dependency. If running from an IDE however it might not see the dependency, in which case the jar distribution can be added as if a normal Java dependency:
-```groovy
-implementation "net.fabricmc:yarn:19w13a.2"
-```
+
 
 ### Running with gz compressed Tiny mappings
-Whilst not making that much of a difference in the grand scheme of things, using the compressed Tiny mappings over the normal jar distribution does save you an entire kilobyte of downloading. And like using Enigma mappings you'll also still need the jar distribution if you're using `runClient` due to Fabric Loader. It's the thought that counts really.
+Whilst not making that much of a difference in the grand scheme of things, using the compressed Tiny mappings over the normal jar distribution does save you an entire kilobyte of downloading. It's the thought that counts really.
 
 If previously the mappings dependency looked like
 ```groovy

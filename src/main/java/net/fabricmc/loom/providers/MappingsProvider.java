@@ -161,13 +161,11 @@ public class MappingsProvider extends DependencyProvider {
 							}
 						}
 					}
-					addDependency(dependency.getDepString(), project, "runtimeOnly");
 					break;
 				}
 				case "gz": //Directly downloaded the tiny file (:tiny@gz)
 					project.getLogger().lifecycle(":extracting " + mappingsJar.getName());
 					FileUtils.copyInputStreamToFile(new GZIPInputStream(new FileInputStream(mappingsJar)), MAPPINGS_TINY_BASE);
-					addDependency(dependency.getDepString(), project, "runtimeOnly");
 					break;
 
 				case "jar": //Downloaded a jar containing the tiny jar
@@ -241,6 +239,8 @@ public class MappingsProvider extends DependencyProvider {
 			mcRemappingFactory = (fromM, toM) -> TinyRemapperMappingsHelper.create(getMappings(), fromM, toM);
 		}
 
+		addDependency(MAPPINGS_TINY, project, Constants.MAPPINGS);
+
 		mappedProvider = new MinecraftMappedProvider();
 		mappedProvider.provide(project, extension, minecraftProvider, this, postPopulationScheduler);
 	}
@@ -265,6 +265,6 @@ public class MappingsProvider extends DependencyProvider {
 
 	@Override
 	public String getTargetConfig() {
-		return Constants.MAPPINGS;
+		return Constants.MAPPINGS_RAW;
 	}
 }
