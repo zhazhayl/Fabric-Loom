@@ -50,14 +50,14 @@ public class YarnGithubResolver {
 
 	public static class DownloadSpec {
 		final String originalName;
-		private String group, name, version, fileName, reason;
+		private String group, name, version, reason;
 
 		protected DownloadSpec(String name) {
 			int group = name.indexOf('/');
 			this.group = name.substring(0, group++);
-			name = name.substring(group, name.indexOf('/', group));
+			this.name = name.substring(group, name.indexOf('/', group));
 
-			fileName = originalName = name;
+			originalName = name;
 		}
 
 		public String getGroup() {
@@ -83,14 +83,6 @@ public class YarnGithubResolver {
 
 		public void setVersion(String version) {
 			this.version = version;
-		}
-
-		public String getFileName() {
-			return fileName;
-		}
-
-		public void setFileName(String name) {
-			fileName = name;
 		}
 
 		public String getReason() {
@@ -225,7 +217,7 @@ public class YarnGithubResolver {
 	}
 
 	private Dependency createFrom(DownloadSpec spec, String origin) {
-		Path destination = cache.resolve(spec.getFileName() + ".zip");
+		Path destination = cache.resolve(spec.originalName + ".zip");
 		createDirectory(destination.getParent());
 
 		return new GithubDependency(spec, origin, destination);
