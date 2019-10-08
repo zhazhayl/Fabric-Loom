@@ -63,7 +63,7 @@ public class LoomGradlePlugin extends AbstractPlugin {
 		super.apply(target);
 
 		assert project.getExtensions().getByName(ExtraPropertiesExtension.EXTENSION_NAME) == project.getExtensions().getExtraProperties();
-		project.getExtensions().getExtraProperties().set("yarn", new YarnGithubResolver(project));
+		project.getExtensions().getExtraProperties().set("loom", new YarnGithubResolver(project));
 
 		TaskContainer tasks = target.getTasks();
 

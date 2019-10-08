@@ -94,11 +94,11 @@ public class YarnGithubResolver {
 		}
 	}
 
-	public Dependency fromBranch(String branch) {
-		return fromBranch(branch, NOOP);
+	public Dependency yarnBranch(String branch) {
+		return yarnBranch(branch, NOOP);
 	}
 
-	public Dependency fromBranch(String branch, Action<DownloadSpec> action) {
+	public Dependency yarnBranch(String branch, Action<DownloadSpec> action) {
 		return fromBranch(DEFAULT_REPO, branch, action);
 	}
 
@@ -112,11 +112,11 @@ public class YarnGithubResolver {
 		return createFrom(spec, String.format(DOWNLOAD_URL, repo, branch));
 	}
 
-	public Dependency fromCommit(String commit) {
-		return fromCommit(commit, NOOP);
+	public Dependency yarnCommit(String commit) {
+		return yarnCommit(commit, NOOP);
 	}
 
-	public Dependency fromCommit(String commit, Action<DownloadSpec> action) {
+	public Dependency yarnCommit(String commit, Action<DownloadSpec> action) {
 		return fromCommit(DEFAULT_REPO, commit, action);
 	}
 
