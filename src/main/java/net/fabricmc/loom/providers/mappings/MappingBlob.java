@@ -23,11 +23,20 @@
  */
 package net.fabricmc.loom.providers.mappings;
 
+import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.UnaryOperator;
+
+import com.google.common.collect.Streams;
 
 import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping;
+import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping.Field;
+import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping.Method;
 
 public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 	public static class Mapping {
@@ -58,6 +67,14 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 
 			String[] args() {
 				return args;
+			}
+
+			void args(String[] args) {
+				if (this.args.length < args.length) {
+					this.args = Arrays.copyOf(args, args.length);
+				} else {
+					System.arraycopy(args, 0, this.args, 0, args.length);
+				}
 			}
 
 			public String arg(int index) {
@@ -196,5 +213,125 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 	@Override
 	public Iterator<Mapping> iterator() {
 		return mappings.values().iterator();
+	}
+
+	public enum InvertionTarget {
+		FIELDS, METHODS, MEMBERS, METHOD_ARGS, ALL;
+	}
+
+	public MappingBlob invert(InvertionTarget... targets) {
+		Set<InvertionTarget> aims = EnumSet.noneOf(InvertionTarget.class);
+		MappingBlob invertion = new MappingBlob();
+
+		for (InvertionTarget target : targets) {
+			switch (target) {
+			case METHOD_ARGS:
+				aims.add(InvertionTarget.METHODS);
+			case FIELDS:
+			case METHODS:
+				aims.add(target);
+				break;
+
+			case ALL:
+				aims.add(InvertionTarget.METHOD_ARGS);
+			case MEMBERS:
+				aims.add(InvertionTarget.FIELDS);
+				aims.add(InvertionTarget.METHODS);
+				break;
+			}
+		}
+
+		boolean doFields = aims.contains(InvertionTarget.FIELDS);
+		boolean doMethods = aims.contains(InvertionTarget.METHODS);
+		boolean doArgs = aims.contains(InvertionTarget.METHOD_ARGS);
+
+		UnaryOperator<String> classRemapper = name -> {
+			String mapping = tryMapName(name);
+			return mapping != null ? mapping : name;
+		};
+
+		for (Mapping mapping : mappings.values()) {
+			if (mapping.to == null) {//If there is no mapped class name there is nothing for it to invert to
+				assert Streams.stream(mapping.fields()).map(Field::name).allMatch(Objects::isNull): mapping.from + " doesn't change name but has fields which do";
+				assert Streams.stream(mapping.methods()).map(Method::name).allMatch(Objects::isNull): mapping.from + " doesn't change name but has methods which do";
+				continue;
+			}
+
+			invertion.acceptClass(mapping.to, mapping.from);
+
+			if (doFields) {
+				for (Field field : mapping.fields()) {
+					if (field.name() == null) continue;
+					//assert field.desc() != null: mapping.from + '#' + field.fromName + " (" + field.fromDesc + ") changes name without a changed descriptor";
+
+					String desc = field.desc() != null ? field.desc() : MappingSplat.remapDesc(field.fromDesc, classRemapper);
+					invertion.acceptField(mapping.to, field.name(), desc, mapping.from, field.fromName, field.fromDesc);
+				}
+			}
+
+			if (doMethods) {
+				for (Method method : mapping.methods()) {
+					if (method.name() == null) continue;
+					//assert method.desc() != null: mapping.from + '#' + method.fromName + method.fromDesc + " changes name without a changed descriptor";
+
+					String desc = method.desc() != null ? method.desc() : MappingSplat.remapDesc(method.fromDesc, classRemapper);
+					invertion.acceptMethod(mapping.to, method.name(), desc, mapping.from, method.fromName, method.fromDesc);
+					if (doArgs) invertion.get(mapping.to).method(method.name(), desc).args(method.args());
+				}
+			}
+		}
+
+		return invertion;
+	}
+
+	public MappingBlob rename(MappingBlob blob) {
+		MappingBlob remap = new MappingBlob();
+
+		UnaryOperator<String> classRemapper = name -> {
+			String mapping = blob.tryMapName(name);
+			return mapping != null ? mapping : name;
+		};
+
+		for (Mapping mapping : mappings.values()) {
+			Mapping bridge = blob.mappings.get(mapping.from);
+			boolean useBridge = bridge != null;
+
+			String className = useBridge ? bridge.to : mapping.from;
+			remap.acceptClass(className, mapping.to);
+
+			for (Field field : mapping.fields()) {
+				if (useBridge && bridge.hasField(field)) {
+					Field bridged = bridge.field(field);
+
+					if (bridged.name() != null) {
+						assert bridged.desc() != null;
+						remap.acceptField(className, bridged.name(), bridged.desc(), mapping.to, field.name(), field.desc());
+						continue;
+					}
+				}
+
+				remap.acceptField(className, field.fromName, MappingSplat.remapDesc(field.fromDesc, classRemapper), mapping.to, field.name(), field.desc());
+			}
+
+			for (Method method : mapping.methods()) {
+				if (useBridge && bridge.hasMethod(method)) {
+					Method bridged = bridge.method(method);
+
+					if (bridged.name() != null) {
+						assert bridged.desc() != null;
+						remap.acceptMethod(className, bridged.name(), bridged.desc(), mapping.to, method.name(), method.desc());
+						remap.get(className).method(bridged.name(), bridged.desc()).args(method.args());
+						continue;
+					}
+				}
+
+				String desc = MappingSplat.remapDesc(method.fromDesc, classRemapper);
+				remap.acceptMethod(className, method.fromName, desc, mapping.to, method.name(), method.desc());
+				remap.get(className).method(method.fromName, desc).args(method.args());
+			}
+
+		}
+
+		return remap;
 	}
 }
