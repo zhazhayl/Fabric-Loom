@@ -51,6 +51,7 @@ public class YarnGithubResolver {
 	public static class DownloadSpec {
 		final String originalName;
 		private String group, name, version, reason;
+		boolean forceFresh;
 
 		protected DownloadSpec(String name) {
 			int group = name.indexOf('/');
@@ -91,6 +92,10 @@ public class YarnGithubResolver {
 
 		public void because(String reason) {
 			this.reason = reason;
+		}
+
+		public void setForceFresh(boolean force) {
+			forceFresh = force;
 		}
 	}
 
@@ -219,6 +224,14 @@ public class YarnGithubResolver {
 	private Dependency createFrom(DownloadSpec spec, String origin) {
 		Path destination = cache.resolve(spec.originalName + ".zip");
 		createDirectory(destination.getParent());
+
+		if (spec.forceFresh) {
+			try {
+				Files.deleteIfExists(destination);
+			} catch (IOException e) {
+				throw new UncheckedIOException("Unable to delete " + spec.originalName + " at " + destination, e);
+			}
+		}
 
 		return new GithubDependency(spec, origin, destination);
 	}
