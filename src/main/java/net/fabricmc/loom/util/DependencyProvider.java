@@ -29,6 +29,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
 import net.fabricmc.loom.LoomGradleExtension;
+import net.fabricmc.loom.YarnGithubResolver.GithubDependency;
 
 import org.apache.commons.io.FilenameUtils;
 import org.gradle.api.InvalidUserDataException;
@@ -85,7 +86,11 @@ public abstract class DependencyProvider {
 
 		public static DependencyInfo create(Project project, Dependency dependency, Configuration sourceConfiguration) {
 			if (dependency instanceof SelfResolvingDependency) {
-				return new FileDependencyInfo(project, (SelfResolvingDependency) dependency, sourceConfiguration);
+				if (dependency instanceof GithubDependency) {
+					return new ConcreteDependencyInfo(project, (GithubDependency) dependency, sourceConfiguration);
+				} else {
+					return FileDependencyInfo.create(project, (SelfResolvingDependency) dependency, sourceConfiguration);
+				}
 			} else {
 				return new DependencyInfo(project, dependency, sourceConfiguration);
 			}
@@ -153,12 +158,47 @@ public abstract class DependencyProvider {
 		}
 	}
 
-	public static class FileDependencyInfo extends DependencyInfo {
-		protected final Map<String, File> classifierToFile = new HashMap<>();
-		protected final String group = "net.fabricmc.synthetic", name, version;
+	public static class ConcreteDependencyInfo extends DependencyInfo {
+		protected final String group, name, version;
 
-		FileDependencyInfo(Project project, SelfResolvingDependency dependency, Configuration configuration) {
+		ConcreteDependencyInfo(Project project, GithubDependency dependency, Configuration configuration) {
+			this(project, dependency, configuration, dependency.getGroup(), dependency.getName(), dependency.getVersion());
+		}
+
+		ConcreteDependencyInfo(Project project, Dependency dependency, Configuration configuration, String group, String name, String version) {
 			super(project, dependency, configuration);
+
+			this.group = group;
+			this.name = name;
+			this.version = version;
+		}
+
+		@Override
+		public String getResolvedVersion() {
+			return version;
+		}
+
+		@Override
+		public String getFullName() {
+			return group + '.' + name;
+		}
+
+		@Override
+		public String getDepString() {
+			return group + ':' + name + ':' + version;
+		}
+
+		@Override
+		public String getResolvedDepString() {
+			return getDepString();
+		}
+	}
+
+	public static class FileDependencyInfo extends ConcreteDependencyInfo {
+		private final Map<String, File> classifierToFile;
+
+		static FileDependencyInfo create(Project project, SelfResolvingDependency dependency, Configuration configuration) {
+			Map<String, File> classifierToFile = new HashMap<>();
 
 			Set<File> files = dependency.resolve();
 			switch (files.size()) {
@@ -179,7 +219,7 @@ public abstract class DependencyProvider {
 				for (File file : sortedFiles) {
 					if (!file.getName().startsWith(shortestName)) {
 						//If there is another file which doesn't start with the same name as the presumed classifier-less one we're out of our depth
-						throw new IllegalArgumentException("Unable to resolve classifiers for " + this + " (failed to sort " + files + ')');
+						throw new IllegalArgumentException("Unable to resolve classifiers for " + dependency + " (failed to sort " + files + ')');
 					}
 				}
 
@@ -193,12 +233,13 @@ public abstract class DependencyProvider {
 
 					//The classifier could well be separated with a dash (thing name.jar and name-sources.jar), we don't want that leading dash
 					if (classifierToFile.put(classifier.charAt(0) == '-' ? classifier.substring(1) : classifier, file) != null) {
-						throw new InvalidUserDataException("Duplicate classifiers for " + this + " (\"" + file.getName().substring(start) + "\" in " + files + ')');
+						throw new InvalidUserDataException("Duplicate classifiers for " + dependency + " (\"" + file.getName().substring(start) + "\" in " + files + ')');
 					}
 				}
 			}
 
 			File root = classifierToFile.get(""); //We've built the classifierToFile map, now to try find a name and version for our dependency
+			String name, version;
 			if ("jar".equals(FilenameUtils.getExtension(root.getName())) && ZipUtil.containsEntry(root, "fabric.mod.json")) {
 				//It's a Fabric mod, see how much we can extract out
 				JsonObject json = new Gson().fromJson(new String(ZipUtil.unpackEntry(root, "fabric.mod.json"), StandardCharsets.UTF_8), JsonObject.class);
@@ -212,45 +253,31 @@ public abstract class DependencyProvider {
 				version = json.get("version").getAsString();
 			} else {
 				//Not a Fabric mod, just have to make something up
-				String name = FilenameUtils.removeExtension(root.getName());
+				name = FilenameUtils.removeExtension(root.getName());
 
 				int split = name.indexOf('-');
 				if (split > 0) {
 					project.getLogger().debug("Inferring versioning from file dependency: " + root);
 
-					this.name = name.substring(0, split);
+					name = name.substring(0, split);
 					version = name.substring(split + 1);
 
-					project.getLogger().debug("Read dependency as " + this.name + '-' + version + " (from split point " + split + ')');
+					project.getLogger().debug("Read dependency as " + name + '-' + version + " (from split point " + split + ')');
 				} else {
 					project.getLogger().warn("Unable to infer versioning from file dependency: " + root);
 					project.getLogger().warn("Renaming the file to the format \"name-version." + FilenameUtils.getExtension(name) + "\" would be advisable");
 
-					this.name = name;
 					version = "1.0";
 				}
 			}
+
+			return new FileDependencyInfo(project, dependency, configuration, classifierToFile, name, version);
 		}
 
-		@Override
-		public String getResolvedVersion() {
-			return version;
-		}
+		private FileDependencyInfo(Project project, Dependency dependency, Configuration configuration, Map<String, File> classifierToFile, String name, String version) {
+			super(project, dependency, configuration, "net.fabricmc.synthetic", name, version);
 
-		@Override
-		public String getFullName() {
-			return group + '.' + name;
-		}
-
-		@Override
-		public String getDepString() {
-			//Use our custom name and version with the dummy group rather than the null:unspecified:null it would otherwise return
-			return group + ':' + name + ':' + version;
-		}
-
-		@Override
-		public String getResolvedDepString() {
-			return getDepString();
+			this.classifierToFile = classifierToFile;
 		}
 	}
 }
