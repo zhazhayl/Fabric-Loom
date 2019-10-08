@@ -32,7 +32,7 @@ import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.YarnGithubResolver.GithubDependency;
 
 import org.apache.commons.io.FilenameUtils;
-import org.gradle.api.InvalidUserDataException;
+
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.Dependency;
@@ -44,9 +44,7 @@ import org.zeroturnaround.zip.ZipUtil;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -89,7 +87,7 @@ public abstract class DependencyProvider {
 				if (dependency instanceof GithubDependency) {
 					return new ConcreteDependencyInfo(project, (GithubDependency) dependency, sourceConfiguration);
 				} else {
-					return FileDependencyInfo.create(project, (SelfResolvingDependency) dependency, sourceConfiguration);
+					return ConcreteDependencyInfo.create(project, (SelfResolvingDependency) dependency, sourceConfiguration);
 				}
 			} else {
 				return new DependencyInfo(project, dependency, sourceConfiguration);
@@ -161,52 +159,16 @@ public abstract class DependencyProvider {
 	public static class ConcreteDependencyInfo extends DependencyInfo {
 		protected final String group, name, version;
 
-		ConcreteDependencyInfo(Project project, GithubDependency dependency, Configuration configuration) {
-			this(project, dependency, configuration, dependency.getGroup(), dependency.getName(), dependency.getVersion());
-		}
-
-		ConcreteDependencyInfo(Project project, Dependency dependency, Configuration configuration, String group, String name, String version) {
-			super(project, dependency, configuration);
-
-			this.group = group;
-			this.name = name;
-			this.version = version;
-		}
-
-		@Override
-		public String getResolvedVersion() {
-			return version;
-		}
-
-		@Override
-		public String getFullName() {
-			return group + '.' + name;
-		}
-
-		@Override
-		public String getDepString() {
-			return group + ':' + name + ':' + version;
-		}
-
-		@Override
-		public String getResolvedDepString() {
-			return getDepString();
-		}
-	}
-
-	public static class FileDependencyInfo extends ConcreteDependencyInfo {
-		private final Map<String, File> classifierToFile;
-
-		static FileDependencyInfo create(Project project, SelfResolvingDependency dependency, Configuration configuration) {
-			Map<String, File> classifierToFile = new HashMap<>();
-
+		static ConcreteDependencyInfo create(Project project, SelfResolvingDependency dependency, Configuration configuration) {
 			Set<File> files = dependency.resolve();
+
+			File root;
 			switch (files.size()) {
 			case 0: //Don't think Gradle would ever let you do this
 				throw new IllegalStateException("Empty dependency?");
 
 			case 1: //Single file dependency
-				classifierToFile.put("", Iterables.getOnlyElement(files));
+				root = Iterables.getOnlyElement(files);
 				break;
 
 			default: //File collection, try work out the classifiers
@@ -216,29 +178,15 @@ public abstract class DependencyProvider {
 				File shortest = sortedFiles.remove(0);
 				String shortestName = FilenameUtils.removeExtension(shortest.getName()); //name.jar -> name
 
-				for (File file : sortedFiles) {
-					if (!file.getName().startsWith(shortestName)) {
-						//If there is another file which doesn't start with the same name as the presumed classifier-less one we're out of our depth
-						throw new IllegalArgumentException("Unable to resolve classifiers for " + dependency + " (failed to sort " + files + ')');
-					}
+				if (sortedFiles.stream().map(File::getName).anyMatch(name -> !name.startsWith(shortestName))) {
+					//If there is another file which doesn't start with the same name as the presumed classifier-less one we're out of our depth
+					throw new IllegalArgumentException("Unable to resolve classifiers for " + dependency + " (failed to sort " + files + ')');
 				}
 
 				//We appear to be right, therefore this is the normal dependency file we want
-				classifierToFile.put("", shortest);
-
-				int start = shortestName.length();
-				for (File file : sortedFiles) {
-					//Now we just have to work out what classifier type the other files are, this shouldn't even return an empty string
-					String classifier = FilenameUtils.removeExtension(file.getName()).substring(start);
-
-					//The classifier could well be separated with a dash (thing name.jar and name-sources.jar), we don't want that leading dash
-					if (classifierToFile.put(classifier.charAt(0) == '-' ? classifier.substring(1) : classifier, file) != null) {
-						throw new InvalidUserDataException("Duplicate classifiers for " + dependency + " (\"" + file.getName().substring(start) + "\" in " + files + ')');
-					}
-				}
+				root = shortest;
 			}
 
-			File root = classifierToFile.get(""); //We've built the classifierToFile map, now to try find a name and version for our dependency
 			String name, version;
 			if ("jar".equals(FilenameUtils.getExtension(root.getName())) && ZipUtil.containsEntry(root, "fabric.mod.json")) {
 				//It's a Fabric mod, see how much we can extract out
@@ -271,13 +219,39 @@ public abstract class DependencyProvider {
 				}
 			}
 
-			return new FileDependencyInfo(project, dependency, configuration, classifierToFile, name, version);
+			return new ConcreteDependencyInfo(project, dependency, configuration, "net.fabricmc.synthetic", name, version);
 		}
 
-		private FileDependencyInfo(Project project, Dependency dependency, Configuration configuration, Map<String, File> classifierToFile, String name, String version) {
-			super(project, dependency, configuration, "net.fabricmc.synthetic", name, version);
+		ConcreteDependencyInfo(Project project, GithubDependency dependency, Configuration configuration) {
+			this(project, dependency, configuration, dependency.getGroup(), dependency.getName(), dependency.getVersion());
+		}
 
-			this.classifierToFile = classifierToFile;
+		private ConcreteDependencyInfo(Project project, Dependency dependency, Configuration configuration, String group, String name, String version) {
+			super(project, dependency, configuration);
+
+			this.group = group;
+			this.name = name;
+			this.version = version;
+		}
+
+		@Override
+		public String getResolvedVersion() {
+			return version;
+		}
+
+		@Override
+		public String getFullName() {
+			return group + '.' + name;
+		}
+
+		@Override
+		public String getDepString() {
+			return group + ':' + name + ':' + version;
+		}
+
+		@Override
+		public String getResolvedDepString() {
+			return getDepString();
 		}
 	}
 }
