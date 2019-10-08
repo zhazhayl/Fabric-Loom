@@ -27,6 +27,8 @@ package net.fabricmc.loom.providers;
 import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.providers.mappings.EnigmaReader;
 import net.fabricmc.loom.providers.mappings.MappingBlob;
+import net.fabricmc.loom.providers.mappings.MappingBlob.InvertionTarget;
+import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping;
 import net.fabricmc.loom.providers.mappings.MappingSplat;
 import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping;
 import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping.ArgOnlyMethod;
@@ -41,10 +43,13 @@ import net.fabricmc.loom.util.Version;
 import net.fabricmc.mappings.Mappings;
 import net.fabricmc.stitch.commands.CommandProposeFieldNames;
 import net.fabricmc.tinyremapper.IMappingProvider;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
+
 import org.gradle.api.Project;
 
+import com.google.common.collect.Streams;
 import com.google.common.net.UrlEscapers;
 
 import java.io.BufferedReader;
@@ -54,7 +59,6 @@ import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.lang.ref.SoftReference;
 import java.net.URL;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
@@ -63,6 +67,7 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 
 //TODO fix local mappings
@@ -127,6 +132,17 @@ public class MappingsProvider extends DependencyProvider {
 					project.getLogger().lifecycle(":loading " + mappingsJar.getName());
 					MappingBlob enigma = new MappingBlob();
 					EnigmaReader.readEnigma(mappingsJar.toPath(), enigma);
+
+					if (Streams.stream(enigma.iterator()).parallel().anyMatch(mapping -> mapping.from.startsWith("net/minecraft/class_"))) {
+						assert Streams.stream(enigma.iterator()).parallel().filter(mapping -> mapping.to() != null).allMatch(mapping -> mapping.from.startsWith("net/minecraft/class_") || mapping.from.matches("com\\/mojang\\/.+\\$class_\\d+")):
+							Streams.stream(enigma.iterator()).filter(mapping -> mapping.to() != null && !mapping.from.startsWith("net/minecraft/class_") && !mapping.from.matches("com\\/mojang\\/.+\\$class_\\d+")).map(mapping -> mapping.from).collect(Collectors.joining(", ", "Found unexpected initial mapping classes: [", "]"));
+						assert Streams.stream(enigma.iterator()).map(Mapping::methods).flatMap(Streams::stream).parallel().filter(method -> method.name() != null).allMatch(method -> method.fromName.startsWith("method_") || method.fromName.equals(method.name())):
+							Streams.stream(enigma.iterator()).map(Mapping::methods).flatMap(Streams::stream).parallel().filter(method -> method.name() != null && !method.fromName.startsWith("method_")).map(method -> method.fromName + method.fromDesc).collect(Collectors.joining(", ", "Found unexpected method mappings: ", "]"));
+						assert Streams.stream(enigma.iterator()).map(Mapping::fields).flatMap(Streams::stream).parallel().filter(field -> field.name() != null).allMatch(field -> field.fromName.startsWith("field_")):
+							Streams.stream(enigma.iterator()).map(Mapping::fields).flatMap(Streams::stream).parallel().filter(field -> field.name() != null && !field.fromName.startsWith("field_")).map(field -> field.fromName).collect(Collectors.joining(", ", "Found unexpected field mappings: ", "]"));
+
+						enigma = enigma.rename(tiny.invert(InvertionTarget.MEMBERS));
+					}
 
 					project.getLogger().lifecycle(":combining mappings");
 					MappingSplat combined = new MappingSplat(enigma, tiny);
