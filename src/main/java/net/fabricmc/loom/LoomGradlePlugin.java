@@ -34,6 +34,7 @@ import org.gradle.api.Action;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
+import org.gradle.api.plugins.ExtraPropertiesExtension;
 import org.gradle.api.tasks.TaskContainer;
 import org.gradle.api.tasks.TaskProvider;
 
@@ -60,6 +61,9 @@ public class LoomGradlePlugin extends AbstractPlugin {
 	@Override
 	public void apply(Project target) {
 		super.apply(target);
+
+		assert project.getExtensions().getByName(ExtraPropertiesExtension.EXTENSION_NAME) == project.getExtensions().getExtraProperties();
+		project.getExtensions().getExtraProperties().set("yarn", new YarnGithubResolver(project));
 
 		TaskContainer tasks = target.getTasks();
 
