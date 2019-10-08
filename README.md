@@ -9,6 +9,7 @@ Usage: `gradlew genSources eclipse/idea/vscode`
 * [FernFlower](https://github.com/FabricMC/intellij-fernflower) switched to [ForgeFlower](https://github.com/MinecraftForge/ForgeFlower) for `genSources`
 * Support for Enigma mappings (and parameter names as a result)
 * Support for gz compressed Tiny mappings
+* Support to pull Enigma mappings straight from Github
 * Access Transformers
 * Easier additional remapped jar tasks
 * Optional non-forking decompiling for `genSources`
@@ -105,6 +106,34 @@ In order to use the compressed form, it would need to be changed to
 mappings "net.fabricmc:yarn:19w13a.2:tiny@gz"
 ```
 Fairly simple stuff, just like with Enigma. Only without the obvious benefits.
+
+
+### Running with Enigma mappings from Github
+Using Enigma mappings is all well and good, parameter names and all, but it does rely on the zip being hosted on a maven in order to be downloaded. Fortunately, Sin² offers a way of downloading mappings straight from the [Yarn repo](https://github.com/FabricMC/yarn) or indeed any other Github repository directly. This means any pull request you might want to try you can before it is pulled into the main repo. As well as using the main repo's Enigma mappings at all given they're not exported anymore.
+
+If previously the mappings dependency looked like
+```groovy
+mappings "net.fabricmc:yarn:19w13a.1"
+```
+In order to use the Github mappings, it would need to be changed to
+```groovy
+mappings loom.yarnBranch("19w13a") {spec ->
+	spec.version = "19w13a-1"
+}
+//or
+mappings loom.yarnCommit("6e610a8") {spec ->
+	spec.version = "19w40a-1"
+}
+//or even
+mappings loom.fromBranch("MyOrg/Repo", "myBranch") {spec ->
+	spec.group = "my.great.group" //Is the user/organisation's name by default
+	spec.name = "Best-Mappings" //Is the repository's name by default
+	spec.version = "1.14.4-3"
+
+	spec.forceFresh = true //Force the mappings to be redownloaded even when they haven't changed
+}
+```
+Explicitly forcing the version is important to ensure the correct Intermediaries are chosen, it also allows versioning commits/branches that would otherwise be impossible to update between without changing the mapping group or name. Note that any changed to a chosen branch will be picked up and downloaded when Gradle is run (similar to a `-SNAPSHOT` version), commits however are completely stable even if forced over in the repository's tree.
 
 
 ### Access Transformers
