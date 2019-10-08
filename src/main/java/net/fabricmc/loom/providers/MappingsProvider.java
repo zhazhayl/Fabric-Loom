@@ -94,12 +94,12 @@ public class MappingsProvider extends DependencyProvider {
 	public void provide(DependencyInfo dependency, Project project, LoomGradleExtension extension, Consumer<Runnable> postPopulationScheduler) throws Exception {
 		MinecraftProvider minecraftProvider = getDependencyManager().getProvider(MinecraftProvider.class);
 
-		project.getLogger().lifecycle(":setting up mappings (" + dependency.getDependency().getName() + " " + dependency.getResolvedVersion() + ")");
+		project.getLogger().lifecycle(":setting up mappings (" + dependency.getFullName() + " " + dependency.getResolvedVersion() + ")");
 
 		String version = dependency.getResolvedVersion();
 		File mappingsJar = dependency.resolveFile().orElseThrow(() -> new RuntimeException("Could not find dependency " + dependency));
 
-		this.mappingsName = dependency.getDependency().getGroup() + "." + dependency.getDependency().getName();
+		this.mappingsName = dependency.getFullName();
 
 		Version mappingsVersion = new Version(version);
 		this.minecraftVersion = mappingsVersion.getMinecraftVersion();

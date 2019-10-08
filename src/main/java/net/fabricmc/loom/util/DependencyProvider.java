@@ -140,6 +140,10 @@ public abstract class DependencyProvider {
 			return getDepString();
 		}
 
+		public String getFullName() {
+			return dependency.getGroup() + '.' + dependency.getName();
+		}
+
 		public String getDepString(){
 			return dependency.getGroup() + ":" + dependency.getName() + ":" + dependency.getVersion();
 		}
@@ -231,6 +235,11 @@ public abstract class DependencyProvider {
 		@Override
 		public String getResolvedVersion() {
 			return version;
+		}
+
+		@Override
+		public String getFullName() {
+			return group + '.' + name;
 		}
 
 		@Override
