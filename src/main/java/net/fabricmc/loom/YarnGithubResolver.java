@@ -29,7 +29,7 @@ public class YarnGithubResolver {
 	private static final String DOWNLOAD_URL = "https://api.github.com/repos/%s/zipball/%s";
 	private static final Action<DownloadSpec> NOOP = spec -> {
 	};
-	private final Function<Path, FileCollection> fileFactory;
+	final Function<Path, FileCollection> fileFactory;
 	private final Path cache;
 	final Logger logger;
 
@@ -200,6 +200,8 @@ public class YarnGithubResolver {
 		@Override
 		public FileCollection getFiles() {
 			logger.info("Detecting Github dependency's file(s) for " + spec.originalName + " from " + origin + " to " + destination);
+
+			resolve(); //Ensure the destination actually exists, as Gradle doesn't really care either way
 			return fileFactory.apply(destination);
 		}
 
