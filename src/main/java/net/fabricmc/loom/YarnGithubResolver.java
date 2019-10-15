@@ -30,8 +30,8 @@ public class YarnGithubResolver {
 	private static final Action<DownloadSpec> NOOP = spec -> {
 	};
 	private final Function<Path, FileCollection> fileFactory;
-	private final Logger logger;
 	private final Path cache;
+	final Logger logger;
 
 	private static void createDirectory(Path path) {
 		try {
@@ -193,11 +193,13 @@ public class YarnGithubResolver {
 
 		@Override
 		public TaskDependency getBuildDependencies() {
+			logger.info("Computing Github dependency's task dependency for " + spec.originalName + " from " + origin + " to " + destination);
 			return task -> Collections.emptySet();
 		}
 
 		@Override
 		public FileCollection getFiles() {
+			logger.info("Detecting Github dependency's file(s) for " + spec.originalName + " from " + origin + " to " + destination);
 			return fileFactory.apply(destination);
 		}
 
@@ -208,6 +210,7 @@ public class YarnGithubResolver {
 
 		@Override
 		public Set<File> resolve() {
+			logger.info("Resolving Github dependency for " + spec.originalName + " from " + origin + " to " + destination);
 			if (Files.notExists(destination.getParent())) throw new IllegalStateException("Dependency on " + origin + " lacks a destination");
 
 			try {
@@ -233,6 +236,7 @@ public class YarnGithubResolver {
 			}
 		}
 
+		logger.debug("Creating new Github dependency for " + spec.originalName + " from " + origin + " to " + destination);
 		return new GithubDependency(spec, origin, destination);
 	}
 }
