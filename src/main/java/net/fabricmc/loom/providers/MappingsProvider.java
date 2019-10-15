@@ -59,11 +59,16 @@ import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -102,7 +107,7 @@ public class MappingsProvider extends DependencyProvider {
 		project.getLogger().lifecycle(":setting up mappings (" + dependency.getFullName() + " " + dependency.getResolvedVersion() + ")");
 
 		String version = dependency.getResolvedVersion();
-		File mappingsJar = dependency.resolveFile().orElseThrow(() -> new RuntimeException("Could not find dependency " + dependency));
+		File mappingsFile = dependency.resolveFile().orElseThrow(() -> new RuntimeException("Could not find dependency " + dependency));
 
 		this.mappingsName = dependency.getFullName();
 
@@ -118,7 +123,7 @@ public class MappingsProvider extends DependencyProvider {
 
 		if (!MAPPINGS_TINY_BASE.exists() || !MAPPINGS_TINY.exists()) {
 			if (!MAPPINGS_TINY_BASE.exists()) {
-				switch (FilenameUtils.getExtension(mappingsJar.getName())) {
+				switch (FilenameUtils.getExtension(mappingsFile.getName())) {
 				case "zip": {//Directly downloaded the enigma file (:enigma@zip)
 					if (parameterNames.exists()) parameterNames.delete();
 
@@ -129,9 +134,9 @@ public class MappingsProvider extends DependencyProvider {
 					}
 					TinyReader.readTiny(intermediaryNames.toPath(), tiny);
 
-					project.getLogger().lifecycle(":loading " + mappingsJar.getName());
+					project.getLogger().lifecycle(":loading " + mappingsFile.getName());
 					MappingBlob enigma = new MappingBlob();
-					EnigmaReader.readEnigma(mappingsJar.toPath(), enigma);
+					EnigmaReader.readEnigma(mappingsFile.toPath(), enigma);
 
 					if (Streams.stream(enigma.iterator()).parallel().anyMatch(mapping -> mapping.from.startsWith("net/minecraft/class_"))) {
 						assert Streams.stream(enigma.iterator()).parallel().filter(mapping -> mapping.to() != null).allMatch(mapping -> mapping.from.startsWith("net/minecraft/class_") || mapping.from.matches("com\\/mojang\\/.+\\$class_\\d+")):
@@ -180,20 +185,20 @@ public class MappingsProvider extends DependencyProvider {
 					break;
 				}
 				case "gz": //Directly downloaded the tiny file (:tiny@gz)
-					project.getLogger().lifecycle(":extracting " + mappingsJar.getName());
-					FileUtils.copyInputStreamToFile(new GZIPInputStream(new FileInputStream(mappingsJar)), MAPPINGS_TINY_BASE);
+					project.getLogger().lifecycle(":extracting " + mappingsFile.getName());
+					FileUtils.copyInputStreamToFile(new GZIPInputStream(new FileInputStream(mappingsFile)), MAPPINGS_TINY_BASE);
 					break;
 
 				case "jar": //Downloaded a jar containing the tiny jar
-					project.getLogger().lifecycle(":extracting " + mappingsJar.getName());
-					try (FileSystem fileSystem = FileSystems.newFileSystem(mappingsJar.toPath(), null)) {
+					project.getLogger().lifecycle(":extracting " + mappingsFile.getName());
+					try (FileSystem fileSystem = FileSystems.newFileSystem(mappingsFile.toPath(), null)) {
 						Path fileToExtract = fileSystem.getPath("mappings/mappings.tiny");
 						Files.copy(fileToExtract, MAPPINGS_TINY_BASE.toPath());
 					}
 					break;
 
 				default: //Not sure what we've ended up with, but it's not what we want/expect
-					throw new IllegalStateException("Unexpected mappings base type: " + FilenameUtils.getExtension(mappingsJar.getName()) + "(from " + mappingsJar.getName() + ')');
+					throw new IllegalStateException("Unexpected mappings base type: " + FilenameUtils.getExtension(mappingsFile.getName()) + "(from " + mappingsFile.getName() + ')');
 				}
 			}
 
@@ -255,7 +260,28 @@ public class MappingsProvider extends DependencyProvider {
 			mcRemappingFactory = (fromM, toM) -> TinyRemapperMappingsHelper.create(getMappings(), fromM, toM);
 		}
 
-		addDependency(MAPPINGS_TINY, project, Constants.MAPPINGS);
+		File mappingJar;
+		if ("jar".equals(FilenameUtils.getExtension(mappingsFile.getName()))) {
+			mappingJar = mappingsFile;
+		} else {
+			mappingJar = new File(MAPPINGS_DIR, mappingsName + "-tiny-" + minecraftVersion + '-' + this.mappingsVersion + ".jar");
+
+			if (!mappingJar.exists() || mappingJar.lastModified() < MAPPINGS_TINY.lastModified()) {
+				try (FileSystem fs = FileSystems.newFileSystem(new URI("jar:" + mappingJar.toURI()), Collections.singletonMap("create", "true"))) {
+					Path destination = fs.getPath("mappings/mappings.tiny");
+
+					Files.createDirectories(destination.getParent());
+					Files.copy(MAPPINGS_TINY.toPath(), destination, StandardCopyOption.REPLACE_EXISTING);
+				} catch (URISyntaxException e) {
+					throw new IllegalStateException("Cannot convert jar path to URI?", e);
+				} catch (IOException e) {
+					throw new UncheckedIOException("Error creating mappings jar", e);
+				}
+			}
+		}
+
+		assert mappingJar.exists() && mappingJar.lastModified() >= MAPPINGS_TINY.lastModified();
+		addDependency(mappingJar, project, Constants.MAPPINGS);
 
 		mappedProvider = new MinecraftMappedProvider();
 		mappedProvider.provide(project, extension, minecraftProvider, this, postPopulationScheduler);
