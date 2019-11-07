@@ -27,6 +27,7 @@ package net.fabricmc.loom.task.fernflower;
 import net.fabricmc.loom.task.AbstractDecompileTask;
 import net.fabricmc.loom.task.ForkingJavaExecTask;
 import net.fabricmc.loom.util.ConsumingOutputStream;
+import net.fabricmc.loom.util.OperatingSystem;
 
 import org.gradle.api.internal.project.ProjectInternal;
 import org.gradle.api.logging.LogLevel;
@@ -60,6 +61,10 @@ public class FernFlowerTask extends AbstractDecompileTask implements ForkingJava
 
     @TaskAction
     public void doTask() throws Throwable {
+    	if (!OperatingSystem.is64Bit()) {
+    		throw new UnsupportedOperationException("FernFlowerTask requires a 64bit JVM to run due to the memory requirements");
+	    }
+
         Map<String, Object> options = new HashMap<>();
         options.put(IFernflowerPreferences.DECOMPILE_GENERIC_SIGNATURES, "1");
         options.put(IFernflowerPreferences.BYTECODE_SOURCE_MAPPING, "1");
