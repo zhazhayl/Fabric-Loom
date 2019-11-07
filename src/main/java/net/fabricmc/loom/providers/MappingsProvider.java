@@ -263,6 +263,7 @@ public class MappingsProvider extends DependencyProvider {
 		File mappingJar;
 		if ("jar".equals(FilenameUtils.getExtension(mappingsFile.getName()))) {
 			mappingJar = mappingsFile;
+			if (MAPPINGS_TINY.lastModified() < mappingJar.lastModified()) mappingJar.setLastModified(mappingJar.lastModified());
 		} else {
 			mappingJar = new File(MAPPINGS_DIR, mappingsName + "-tiny-" + minecraftVersion + '-' + this.mappingsVersion + ".jar");
 
