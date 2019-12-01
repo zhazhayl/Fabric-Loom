@@ -82,7 +82,6 @@ public class ModCompileRemapper {
 				logger.info(output.getName() + " is up to date with " + input.getName());
 			}
 
-			ModProcessor.acknowledgeMod(input, output, project, modCompileRemapped);
 			dependencies.add(modCompileRemapped.getName(), dependencies.module(remappedNotation));
 
 			Optional<File> sources = artifact.getSources();
