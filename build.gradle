@@ -55,7 +55,6 @@ dependencies {
 	implementation ('com.github.Chocohead:tiny-remapper:ddc99f7') {
 		transitive = false
 	}
-	implementation ('net.fabricmc:fabric-mixin-compile-extensions:0.1.1.1')
 
 	// decompilers
 	implementation ('net.fabricmc:procyon-fabric-compilertools:0.5.35.+')

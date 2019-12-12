@@ -57,4 +57,6 @@ public class Constants {
 	public static final String MINECRAFT_LINEMAPPED = "minecraftLinemapped";
 	public static final String MAPPINGS_RAW = "mappings";
 	public static final String MAPPINGS = "mappingsNative";
+
+	public static final String MIXIN_COMPILE_EXTENSIONS_VERSION = "0.1.1.1";
 }
