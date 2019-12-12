@@ -64,6 +64,7 @@ import org.gradle.plugins.ide.idea.model.IdeaModel;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
@@ -152,28 +153,22 @@ public class AbstractPlugin implements Plugin<Project> {
 		configureCompile();
 		configureScala();
 
-		Map<Project, Set<Task>> taskMap = project.getAllTasks(true);
-		for (Map.Entry<Project, Set<Task>> entry : taskMap.entrySet()) {
-			Project project = entry.getKey();
-			Set<Task> taskSet = entry.getValue();
-			for (Task task : taskSet) {
-				if (task instanceof JavaCompile
-					&& !task.getName().contains("Test") && !task.getName().contains("test")) {
-					JavaCompile javaCompileTask = (JavaCompile) task;
-					javaCompileTask.doFirst(task1 -> {
-						project.getLogger().lifecycle(":setting java compiler args");
-						try {
-							javaCompileTask.getOptions().getCompilerArgs().add("-AinMapFileNamedIntermediary=" + extension.getMappingsProvider().MAPPINGS_TINY.getCanonicalPath());
-							javaCompileTask.getOptions().getCompilerArgs().add("-AoutMapFileNamedIntermediary=" + extension.getMappingsProvider().MAPPINGS_MIXIN_EXPORT.getCanonicalPath());
-							javaCompileTask.getOptions().getCompilerArgs().add("-AoutRefMapFile=" + new File(javaCompileTask.getDestinationDir(), extension.getRefmapName()).getCanonicalPath());
-							javaCompileTask.getOptions().getCompilerArgs().add("-AdefaultObfuscationEnv=named:intermediary");
-						} catch (IOException e) {
-							e.printStackTrace();
-						}
-					});
-				}
+		project.getTasks().withType(JavaCompile.class, javaCompileTask -> {
+			if (!javaCompileTask.getName().contains("Test") && !javaCompileTask.getName().contains("test")) {
+				javaCompileTask.doFirst(task -> {
+					project.getLogger().lifecycle(":setting java compiler args");
+					try {
+						Collections.addAll(javaCompileTask.getOptions().getCompilerArgs(),
+							"-AinMapFileNamedIntermediary=" + extension.getMappingsProvider().MAPPINGS_TINY.getCanonicalPath(),
+							"-AoutMapFileNamedIntermediary=" + extension.getMappingsProvider().MAPPINGS_MIXIN_EXPORT.getCanonicalPath(),
+							"-AoutRefMapFile=" + new File(javaCompileTask.getDestinationDir(), extension.getRefmapName()).getCanonicalPath(),
+							"-AdefaultObfuscationEnv=named:intermediary");
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				});
 			}
-		}
+		});
 
 		configureMaven();
 	}
