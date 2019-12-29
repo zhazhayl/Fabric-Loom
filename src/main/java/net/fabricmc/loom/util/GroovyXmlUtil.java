@@ -48,7 +48,7 @@ public final class GroovyXmlUtil {
 	}
 
 	/**
-	 * Type safe casting a raw type {@link Stream} to a {@link Stream<Node>}
+	 * Type safe casting a raw type {@link Stream} to a {@code Stream<Node>}
 	 *
 	 * @param stuff A raw stream of objects, potentially containing {@link Node}s
 	 *
