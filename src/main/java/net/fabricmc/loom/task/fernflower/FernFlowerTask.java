@@ -24,10 +24,15 @@
 
 package net.fabricmc.loom.task.fernflower;
 
-import net.fabricmc.loom.task.AbstractDecompileTask;
-import net.fabricmc.loom.task.ForkingJavaExecTask;
-import net.fabricmc.loom.util.ConsumingOutputStream;
-import net.fabricmc.loom.util.OperatingSystem;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.text.MessageFormat;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Stack;
+import java.util.function.Supplier;
 
 import org.gradle.api.internal.project.ProjectInternal;
 import org.gradle.api.logging.LogLevel;
@@ -41,29 +46,23 @@ import org.gradle.process.ExecResult;
 import org.jetbrains.java.decompiler.main.extern.IFernflowerLogger.Severity;
 import org.jetbrains.java.decompiler.main.extern.IFernflowerPreferences;
 
-import java.io.OutputStream;
-import java.io.PrintStream;
-import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Stack;
-import java.util.function.Supplier;
+import net.fabricmc.loom.task.AbstractDecompileTask;
+import net.fabricmc.loom.task.ForkingJavaExecTask;
+import net.fabricmc.loom.util.ConsumingOutputStream;
+import net.fabricmc.loom.util.OperatingSystem;
 
 /**
  * Created by covers1624 on 9/02/19.
  */
 public class FernFlowerTask extends AbstractDecompileTask implements ForkingJavaExecTask {
+	private boolean noFork = false;
+	private int numThreads = Runtime.getRuntime().availableProcessors();
 
-    private boolean noFork = false;
-    private int numThreads = Runtime.getRuntime().availableProcessors();
-
-    @TaskAction
-    public void doTask() throws Throwable {
-    	if (!OperatingSystem.is64Bit()) {
-    		throw new UnsupportedOperationException("FernFlowerTask requires a 64bit JVM to run due to the memory requirements");
-	    }
+	@TaskAction
+	public void doTask() throws Throwable {
+		if (!OperatingSystem.is64Bit()) {
+			throw new UnsupportedOperationException("FernFlowerTask requires a 64bit JVM to run due to the memory requirements");
+		}
 
         Map<String, Object> options = new HashMap<>();
         options.put(IFernflowerPreferences.DECOMPILE_GENERIC_SIGNATURES, "1");
@@ -73,20 +72,23 @@ public class FernFlowerTask extends AbstractDecompileTask implements ForkingJava
         options.put(IFernflowerPreferences.LOG_LEVEL, "trace");
         getLogging().captureStandardOutput(LogLevel.LIFECYCLE);
 
-        List<String> args = new ArrayList<>();
+		List<String> args = new ArrayList<>();
 
-        options.forEach((k, v) -> args.add(MessageFormat.format("-{0}={1}", k, v)));
-        args.add(getInput().getAbsolutePath());
-        args.add("-o=" + getOutput().getAbsolutePath());
-        if (getLineMapFile() != null) {
-            args.add("-l=" + getLineMapFile().getAbsolutePath());
-        }
-        args.add("-t=" + getNumThreads());
+		options.forEach((k, v) -> args.add(MessageFormat.format("-{0}={1}", k, v)));
+		args.add(getInput().getAbsolutePath());
+		args.add("-o=" + getOutput().getAbsolutePath());
 
-        //TODO, Decompiler breaks on jemalloc, J9 module-info.class?
-        getLibraries().forEach(f -> args.add("-e=" + f.getAbsolutePath()));
+		if (getLineMapFile() != null) {
+			args.add("-l=" + getLineMapFile().getAbsolutePath());
+		}
 
-        ServiceRegistry registry = ((ProjectInternal) getProject()).getServices();
+		args.add("-t=" + getNumThreads());
+		args.add("-m=" + getExtension().getMappingsProvider().MAPPINGS_TINY.getAbsolutePath());
+
+		//TODO, Decompiler breaks on jemalloc, J9 module-info.class?
+		getLibraries().forEach(f -> args.add("-e=" + f.getAbsolutePath()));
+
+		ServiceRegistry registry = ((ProjectInternal) getProject()).getServices();
         ProgressLoggerFactory factory = registry.get(ProgressLoggerFactory.class);
         ProgressLogger progressGroup = factory.newOperation(getClass()).setDescription("Decompile");
         Supplier<ProgressLogger> loggerFactory = () -> {
@@ -168,12 +170,21 @@ public class FernFlowerTask extends AbstractDecompileTask implements ForkingJava
         }
     }
 
-    //@formatter:off
-    @Internal public int getNumThreads() { return numThreads; }
-    @Internal public boolean isNoFork() { return noFork; }
-    public void setNoFork(boolean noFork) { this.noFork = noFork; }
-    public void setNumThreads(int numThreads) { this.numThreads = numThreads;
-    if (numThreads > 1) getLogger().warn("Using multiple threads is unsupported with ForgeFlower");
-    }
-    //@formatter:on
+	@Internal
+	public int getNumThreads() {
+		return numThreads;
+	}
+
+	@Internal
+	public boolean isNoFork() {
+		return noFork;
+	}
+
+	public void setNoFork(boolean noFork) {
+		this.noFork = noFork;
+	}
+
+	public void setNumThreads(int numThreads) {
+		this.numThreads = numThreads;
+	}
 }

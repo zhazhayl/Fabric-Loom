@@ -24,23 +24,31 @@
 
 package net.fabricmc.loom;
 
+import java.io.File;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.function.BiPredicate;
+import java.util.function.Function;
+import java.util.function.Supplier;
+
+import javax.annotation.Nullable;
+
 import com.google.gson.JsonObject;
-import net.fabricmc.loom.providers.MappingsProvider;
-import net.fabricmc.loom.providers.MinecraftMappedProvider;
-import net.fabricmc.loom.providers.MinecraftProvider;
-import net.fabricmc.loom.util.LoomDependencyManager;
 import org.cadixdev.lorenz.MappingSet;
 import org.cadixdev.mercury.Mercury;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.Dependency;
-import javax.annotation.Nullable;
-import java.io.File;
-import java.nio.file.Path;
-import java.util.*;
-import java.util.function.BiPredicate;
-import java.util.function.Function;
-import java.util.function.Supplier;
+import org.gradle.api.plugins.BasePluginConvention;
+
+import net.fabricmc.loom.providers.MappingsProvider;
+import net.fabricmc.loom.providers.MinecraftMappedProvider;
+import net.fabricmc.loom.providers.MinecraftProvider;
+import net.fabricmc.loom.util.LoomDependencyManager;
 
 public class LoomGradleExtension {
 	public String runDir = "run";
@@ -86,56 +94,92 @@ public class LoomGradleExtension {
 		this.installerJson = object;
 	}
 
-    public JsonObject getInstallerJson() {
-	    return installerJson;
-    }
+	public JsonObject getInstallerJson() {
+		return installerJson;
+	}
 
 	public File getUserCache() {
 		File userCache = new File(project.getGradle().getGradleUserHomeDir(), "caches" + File.separator + "fabric-loom");
+
 		if (!userCache.exists()) {
 			userCache.mkdirs();
 		}
+
 		return userCache;
 	}
 
 	public File getRootProjectPersistentCache() {
 		File projectCache = new File(project.getRootProject().file(".gradle"), "loom-cache");
-		if(!projectCache.exists()){
+
+		if (!projectCache.exists()) {
 			projectCache.mkdirs();
 		}
+
 		return projectCache;
 	}
 
 	public File getRootProjectBuildCache() {
 		File projectCache = new File(project.getRootProject().getBuildDir(), "loom-cache");
-		if(!projectCache.exists()){
+
+		if (!projectCache.exists()) {
 			projectCache.mkdirs();
 		}
+
 		return projectCache;
 	}
 
 	public File getProjectBuildCache() {
 		File projectCache = new File(project.getBuildDir(), "loom-cache");
-		if(!projectCache.exists()){
+
+		if (!projectCache.exists()) {
 			projectCache.mkdirs();
 		}
+
 		return projectCache;
 	}
 
 	public File getRemappedModCache() {
 		File remappedModCache = new File(getRootProjectPersistentCache(), "remapped_mods");
+
 		if (!remappedModCache.exists()) {
 			remappedModCache.mkdir();
 		}
+
 		return remappedModCache;
 	}
 
 	public File getNestedModCache() {
 		File nestedModCache = new File(getRootProjectPersistentCache(), "nested_mods");
+
 		if (!nestedModCache.exists()) {
 			nestedModCache.mkdir();
 		}
+
 		return nestedModCache;
+	}
+
+	public File getNativesJarStore() {
+		File natives = new File(getUserCache(), "natives/jars");
+
+		if (!natives.exists()) {
+			natives.mkdirs();
+		}
+
+		return natives;
+	}
+
+	public File getNativesDirectory() {
+		File natives = new File(getUserCache(), "natives/" + getMinecraftProvider().minecraftVersion);
+
+		if (!natives.exists()) {
+			natives.mkdirs();
+		}
+
+		return natives;
+	}
+
+	public File getDevLauncherConfig() {
+		return new File(getRootProjectPersistentCache(), "launch.cfg");
 	}
 
 	@Nullable
@@ -144,6 +188,7 @@ public class LoomGradleExtension {
 			for (Dependency dependency : config.getDependencies()) {
 				String group = dependency.getGroup();
 				String name = dependency.getName();
+
 				if (groupNameFilter.test(group, name)) {
 					p.getLogger().debug("Loom findDependency found: " + group + ":" + name + ":" + dependency.getVersion());
 					return dependency;
@@ -158,12 +203,15 @@ public class LoomGradleExtension {
 	private <T> T recurseProjects(Function<Project, T> projectTFunction) {
 		Project p = this.project;
 		T result;
+
 		while (!AbstractPlugin.isRootProject(p)) {
 			if ((result = projectTFunction.apply(p)) != null) {
 				return result;
 			}
+
 			p = p.getRootProject();
 		}
+
 		result = projectTFunction.apply(p);
 		return result;
 	}
@@ -173,7 +221,12 @@ public class LoomGradleExtension {
 		return recurseProjects((p) -> {
 			List<Configuration> configs = new ArrayList<>();
 			// check compile classpath first
-			configs.add(p.getConfigurations().getByName("compileClasspath"));
+			Configuration possibleCompileClasspath = p.getConfigurations().findByName("compileClasspath");
+
+			if (possibleCompileClasspath != null) {
+				configs.add(possibleCompileClasspath);
+			}
+
 			// failing that, buildscript
 			configs.addAll(p.getBuildscript().getConfigurations());
 
@@ -216,15 +269,15 @@ public class LoomGradleExtension {
 		return dependencyManager;
 	}
 
-	public MinecraftProvider getMinecraftProvider(){
+	public MinecraftProvider getMinecraftProvider() {
 		return getDependencyManager().getProvider(MinecraftProvider.class);
 	}
 
-	public MinecraftMappedProvider getMinecraftMappedProvider(){
+	public MinecraftMappedProvider getMinecraftMappedProvider() {
 		return getMappingsProvider().mappedProvider;
 	}
 
-	public MappingsProvider getMappingsProvider(){
+	public MappingsProvider getMappingsProvider() {
 		return getDependencyManager().getProvider(MappingsProvider.class);
 	}
 
@@ -233,12 +286,17 @@ public class LoomGradleExtension {
 	}
 
 	public String getRefmapName() {
-		if(refmapName == null || refmapName.isEmpty()){
-			project.getLogger().warn("Could not find refmap definition, will be using default name: " + project.getName() + "-refmap.json");
-			refmapName = project.getName() + "-refmap.json";
+		if (refmapName == null || refmapName.isEmpty()) {
+			String defaultRefmapName = project.getConvention().getPlugin(BasePluginConvention.class).getArchivesBaseName() + "-refmap.json";
+			project.getLogger().warn("Could not find refmap definition, will be using default name: " + defaultRefmapName);
+			refmapName = defaultRefmapName;
 		}
 
 		return refmapName;
+	}
+
+	public boolean ideSync() {
+		return Boolean.parseBoolean(System.getProperty("idea.sync.active", "false"));
 	}
 
 	public void setAT(Object file) {

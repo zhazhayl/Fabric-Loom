@@ -35,7 +35,6 @@ import org.cadixdev.mercury.Mercury;
 import org.cadixdev.mercury.remapper.MercuryRemapper;
 
 import org.gradle.api.Project;
-
 import org.zeroturnaround.zip.ZipUtil;
 
 import net.fabricmc.loom.LoomGradleExtension;
@@ -70,19 +69,11 @@ public class SourceRemapper {
 			}
 		});
 
-		project.getLogger().lifecycle(":remapping source jar");
+		project.getLogger().info(":remapping source jar");
 
 		Mercury mercury = extension.getOrCreateSrcMercuryCache(toNamed ? 1 : 0, () -> {
-			Mercury m = new Mercury();
+			Mercury m = createMercuryWithClassPath(project, toNamed);
 
-			for (File file : project.getConfigurations().getByName(Constants.MINECRAFT_DEPENDENCIES).getFiles()) {
-				m.getClassPath().add(file.toPath());
-			}
-			if (!toNamed) {
-				for (File file : project.getConfigurations().getByName("compileClasspath").getFiles()) {
-					m.getClassPath().add(file.toPath());
-				}
-			}
 			for (Path file : extension.getUnmappedMods()) {
 				if (Files.isRegularFile(file)) {
 					m.getClassPath().add(file);
@@ -103,6 +94,7 @@ public class SourceRemapper {
 			}
 
 			source = new File(destination.getAbsolutePath().substring(0, destination.getAbsolutePath().lastIndexOf('.')) + "-dev.jar");
+
 			try {
 				com.google.common.io.Files.move(destination, source);
 			} catch (IOException e) {
@@ -112,6 +104,7 @@ public class SourceRemapper {
 
 		Path srcPath = source.toPath();
 		boolean isSrcTmp = false;
+
 		if (!source.isDirectory()) {
 			// create tmp directory
 			isSrcTmp = true;
@@ -145,24 +138,41 @@ public class SourceRemapper {
 		}
 	}
 
-    private static void copyNonJavaFiles(Path from, Path to, Project project, File source) throws IOException {
-        Files.walk(from).forEach(path -> {
-            Path targetPath = to.resolve(from.relativize(path).toString());
-            if (!isJavaFile(path) && !Files.exists(targetPath)) {
-                try {
-                    Files.copy(path, targetPath);
-                } catch (IOException e) {
-                    project.getLogger().warn("Could not copy non-java sources '" + source.getName() + "' fully!", e);
-                }
-            }
-        });
-    }
+	private static void copyNonJavaFiles(Path from, Path to, Project project, File source) throws IOException {
+		Files.walk(from).forEach(path -> {
+			Path targetPath = to.resolve(from.relativize(path).toString());
 
-    private static boolean isJavaFile(Path path) {
-        String name = path.getFileName().toString();
-        // ".java" is not a valid java file
-        return name.endsWith(".java") && name.length() != 5;
-    }
+			if (!isJavaFile(path) && !Files.exists(targetPath)) {
+				try {
+					Files.copy(path, targetPath);
+				} catch (IOException e) {
+					project.getLogger().warn("Could not copy non-java sources '" + source.getName() + "' fully!", e);
+				}
+			}
+		});
+	}
+
+	public static Mercury createMercuryWithClassPath(Project project, boolean toNamed) {
+		Mercury m = new Mercury();
+
+		for (File file : project.getConfigurations().getByName(Constants.MINECRAFT_DEPENDENCIES).getFiles()) {
+			m.getClassPath().add(file.toPath());
+		}
+
+		if (!toNamed) {
+			for (File file : project.getConfigurations().getByName("compileClasspath").getFiles()) {
+				m.getClassPath().add(file.toPath());
+			}
+		}
+
+		return m;
+	}
+
+	private static boolean isJavaFile(Path path) {
+		String name = path.getFileName().toString();
+		// ".java" is not a valid java file
+		return name.endsWith(".java") && name.length() != 5;
+	}
 
 	public static class TinyReader extends MappingsReader {
 		private final Mappings m;
@@ -203,9 +213,6 @@ public class SourceRemapper {
 		}
 
 		@Override
-		public void close() throws IOException {
-
-		}
+		public void close() { }
 	}
-
 }

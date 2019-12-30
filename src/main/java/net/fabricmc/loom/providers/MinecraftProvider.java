@@ -24,20 +24,6 @@
 
 package net.fabricmc.loom.providers;
 
-import com.google.common.io.Files;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-
-import net.fabricmc.loom.AbstractPlugin;
-import net.fabricmc.loom.LoomGradleExtension;
-import net.fabricmc.loom.providers.openfine.Openfine;
-import net.fabricmc.loom.util.*;
-import net.fabricmc.stitch.merge.JarMerger;
-
-import org.gradle.api.GradleException;
-import org.gradle.api.Project;
-import org.gradle.api.logging.Logger;
-
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
@@ -47,8 +33,26 @@ import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.zip.ZipError;
 
-public class MinecraftProvider extends DependencyProvider {
+import com.google.common.io.Files;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import org.gradle.api.GradleException;
+import org.gradle.api.Project;
+import org.gradle.api.logging.Logger;
 
+import net.fabricmc.loom.AbstractPlugin;
+import net.fabricmc.loom.LoomGradleExtension;
+import net.fabricmc.loom.providers.openfine.Openfine;
+import net.fabricmc.loom.util.Checksum;
+import net.fabricmc.loom.util.Constants;
+import net.fabricmc.loom.util.DependencyProvider;
+import net.fabricmc.loom.util.DownloadUtil;
+import net.fabricmc.loom.util.ManifestVersion;
+import net.fabricmc.loom.util.MinecraftVersionInfo;
+import net.fabricmc.loom.util.StaticPathWatcher;
+import net.fabricmc.stitch.merge.JarMerger;
+
+public class MinecraftProvider extends DependencyProvider {
 	public String minecraftVersion;
 
 	public MinecraftVersionInfo versionInfo;
@@ -69,6 +73,7 @@ public class MinecraftProvider extends DependencyProvider {
 		initFiles(project);
 
 		downloadMcJson(project, offline);
+
 		try (FileReader reader = new FileReader(MINECRAFT_JSON)) {
 			versionInfo = gson.fromJson(reader, MinecraftVersionInfo.class);
 		}
@@ -115,7 +120,6 @@ public class MinecraftProvider extends DependencyProvider {
 		MINECRAFT_CLIENT_JAR = new File(extension.getUserCache(), "minecraft-" + minecraftVersion + "-client.jar");
 		MINECRAFT_SERVER_JAR = new File(extension.getUserCache(), "minecraft-" + minecraftVersion + "-server.jar");
 		MINECRAFT_MERGED_JAR = new File(extension.getUserCache(), "minecraft-" + minecraftVersion + "-merged.jar");
-
 	}
 
 	private void downloadMcJson(Project project, boolean offline) throws IOException {
@@ -142,7 +146,7 @@ public class MinecraftProvider extends DependencyProvider {
 
 		Optional<ManifestVersion.Versions> optionalVersion = Optional.empty();
 
-		if(extension.customManifest != null){
+		if (extension.customManifest != null) {
 			ManifestVersion.Versions customVersion = new ManifestVersion.Versions();
 			customVersion.id = minecraftVersion;
 			customVersion.url = extension.customManifest;
@@ -150,7 +154,7 @@ public class MinecraftProvider extends DependencyProvider {
 			project.getLogger().lifecycle("Using custom minecraft manifest");
 		}
 
-		if(!optionalVersion.isPresent()){
+		if (!optionalVersion.isPresent()) {
 			optionalVersion = mcManifest.versions.stream().filter(versions -> versions.id.equalsIgnoreCase(minecraftVersion)).findFirst();
 		}
 
@@ -172,16 +176,15 @@ public class MinecraftProvider extends DependencyProvider {
 		} else {
 			throw new RuntimeException("Failed to find minecraft version: " + minecraftVersion);
 		}
-
 	}
 
 	private void downloadJars(Logger logger) throws IOException {
-		if (!MINECRAFT_CLIENT_JAR.exists() || (!Checksum.equals(MINECRAFT_CLIENT_JAR, versionInfo.downloads.get("client").sha1) && StaticPathWatcher.INSTANCE.hasFileChanged(MINECRAFT_CLIENT_JAR.toPath()))) {
+		if (!MINECRAFT_CLIENT_JAR.exists() || !Checksum.equals(MINECRAFT_CLIENT_JAR, versionInfo.downloads.get("client").sha1) && StaticPathWatcher.INSTANCE.hasFileChanged(MINECRAFT_CLIENT_JAR.toPath())) {
 			logger.debug("Downloading Minecraft {} client jar", minecraftVersion);
 			DownloadUtil.downloadIfChanged(new URL(versionInfo.downloads.get("client").url), MINECRAFT_CLIENT_JAR, logger);
 		}
 
-		if (!MINECRAFT_SERVER_JAR.exists() || (!Checksum.equals(MINECRAFT_SERVER_JAR, versionInfo.downloads.get("server").sha1) && StaticPathWatcher.INSTANCE.hasFileChanged(MINECRAFT_SERVER_JAR.toPath()))) {
+		if (!MINECRAFT_SERVER_JAR.exists() || !Checksum.equals(MINECRAFT_SERVER_JAR, versionInfo.downloads.get("server").sha1) && StaticPathWatcher.INSTANCE.hasFileChanged(MINECRAFT_SERVER_JAR.toPath())) {
 			logger.debug("Downloading Minecraft {} server jar", minecraftVersion);
 			DownloadUtil.downloadIfChanged(new URL(versionInfo.downloads.get("server").url), MINECRAFT_SERVER_JAR, logger);
 		}
@@ -189,6 +192,7 @@ public class MinecraftProvider extends DependencyProvider {
 
 	private void mergeJars(Logger logger) throws IOException {
 		logger.lifecycle(":merging jars");
+
 		try (JarMerger jarMerger = new JarMerger(MINECRAFT_CLIENT_JAR, MINECRAFT_SERVER_JAR, MINECRAFT_MERGED_JAR)) {
 			jarMerger.enableSyntheticParamsOffset();
 			jarMerger.merge();

@@ -22,37 +22,36 @@
  * SOFTWARE.
  */
 
-package net.fabricmc.loom.util;
+package net.fabricmc.loom.providers;
 
-public class Version {
-	private final String mappingsVersion;
-	private final String minecraftVersion;
-	private final String version;
+import java.io.File;
+import java.io.IOException;
+import java.net.URL;
 
-	public Version(String version) {
-		this.version = version;
+import org.zeroturnaround.zip.ZipUtil;
+import org.gradle.api.Project;
 
-		if(version.contains("+build.")){
-			this.minecraftVersion = version.substring(0, version.lastIndexOf('+'));
-			this.mappingsVersion = version.substring(version.lastIndexOf('.') + 1);
-		} else {
-			//TODO legacy remove when no longer needed
-			char verSep = version.contains("-") ? '-' : '.';
-			this.minecraftVersion = version.substring(0, version.lastIndexOf(verSep));
-			this.mappingsVersion = version.substring(version.lastIndexOf(verSep) + 1);
+import net.fabricmc.loom.LoomGradleExtension;
+import net.fabricmc.loom.util.DownloadUtil;
+import net.fabricmc.loom.util.MinecraftVersionInfo;
+
+public class MinecraftNativesProvider {
+	public static void provide(MinecraftProvider minecraftProvider, Project project) throws IOException {
+		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
+		MinecraftVersionInfo versionInfo = minecraftProvider.versionInfo;
+
+		File nativesDir = extension.getNativesDirectory();
+		File jarStore = extension.getNativesJarStore();
+
+		for (MinecraftVersionInfo.Library library : versionInfo.libraries) {
+			File libJarFile = library.getFile(jarStore);
+
+			if (library.allowed() && library.isNative() && libJarFile != null) {
+				DownloadUtil.downloadIfChanged(new URL(library.getURL()), libJarFile, project.getLogger());
+
+				//TODO possibly find a way to prevent needing to re-extract after each run, doesnt seem too slow
+				ZipUtil.unpack(libJarFile, nativesDir);
+			}
 		}
-	}
-
-	public String getMappingsVersion() {
-		return mappingsVersion;
-	}
-
-	public String getMinecraftVersion() {
-		return minecraftVersion;
-	}
-
-	@Override
-	public String toString() {
-		return version;
 	}
 }

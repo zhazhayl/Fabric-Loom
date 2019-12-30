@@ -24,23 +24,6 @@
 
 package net.fabricmc.loom.util;
 
-import com.google.common.collect.Iterables;
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-
-import net.fabricmc.loom.LoomGradleExtension;
-import net.fabricmc.loom.YarnGithubResolver.GithubDependency;
-
-import org.apache.commons.io.FilenameUtils;
-
-import org.gradle.api.Project;
-import org.gradle.api.artifacts.Configuration;
-import org.gradle.api.artifacts.Dependency;
-import org.gradle.api.artifacts.ResolvedDependency;
-import org.gradle.api.artifacts.SelfResolvingDependency;
-
-import org.zeroturnaround.zip.ZipUtil;
-
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
@@ -50,8 +33,22 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-public abstract class DependencyProvider {
+import com.google.common.collect.Iterables;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import org.apache.commons.io.FilenameUtils;
 
+import org.gradle.api.Project;
+import org.gradle.api.artifacts.Configuration;
+import org.gradle.api.artifacts.Dependency;
+import org.gradle.api.artifacts.ResolvedDependency;
+import org.gradle.api.artifacts.SelfResolvingDependency;
+import org.zeroturnaround.zip.ZipUtil;
+
+import net.fabricmc.loom.LoomGradleExtension;
+import net.fabricmc.loom.YarnGithubResolver.GithubDependency;
+
+public abstract class DependencyProvider {
 	private LoomDependencyManager dependencyManager;
 
 	public abstract void provide(DependencyInfo dependency, Project project, LoomGradleExtension extension, Consumer<Runnable> postPopulationScheduler) throws Exception;
@@ -63,13 +60,14 @@ public abstract class DependencyProvider {
 	}
 
 	public void addDependency(Object object, Project project, String target) {
-		if(object instanceof File){
+		if (object instanceof File) {
 			object = project.files(object);
 		}
+
 		project.getDependencies().add(target, object);
 	}
 
-	public void register(LoomDependencyManager dependencyManager){
+	public void register(LoomDependencyManager dependencyManager) {
 		this.dependencyManager = dependencyManager;
 	}
 
@@ -124,14 +122,17 @@ public abstract class DependencyProvider {
 
 		public Optional<File> resolveFile() {
 			Set<File> files = resolve();
+
 			if (files.isEmpty()) {
 				return Optional.empty();
 			} else if (files.size() > 1) {
 				StringBuilder builder = new StringBuilder(this.toString());
 				builder.append(" resolves to more than one file:");
+
 				for (File f : files) {
 					builder.append("\n\t-").append(f.getAbsolutePath());
 				}
+
 				throw new RuntimeException(builder.toString());
 			} else {
 				return files.stream().findFirst();
@@ -147,11 +148,11 @@ public abstract class DependencyProvider {
 			return dependency.getGroup() + '.' + dependency.getName();
 		}
 
-		public String getDepString(){
+		public String getDepString() {
 			return dependency.getGroup() + ":" + dependency.getName() + ":" + dependency.getVersion();
 		}
 
-		public String getResolvedDepString(){
+		public String getResolvedDepString() {
 			return dependency.getGroup() + ":" + dependency.getName() + ":" + getResolvedVersion();
 		}
 	}

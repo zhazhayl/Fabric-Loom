@@ -24,18 +24,21 @@
 
 package net.fabricmc.loom.util;
 
-import com.google.gson.JsonObject;
-import net.fabricmc.loom.LoomGradleExtension;
-import net.fabricmc.loom.providers.MappingsProvider;
-import net.fabricmc.loom.util.DependencyProvider.DependencyInfo;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
+import com.google.gson.JsonObject;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.ExternalModuleDependency;
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
 
-import java.io.File;
-import java.util.*;
+import net.fabricmc.loom.LoomGradleExtension;
+import net.fabricmc.loom.providers.MappingsProvider;
+import net.fabricmc.loom.util.DependencyProvider.DependencyInfo;
 
 public class LoomDependencyManager {
 	private static class ProviderList {
@@ -49,27 +52,30 @@ public class LoomDependencyManager {
 
 	private List<DependencyProvider> dependencyProviderList = new ArrayList<>();
 
-	public void addProvider(DependencyProvider provider){
-		if(dependencyProviderList.contains(provider)){
+	public void addProvider(DependencyProvider provider) {
+		if (dependencyProviderList.contains(provider)) {
 			throw new RuntimeException("Provider is already registered");
 		}
-		if(getProvider(provider.getClass()) != null){
+
+		if (getProvider(provider.getClass()) != null) {
 			throw new RuntimeException("Provider of this type is already registered");
 		}
+
 		provider.register(this);
 		dependencyProviderList.add(provider);
 	}
 
-	public <T> T getProvider(Class<T> clazz){
-		for(DependencyProvider provider : dependencyProviderList){
-			if(provider.getClass() == clazz){
+	public <T> T getProvider(Class<T> clazz) {
+		for (DependencyProvider provider : dependencyProviderList) {
+			if (provider.getClass() == clazz) {
 				return clazz.cast(provider);
 			}
 		}
+
 		return null;
 	}
 
-	public void handleDependencies(Project project){
+	public void handleDependencies(Project project) {
 		List<Runnable> afterTasks = new ArrayList<>();
 
 		MappingsProvider mappingsProvider = null;
@@ -79,7 +85,7 @@ public class LoomDependencyManager {
 		Map<String, ProviderList> providerListMap = new HashMap<>();
 		List<ProviderList> targetProviders = new ArrayList<>();
 
-		for(DependencyProvider provider : dependencyProviderList){
+		for (DependencyProvider provider : dependencyProviderList) {
 			providerListMap.computeIfAbsent(provider.getTargetConfig(), (k) -> {
 				ProviderList list = new ProviderList(k);
 				targetProviders.add(list);
@@ -100,6 +106,7 @@ public class LoomDependencyManager {
 			configuration.getDependencies().forEach(dependency -> {
 				for (DependencyProvider provider : list.providers) {
 					DependencyProvider.DependencyInfo info = DependencyInfo.create(project, dependency, configuration);
+
 					try {
 						provider.provide(info, project, extension, afterTasks::add);
 					} catch (Exception e) {
@@ -113,13 +120,7 @@ public class LoomDependencyManager {
 			String mappingsKey = mappingsProvider.mappingsName + "." + mappingsProvider.minecraftVersion.replace(' ', '_').replace('.', '_').replace('-', '_') + "." + mappingsProvider.mappingsVersion;
 
 			for (RemappedConfigurationEntry entry : Constants.MOD_COMPILE_ENTRIES) {
-				ModCompileRemapper.remapDependencies(
-						project, mappingsKey, extension,
-						project.getConfigurations().getByName(entry.getSourceConfiguration()),
-						project.getConfigurations().getByName(entry.getRemappedConfiguration()),
-						project.getConfigurations().getByName(entry.getTargetConfiguration(project.getConfigurations())),
-						afterTasks::add
-				);
+				ModCompileRemapper.remapDependencies(project, mappingsKey, extension, project.getConfigurations().getByName(entry.getSourceConfiguration()), project.getConfigurations().getByName(entry.getRemappedConfiguration()), project.getConfigurations().getByName(entry.getTargetConfiguration(project.getConfigurations())), afterTasks::add);
 			}
 		}
 
@@ -154,7 +155,9 @@ public class LoomDependencyManager {
 		}
 	}
 
-	private static void handleInstallerJson(JsonObject jsonObject, Project project){
+	private static void handleInstallerJson(JsonObject jsonObject, Project project) {
+		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
+
 		JsonObject libraries = jsonObject.get("libraries").getAsJsonObject();
 		Configuration mcDepsConfig = project.getConfigurations().getByName(Constants.MINECRAFT_DEPENDENCIES);
 		Configuration apDepsConfig = project.getConfigurations().getByName("annotationProcessor");
@@ -165,20 +168,22 @@ public class LoomDependencyManager {
 			ExternalModuleDependency modDep = (ExternalModuleDependency) project.getDependencies().create(name);
 			modDep.setTransitive(false);
 			mcDepsConfig.getDependencies().add(modDep);
-			apDepsConfig.getDependencies().add(modDep);
+
+			if (!extension.ideSync()) {
+				apDepsConfig.getDependencies().add(modDep);
+			}
 
 			project.getLogger().debug("Loom adding " + name + " from installer JSON");
 
-			if(jsonElement.getAsJsonObject().has("url")){
+			if (jsonElement.getAsJsonObject().has("url")) {
 				String url = jsonElement.getAsJsonObject().get("url").getAsString();
-				long count = project.getRepositories().stream()
-						.filter(artifactRepository -> artifactRepository instanceof MavenArtifactRepository)
+				long count = project.getRepositories().stream().filter(artifactRepository -> artifactRepository instanceof MavenArtifactRepository)
 						.map(artifactRepository -> (MavenArtifactRepository) artifactRepository)
 						.filter(mavenArtifactRepository -> mavenArtifactRepository.getUrl().toString().equalsIgnoreCase(url)).count();
-				if(count == 0){
+
+				if (count == 0) {
 					project.getRepositories().maven(mavenArtifactRepository -> mavenArtifactRepository.setUrl(jsonElement.getAsJsonObject().get("url").getAsString()));
 				}
-
 			}
 		});
 	}

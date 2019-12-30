@@ -24,23 +24,23 @@
 
 package net.fabricmc.loom.providers;
 
-import net.fabricmc.loom.LoomGradleExtension;
-import net.fabricmc.loom.providers.openfine.Openfine;
-import net.fabricmc.loom.util.AccessTransformerHelper;
-import net.fabricmc.loom.util.Constants;
-import net.fabricmc.loom.util.MapJarsTiny;
-import net.fabricmc.stitch.util.Pair;
-
-import org.gradle.api.Project;
-
-import com.google.common.io.Files;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
 import java.util.function.Consumer;
+
+import org.gradle.api.Project;
+
+import com.google.common.io.Files;
+
+import net.fabricmc.loom.LoomGradleExtension;
+import net.fabricmc.loom.providers.openfine.Openfine;
+import net.fabricmc.loom.util.AccessTransformerHelper;
+import net.fabricmc.loom.util.Constants;
+import net.fabricmc.loom.util.MapJarsTiny;
+import net.fabricmc.stitch.util.Pair;
 
 public class MinecraftMappedProvider {
     public File MINECRAFT_MAPPED_JAR;
@@ -118,9 +118,9 @@ public class MinecraftMappedProvider {
         return minecraftProvider.libraryProvider.getLibraries();
     }
 
-    public File getIntermediaryJar() {
-        return MINECRAFT_INTERMEDIARY_JAR;
-    }
+	public File getIntermediaryJar() {
+		return MINECRAFT_INTERMEDIARY_JAR;
+	}
 
     public File getMappedJar() {
         return MINECRAFT_MAPPED_JAR;

@@ -24,26 +24,6 @@
 
 package net.fabricmc.loom.util;
 
-
-import net.fabricmc.loom.LoomGradleExtension;
-import net.fabricmc.loom.providers.MinecraftMappedProvider;
-import net.fabricmc.loom.providers.MinecraftProvider;
-import net.fabricmc.loom.providers.mappings.MappingSplat;
-import net.fabricmc.loom.util.AccessTransformerHelper.ZipEntryAT;
-import net.fabricmc.mappings.ClassEntry;
-import net.fabricmc.mappings.EntryTriple;
-import net.fabricmc.mappings.Mappings;
-import net.fabricmc.mappings.MethodEntry;
-import net.fabricmc.stitch.util.Pair;
-import net.fabricmc.loom.providers.MappingsProvider;
-import net.fabricmc.tinyremapper.OutputConsumerPath;
-import net.fabricmc.tinyremapper.TinyRemapper;
-
-import org.gradle.api.InvalidUserDataException;
-import org.gradle.api.Project;
-
-import org.zeroturnaround.zip.ZipUtil;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -60,17 +40,32 @@ import java.util.Set;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
-public class MapJarsTiny {
+import org.gradle.api.InvalidUserDataException;
+import org.gradle.api.Project;
+import org.zeroturnaround.zip.ZipUtil;
 
+import net.fabricmc.loom.LoomGradleExtension;
+import net.fabricmc.loom.providers.MappingsProvider;
+import net.fabricmc.loom.providers.MinecraftMappedProvider;
+import net.fabricmc.loom.providers.MinecraftProvider;
+import net.fabricmc.loom.providers.mappings.MappingSplat;
+import net.fabricmc.loom.util.AccessTransformerHelper.ZipEntryAT;
+import net.fabricmc.mappings.ClassEntry;
+import net.fabricmc.mappings.EntryTriple;
+import net.fabricmc.mappings.Mappings;
+import net.fabricmc.mappings.MethodEntry;
+import net.fabricmc.stitch.util.Pair;
+import net.fabricmc.tinyremapper.OutputConsumerPath;
+import net.fabricmc.tinyremapper.TinyRemapper;
+
+public class MapJarsTiny {
 	public void mapJars(MinecraftProvider jarProvider, MinecraftMappedProvider mapProvider, Project project) throws IOException {
 		String fromM = "official";
 
 		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
 		MappingsProvider mappingsProvider = extension.getMappingsProvider();
 
-		Path[] classpath = mapProvider.getMapperPaths().stream()
-				.map(File::toPath)
-				.toArray(Path[]::new);
+		Path[] classpath = mapProvider.getMapperPaths().stream().map(File::toPath).toArray(Path[]::new);
 
 		Path input = jarProvider.getMergedJar().toPath();
 		Path outputMapped = mapProvider.getMappedJar().toPath();
@@ -93,7 +88,7 @@ public class MapJarsTiny {
 				remapper.readInputs(input);
 				remapper.apply(outputConsumer);
 			} catch (Exception e) {
-				throw new RuntimeException("Failed to remap JAR", e);
+				throw new RuntimeException("Failed to remap JAR " + input + " with mappings from " + mappingsProvider.MAPPINGS_TINY, e);
 			} finally {
 				remapper.finish();
 			}

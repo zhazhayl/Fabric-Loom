@@ -24,13 +24,11 @@
 
 package net.fabricmc.loom.util;
 
+import java.util.List;
 
 import com.google.common.collect.ImmutableList;
 
-import java.util.List;
-
 public class Constants {
-
 	public static final String DEFAULT_FABRIC_CLIENT_TWEAKER = "net.fabricmc.loader.launch.FabricClientTweaker";
 	public static final String DEFAULT_FABRIC_SERVER_TWEAKER = "net.fabricmc.loader.launch.FabricServerTweaker";
 
@@ -59,4 +57,5 @@ public class Constants {
 	public static final String MAPPINGS = "mappingsNative";
 
 	public static final String MIXIN_COMPILE_EXTENSIONS_VERSION = "0.1.1.1";
+	public static final String DEV_LAUNCH_INJECTOR_VERSION = "0.1.0+build.3";
 }

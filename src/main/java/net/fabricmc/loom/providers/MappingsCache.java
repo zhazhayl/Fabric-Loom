@@ -24,10 +24,6 @@
 
 package net.fabricmc.loom.providers;
 
-import net.fabricmc.loom.util.StaticPathWatcher;
-import net.fabricmc.mappings.Mappings;
-import net.fabricmc.mappings.MappingsProvider;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.ref.SoftReference;
@@ -36,16 +32,22 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
+import net.fabricmc.loom.util.StaticPathWatcher;
+import net.fabricmc.mappings.Mappings;
+import net.fabricmc.mappings.MappingsProvider;
+
 public final class MappingsCache {
-    public static final MappingsCache INSTANCE = new MappingsCache();
+	public static final MappingsCache INSTANCE = new MappingsCache();
 
-    private final Map<Path, SoftReference<Mappings>> mappingsCache = new HashMap<>();
+	private final Map<Path, SoftReference<Mappings>> mappingsCache = new HashMap<>();
 
+	//TODO: loom doesn't actually use new mappings when the mappings change until the Gradle daemons are stopped
     public Mappings get(Path mappingsPath) throws IOException {
-        mappingsPath = mappingsPath.toAbsolutePath();
-        if (StaticPathWatcher.INSTANCE.hasFileChanged(mappingsPath)) {
-            mappingsCache.remove(mappingsPath);
-        }
+		mappingsPath = mappingsPath.toAbsolutePath();
+
+		if (StaticPathWatcher.INSTANCE.hasFileChanged(mappingsPath)) {
+			mappingsCache.remove(mappingsPath);
+		}
 
         SoftReference<Mappings> ref = mappingsCache.get(mappingsPath);
         Mappings mappings = ref != null ? ref.get() : null;

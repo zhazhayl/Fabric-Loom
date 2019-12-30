@@ -24,30 +24,29 @@
 
 package net.fabricmc.loom.task.fernflower;
 
-import org.jetbrains.java.decompiler.main.extern.IFernflowerLogger;
-
 import java.io.PrintStream;
 import java.text.MessageFormat;
 import java.util.Stack;
+
+import org.jetbrains.java.decompiler.main.extern.IFernflowerLogger;
 
 /**
  * This logger simply prints what each thread is doing
  * to the console in a machine parsable way.
  *
- * Created by covers1624 on 11/02/19.
+ * <p>Created by covers1624 on 11/02/19.
  */
 public class ThreadIDFFLogger extends IFernflowerLogger {
+	public final PrintStream stdOut;
+	public final PrintStream stdErr;
 
-    public final PrintStream stdOut;
-    public final PrintStream stdErr;
+	private ThreadLocal<Stack<String>> workingClass = ThreadLocal.withInitial(Stack::new);
+	private ThreadLocal<Stack<String>> line = ThreadLocal.withInitial(Stack::new);
 
-    private ThreadLocal<Stack<String>> workingClass = ThreadLocal.withInitial(Stack::new);
-    private ThreadLocal<Stack<String>> line = ThreadLocal.withInitial(Stack::new);
-
-    public ThreadIDFFLogger(PrintStream stdOut, PrintStream stdErr) {
-        this.stdOut = stdOut;
-        this.stdErr = stdErr;
-    }
+	public ThreadIDFFLogger(PrintStream stdOut, PrintStream stdErr) {
+		this.stdOut = stdOut;
+		this.stdErr = stdErr;
+	}
 
     @Override
     public void writeMessage(String message, Severity severity) {
@@ -61,16 +60,18 @@ public class ThreadIDFFLogger extends IFernflowerLogger {
         t.printStackTrace(stdErr);
     }
 
-    private void print() {
-        Thread thread = Thread.currentThread();
-        long id = thread.getId();
-        if (line.get().isEmpty()) {
+	private void print() {
+		Thread thread = Thread.currentThread();
+		long id = thread.getId();
+
+		if (line.get().isEmpty()) {
             stdOut.println(MessageFormat.format("{0} :: waiting", id));
-            return;
-        }
-        String line = this.line.get().peek();
+			return;
+		}
+
+		String line = this.line.get().peek();
         stdOut.println(MessageFormat.format("{0} :: {1}", id, line).trim());
-    }
+	}
 
     @Override
     public void startReadingClass(String className) {
@@ -90,13 +91,13 @@ public class ThreadIDFFLogger extends IFernflowerLogger {
         writeMessage("Decompiling " + className + '.' + methodName.substring(0, methodName.indexOf(' ')), Severity.INFO);
     }
 
-    @Override
-    public void endMethod() {
-        line.get().pop();
-        print();
-    }
+	@Override
+	public void endMethod() {
+		line.get().pop();
+		print();
+	}
 
-    @Override
+	@Override
     public void endClass() {
         line.get().pop();
         workingClass.get().pop();
@@ -108,17 +109,16 @@ public class ThreadIDFFLogger extends IFernflowerLogger {
     	writeMessage("Writing " + className, Severity.INFO);
     }
 
-    @Override
-    public void endWriteClass() {
-        line.get().pop();
-        print();
-    }
+	@Override
+	public void endWriteClass() {
+		line.get().pop();
+		print();
+	}
 
-    @Override
-    public void endReadingClass() {
-        line.get().pop();
-        workingClass.get().pop();
-        print();
-    }
-
+	@Override
+	public void endReadingClass() {
+		line.get().pop();
+		workingClass.get().pop();
+		print();
+	}
 }

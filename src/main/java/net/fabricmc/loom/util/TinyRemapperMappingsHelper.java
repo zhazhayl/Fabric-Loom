@@ -24,16 +24,20 @@
 
 package net.fabricmc.loom.util;
 
-import net.fabricmc.mappings.*;
+import net.fabricmc.mappings.ClassEntry;
+import net.fabricmc.mappings.EntryTriple;
+import net.fabricmc.mappings.FieldEntry;
+import net.fabricmc.mappings.Mappings;
+import net.fabricmc.mappings.MethodEntry;
 import net.fabricmc.tinyremapper.IMappingProvider;
 import net.fabricmc.tinyremapper.MemberInstance;
 
 public class TinyRemapperMappingsHelper {
-	private TinyRemapperMappingsHelper() {
+	private TinyRemapperMappingsHelper() { }
 
-	}
+	public static IMappingProvider create(Mappings mappings, String from, String to, boolean remapLocalVariables) {
+		if (remapLocalVariables) throw new UnsupportedOperationException("TODO");
 
-	public static IMappingProvider create(Mappings mappings, String from, String to) {
 		return (classMap, fieldMap, methodMap) -> {
 			for (ClassEntry entry : mappings.getClassEntries()) {
 				classMap.put(entry.get(from), entry.get(to));
@@ -41,12 +45,12 @@ public class TinyRemapperMappingsHelper {
 
 			for (FieldEntry entry : mappings.getFieldEntries()) {
 				EntryTriple fromTriple = entry.get(from);
-				fieldMap.put(fromTriple.getOwner() + "/" + MemberInstance.getFieldId(fromTriple.getName(), fromTriple.getDesc()), entry.get(to).getName());
+				fieldMap.put(fromTriple.getOwner() + '/' + MemberInstance.getFieldId(fromTriple.getName(), fromTriple.getDesc()), entry.get(to).getName());
 			}
 
 			for (MethodEntry entry : mappings.getMethodEntries()) {
 				EntryTriple fromTriple = entry.get(from);
-				methodMap.put(fromTriple.getOwner() + "/" + MemberInstance.getMethodId(fromTriple.getName(), fromTriple.getDesc()), entry.get(to).getName());
+				methodMap.put(fromTriple.getOwner() + '/' + MemberInstance.getMethodId(fromTriple.getName(), fromTriple.getDesc()), entry.get(to).getName());
 			}
 		};
 	}

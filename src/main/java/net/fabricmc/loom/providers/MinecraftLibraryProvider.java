@@ -24,18 +24,18 @@
 
 package net.fabricmc.loom.providers;
 
-import net.fabricmc.loom.LoomGradleExtension;
-import net.fabricmc.loom.util.Constants;
-import net.fabricmc.loom.util.MinecraftVersionInfo;
-import org.gradle.api.Project;
-
 import java.io.File;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.function.Consumer;
 
-public class MinecraftLibraryProvider {
+import org.gradle.api.Project;
 
+import net.fabricmc.loom.LoomGradleExtension;
+import net.fabricmc.loom.util.Constants;
+import net.fabricmc.loom.util.MinecraftVersionInfo;
+
+public class MinecraftLibraryProvider {
 	public File MINECRAFT_LIBS;
 
 	private Collection<File> libs = new HashSet<>();
@@ -46,11 +46,12 @@ public class MinecraftLibraryProvider {
 		initFiles(project, minecraftProvider);
 
 		for (MinecraftVersionInfo.Library library : versionInfo.libraries) {
-			if (library.allowed() && library.getFile(MINECRAFT_LIBS) != null) {
+			if (library.allowed() && !library.isNative() && library.getFile(MINECRAFT_LIBS) != null) {
 				// TODO: Add custom library locations
 
 				// By default, they are all available on all sides
 				/* boolean isClientOnly = false;
+
 				if (library.name.contains("java3d") || library.name.contains("paulscode") || library.name.contains("lwjgl") || library.name.contains("twitch") || library.name.contains("jinput") || library.name.contains("text2speech") || library.name.contains("objc")) {
 					isClientOnly = true;
 				} */
@@ -70,5 +71,4 @@ public class MinecraftLibraryProvider {
 		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
 		MINECRAFT_LIBS = new File(extension.getUserCache(), "libraries");
 	}
-
 }

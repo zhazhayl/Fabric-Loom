@@ -24,17 +24,26 @@
 
 package net.fabricmc.loom.task;
 
-import net.fabricmc.loom.LoomGradleExtension;
-import org.gradle.api.Project;
+import java.io.IOException;
+
+import org.apache.commons.io.FileUtils;
 import org.gradle.api.tasks.TaskAction;
 
+import net.fabricmc.loom.LoomGradleExtension;
+
 public class CleanLoomBinaries extends AbstractLoomTask {
-    @TaskAction
-    public void run() {
-        Project project = this.getProject();
-        LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
-        extension.getMinecraftProvider().getMergedJar().delete();
-        extension.getMinecraftMappedProvider().getIntermediaryJar().delete();
-        extension.getMinecraftMappedProvider().getMappedJar().delete();
-    }
+	@TaskAction
+	public void run() {
+		LoomGradleExtension extension = getExtension();
+		extension.getMinecraftProvider().getMergedJar().delete();
+		extension.getMinecraftMappedProvider().getIntermediaryJar().delete();
+		extension.getMinecraftMappedProvider().getMappedJar().delete();
+
+		try {
+			FileUtils.deleteDirectory(extension.getNativesDirectory());
+			FileUtils.deleteDirectory(extension.getNativesJarStore());
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
 }

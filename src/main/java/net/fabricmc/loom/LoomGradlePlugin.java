@@ -24,11 +24,12 @@
 
 package net.fabricmc.loom;
 
-import net.fabricmc.loom.providers.MappingsProvider;
-import net.fabricmc.loom.providers.MinecraftLibraryProvider;
-import net.fabricmc.loom.providers.MinecraftMappedProvider;
-import net.fabricmc.loom.task.*;
-import net.fabricmc.loom.task.fernflower.FernFlowerTask;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Locale;
+import java.util.function.BiConsumer;
 
 import org.gradle.api.Action;
 import org.gradle.api.DefaultTask;
@@ -38,12 +39,23 @@ import org.gradle.api.plugins.ExtraPropertiesExtension;
 import org.gradle.api.tasks.TaskContainer;
 import org.gradle.api.tasks.TaskProvider;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Locale;
-import java.util.function.BiConsumer;
+import net.fabricmc.loom.providers.MappingsProvider;
+import net.fabricmc.loom.providers.MinecraftLibraryProvider;
+import net.fabricmc.loom.providers.MinecraftMappedProvider;
+import net.fabricmc.loom.task.AbstractDecompileTask;
+import net.fabricmc.loom.task.CleanLoomBinaries;
+import net.fabricmc.loom.task.CleanLoomMappings;
+import net.fabricmc.loom.task.DownloadAssetsTask;
+import net.fabricmc.loom.task.GenEclipseRunsTask;
+import net.fabricmc.loom.task.GenIdeaProjectTask;
+import net.fabricmc.loom.task.GenVsCodeProjectTask;
+import net.fabricmc.loom.task.MigrateMappingsTask;
+import net.fabricmc.loom.task.RemapJarTask;
+import net.fabricmc.loom.task.RemapLineNumbersTask;
+import net.fabricmc.loom.task.RemapSourcesJarTask;
+import net.fabricmc.loom.task.RunClientTask;
+import net.fabricmc.loom.task.RunServerTask;
+import net.fabricmc.loom.task.fernflower.FernFlowerTask;
 
 public class LoomGradlePlugin extends AbstractPlugin {
 	private static File getMappedByproduct(Project project, String suffix) {
@@ -51,6 +63,7 @@ public class LoomGradlePlugin extends AbstractPlugin {
 		MappingsProvider mappingsProvider = extension.getMappingsProvider();
 		File mappedJar = mappingsProvider.mappedProvider.getMappedJar();
 		String path = mappedJar.getAbsolutePath();
+
 		if (!path.toLowerCase(Locale.ROOT).endsWith(".jar")) {
 			throw new RuntimeException("Invalid mapped JAR path: " + path);
 		}
@@ -69,6 +82,11 @@ public class LoomGradlePlugin extends AbstractPlugin {
 
 		tasks.register("cleanLoomBinaries", CleanLoomBinaries.class);
 		tasks.register("cleanLoomMappings", CleanLoomMappings.class);
+
+		tasks.register("cleanLoom").configure(task -> {
+			task.dependsOn(tasks.getByName("cleanLoomBinaries"));
+			task.dependsOn(tasks.getByName("cleanLoomMappings"));
+		});
 
 		tasks.register("migrateMappings", MigrateMappingsTask.class, t -> {
 			t.getOutputs().upToDateWhen((o) -> false);

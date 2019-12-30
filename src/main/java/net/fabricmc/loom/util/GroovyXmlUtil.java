@@ -24,16 +24,14 @@
 
 package net.fabricmc.loom.util;
 
-import groovy.util.Node;
-
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public final class GroovyXmlUtil {
-	private GroovyXmlUtil() {
+import groovy.util.Node;
 
-	}
+public final class GroovyXmlUtil {
+	private GroovyXmlUtil() { }
 
 	public static Node getOrCreateNode(Node parent, String name) {
 		return getNode(parent, name).orElseGet(() -> parent.appendNode(name));

@@ -24,22 +24,20 @@
 
 package net.fabricmc.loom.util;
 
-import net.fabricmc.loom.LoomGradleExtension;
-import net.fabricmc.loom.util.ModProcessor;
-import net.fabricmc.loom.util.SourceRemapper;
+import java.io.File;
+import java.io.IOException;
+import java.util.Optional;
+import java.util.function.Consumer;
 
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.dsl.DependencyHandler;
 import org.gradle.api.logging.Logger;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.Optional;
-import java.util.function.Consumer;
+import net.fabricmc.loom.LoomGradleExtension;
 
 public class ModCompileRemapper {
-	public static void remapDependencies(Project project, String mappingsPrefix, LoomGradleExtension extension, Configuration modCompile, Configuration modCompileRemapped, Configuration regularCompile, Consumer<Runnable> postPopulationScheduler) {
+	public static void remapDependencies(Project project, String mappingsSuffix, LoomGradleExtension extension, Configuration modCompile, Configuration modCompileRemapped, Configuration regularCompile, Consumer<Runnable> postPopulationScheduler) {
 		Logger logger = project.getLogger();
 		DependencyHandler dependencies = project.getDependencies();
 
@@ -57,9 +55,11 @@ public class ModCompileRemapper {
 				continue;
 			}
 
-			String remappedLog = group + ':' + name + ':' + version + classifier + " (" + mappingsPrefix + ")";
-			String remappedNotation = "net.fabricmc.mapped:" + mappingsPrefix + '.' + group + '.' + name + ':' + version + classifier;
-			String remappedFilename = mappingsPrefix + '.' + group + '.' + name + '-' + version + classifier.replace(':', '-');
+			String remappedLog = group + ':' + name + ':' + version + classifier + " (" + mappingsSuffix + ')';
+			//String remappedNotation = "net.fabricmc.mapped:" + mappingsSuffix + '.' + group + '.' + name + ':' + version + classifier;
+			String remappedNotation = String.format("%s:%s:%s@%s%s", group, name, version, mappingsSuffix, classifier);
+			//String remappedFilename = mappingsSuffix + '.' + group + '.' + name + '-' + version + classifier.replace(':', '-');
+			String remappedFilename = String.format("%s-%s@%s", name, version, mappingsSuffix + classifier.replace(':', '-'));
 			logger.lifecycle(":providing " + remappedLog);
 
 			File modStore = extension.getRemappedModCache();
@@ -68,7 +68,7 @@ public class ModCompileRemapper {
 			if (!output.exists() || input.lastModified() <= 0 || input.lastModified() > output.lastModified()) {
 				//If the output doesn't exist, or appears to be outdated compared to the input we'll remap it
 				try {
-					ModProcessor.processMod(input, output, project, modCompileRemapped);
+					ModProcessor.processMod(input, output, project, modCompileRemapped, artifact.getSources());
 				} catch (IOException e) {
 					throw new RuntimeException("Failed to remap mod", e);
 				}
