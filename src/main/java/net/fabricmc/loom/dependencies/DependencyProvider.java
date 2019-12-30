@@ -47,6 +47,11 @@ public abstract class DependencyProvider {
 		return Collections.emptySet();
 	}
 
+	/** The collection of {@link DependencyProvider} types this should run before */
+	public Set<Class<? extends DependencyProvider>> getDependents() {
+		return Collections.emptySet();
+	}
+
 	public void addDependency(Object object, Project project) {
 		addDependency(object, project, "compile");
 	}

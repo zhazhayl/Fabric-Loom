@@ -26,14 +26,15 @@ package net.fabricmc.loom.dependencies;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 import com.google.gson.JsonObject;
+
+import org.gradle.api.InvalidUserDataException;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
+import org.gradle.api.artifacts.Dependency;
+import org.gradle.api.artifacts.DependencySet;
 import org.gradle.api.artifacts.ExternalModuleDependency;
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
 
@@ -41,34 +42,34 @@ import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.dependencies.PhysicalDependencyProvider.DependencyInfo;
 import net.fabricmc.loom.providers.MappingsProvider;
 import net.fabricmc.loom.util.Constants;
-import net.fabricmc.stitch.util.StitchUtil;
 
 public class LoomDependencyManager {
-	private static class ProviderList {
-		private final String key;
-		private final List<PhysicalDependencyProvider> providers = new ArrayList<>();
+	private final List<DependencyProvider> dependencyProviderList = new ArrayList<>();
 
-		ProviderList(String key) {
-			this.key = key;
+	public boolean hasProvider(Class<? extends DependencyProvider> clazz) {
+		for (DependencyProvider provider : dependencyProviderList) {
+			if (provider.getClass() == clazz) {
+				return true;
+			}
 		}
-	}
 
-	private List<DependencyProvider> dependencyProviderList = new ArrayList<>();
+		return false;
+	}
 
 	public void addProvider(DependencyProvider provider) {
 		if (dependencyProviderList.contains(provider)) {
-			throw new RuntimeException("Provider is already registered");
+			throw new IllegalArgumentException("Provider is already registered");
 		}
 
-		if (getProvider(provider.getClass()) != null) {
-			throw new RuntimeException("Provider of this type is already registered");
+		if (hasProvider(provider.getClass())) {
+			throw new IllegalArgumentException("Provider of this type is already registered");
 		}
 
 		provider.register(this);
 		dependencyProviderList.add(provider);
 	}
 
-	public <T> T getProvider(Class<T> clazz) {
+	public <T extends DependencyProvider> T getProvider(Class<T> clazz) {
 		for (DependencyProvider provider : dependencyProviderList) {
 			if (provider.getClass() == clazz) {
 				return clazz.cast(provider);
@@ -82,51 +83,49 @@ public class LoomDependencyManager {
 		project.getLogger().lifecycle(":setting up loom dependencies");
 		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
 
-		MappingsProvider mappingsProvider = null;
-		List<ProviderList> targetProviders = new ArrayList<>();
-		Set<LogicalDependencyProvider> linkingProviders = StitchUtil.newIdentityHashSet();
-
-		Map<String, ProviderList> providerListMap = new HashMap<>();
-		for (DependencyProvider dependencyProvider : dependencyProviderList) {
-			if (dependencyProvider instanceof PhysicalDependencyProvider) {
-				PhysicalDependencyProvider provider = (PhysicalDependencyProvider) dependencyProvider;
-
-				providerListMap.computeIfAbsent(provider.getTargetConfig(), (k) -> {
-					ProviderList list = new ProviderList(k);
-					targetProviders.add(list);
-					return list;
-				}).providers.add(provider);
-
-				if (provider instanceof MappingsProvider) {
-					assert mappingsProvider == null;
-					mappingsProvider = (MappingsProvider) provider;
-				}
-			} else {
-				LogicalDependencyProvider provider = (LogicalDependencyProvider) dependencyProvider;
-
-				linkingProviders.add(provider);
-			}
-		}
-
+		MappingsProvider mappingsProvider = getProvider(MappingsProvider.class);
 		if (mappingsProvider == null) {
 			throw new RuntimeException("Could not find MappingsProvider instance!");
 		}
 
+		DependencyGraph graph = new DependencyGraph(dependencyProviderList);
 		List<Runnable> afterTasks = new ArrayList<>();
 
-		for (ProviderList list : targetProviders) {
-			Configuration configuration = project.getConfigurations().getByName(list.key);
-			configuration.getDependencies().forEach(dependency -> {
-				for (PhysicalDependencyProvider provider : list.providers) {
+		for (DependencyProvider provider : graph.asIterable()) {
+			if (provider instanceof PhysicalDependencyProvider) {
+				PhysicalDependencyProvider physicalProvider = (PhysicalDependencyProvider) provider;
+
+				Configuration configuration = project.getConfigurations().getByName(physicalProvider.getTargetConfig());
+				DependencySet dependencies = configuration.getDependencies();
+
+				if (physicalProvider.isRequired() && dependencies.size() < 1) {
+					throw new InvalidUserDataException("Missing dependency for " + configuration.getName() + " configuration");
+				}
+
+				if (physicalProvider.isUnique() && dependencies.size() > 1) {
+					throw new InvalidUserDataException("Duplicate dependencies for " + configuration.getName() + " configuration");
+				}
+
+				for (Dependency dependency : dependencies) {
 					DependencyInfo info = DependencyInfo.create(project, dependency, configuration);
 
 					try {
-						provider.provide(info, project, extension, afterTasks::add);
+						physicalProvider.provide(info, project, extension, afterTasks::add);
 					} catch (Exception e) {
-						throw new RuntimeException("Failed to provide " + dependency.getGroup() + ":" + dependency.getName() + ":" + dependency.getVersion(), e);
+						throw new RuntimeException("Failed to provide " + dependency.getGroup() + ':' + dependency.getName() + ':' + dependency.getVersion(), e);
 					}
 				}
-			});
+			} else if (provider instanceof LogicalDependencyProvider) {
+				try {
+					((LogicalDependencyProvider) provider).provide(project, extension, afterTasks::add);
+				} catch (Exception e) {
+					throw new RuntimeException("Failed to provide logical dependency of type " + provider.getClass(), e);
+				}
+			} else {
+				throw new IllegalStateException("Unexpected dependency provider type for " + provider + ": " + provider.getClass());
+			}
+
+			graph.markComplete(provider);
 		}
 
 		{

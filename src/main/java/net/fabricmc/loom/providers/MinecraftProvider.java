@@ -209,7 +209,12 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 	}
 
 	@Override
-	public boolean isUnique() {
+	protected boolean isRequired() {
+		return true;
+	}
+
+	@Override
+	protected boolean isUnique() {
 		return true;
 	}
 }

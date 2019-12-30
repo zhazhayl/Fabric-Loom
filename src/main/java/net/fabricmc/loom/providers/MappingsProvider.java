@@ -410,7 +410,12 @@ public class MappingsProvider extends PhysicalDependencyProvider {
 	}
 
 	@Override
-	public boolean isUnique() {
+	protected boolean isRequired() {
+		return false; //Mappings can be inferred from the (required) Minecraft provider
+	}
+
+	@Override
+	protected boolean isUnique() {
 		return false;
 	}
 }

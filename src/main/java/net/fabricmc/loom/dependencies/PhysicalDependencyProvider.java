@@ -35,8 +35,11 @@ public abstract class PhysicalDependencyProvider extends DependencyProvider {
 	/** The name of the {@link Configuration} (as given by {@link Configuration#getName()}) that this handles */
 	public abstract String getTargetConfig();
 
-	/** Whether there should only be a single dependency in the target {@link Configuration} */
-	public abstract boolean isUnique();
+	/** Whether the target {@link Configuration} must have at least one dependency in */
+	protected abstract boolean isRequired();
+
+	/** Whether there should be at most a single dependency in the target {@link Configuration} */
+	protected abstract boolean isUnique();
 
 	/** Perform whatever action this needs for the given {@link DependencyInfo} from the target {@link Configuration} */
 	public abstract void provide(DependencyInfo dependency, Project project, LoomGradleExtension extension, Consumer<Runnable> postPopulationScheduler) throws Exception;
