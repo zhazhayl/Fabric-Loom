@@ -58,7 +58,7 @@ class DependencyGraph {
 		}
 
 		boolean addDependency(DependencyNode node) {
-			if (node.getClass().equals(type)) throw new IllegalArgumentException("Provider cannot depend on itself");
+			if (node.type == type) throw new IllegalArgumentException("Provider cannot depend on itself");
 
 			return dependencies.add(node);
 		}
@@ -68,7 +68,7 @@ class DependencyGraph {
 		}
 
 		boolean addDependent(DependencyNode node) {
-			if (node.getClass().equals(type)) throw new IllegalArgumentException("Provider cannot depend on itself");
+			if (node.type == type) throw new IllegalArgumentException("Provider cannot depend on itself");
 
 			return dependents.add(node);
 		}

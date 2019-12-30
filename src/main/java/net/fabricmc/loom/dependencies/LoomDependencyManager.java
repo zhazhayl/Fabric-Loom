@@ -44,6 +44,7 @@ import net.fabricmc.loom.util.Constants;
 
 public class LoomDependencyManager {
 	private final List<DependencyProvider> dependencyProviderList = new ArrayList<>();
+	private boolean hasHandled;
 
 	public boolean hasProvider(Class<? extends DependencyProvider> clazz) {
 		for (DependencyProvider provider : dependencyProviderList) {
@@ -64,6 +65,10 @@ public class LoomDependencyManager {
 			throw new IllegalArgumentException("Provider of this type is already registered");
 		}
 
+		if (hasHandled) {
+			throw new IllegalStateException("Dependencies have already been handled");
+		}
+
 		provider.register(this);
 		dependencyProviderList.add(provider);
 	}
@@ -82,6 +87,7 @@ public class LoomDependencyManager {
 		project.getLogger().lifecycle(":setting up loom dependencies");
 		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
 
+		hasHandled = true; //No time for anything else now
 		DependencyGraph graph = new DependencyGraph(dependencyProviderList);
 		List<Runnable> afterTasks = new ArrayList<>();
 
