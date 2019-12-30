@@ -61,6 +61,7 @@ import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.dependencies.DependencyProvider;
 import net.fabricmc.loom.dependencies.LogicalDependencyProvider;
 import net.fabricmc.loom.dependencies.PhysicalDependencyProvider.DependencyInfo;
+import net.fabricmc.loom.providers.StackedMappingsProvider.MappingFile;
 import net.fabricmc.loom.providers.mappings.EnigmaReader;
 import net.fabricmc.loom.providers.mappings.MappingBlob;
 import net.fabricmc.loom.providers.mappings.MappingBlob.InvertionTarget;
@@ -106,6 +107,9 @@ public class MappingsProvider extends LogicalDependencyProvider {
 	@Override
 	public Set<Class<? extends DependencyProvider>> getDependencies() {
 		return ImmutableSet.of(StackedMappingsProvider.class, MinecraftProvider.class);
+	}
+
+	void stackMappings(MappingFile mappings) {
 	}
 
 	@Override
