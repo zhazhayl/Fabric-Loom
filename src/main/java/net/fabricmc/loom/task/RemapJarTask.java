@@ -27,6 +27,7 @@ package net.fabricmc.loom.task;
 import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.providers.MappingsProvider;
 import net.fabricmc.loom.util.AccessTransformerHelper;
+import net.fabricmc.loom.util.GradleSupport;
 import net.fabricmc.loom.util.MixinRefmapHelper;
 import net.fabricmc.loom.util.NestedJars;
 import net.fabricmc.loom.util.TinyRemapperMappingsHelper;
@@ -51,7 +52,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 public class RemapJarTask extends Jar {
-	private final RegularFileProperty input = getProject().getLayout().fileProperty();
+	private final RegularFileProperty input = GradleSupport.getFileProperty(getProject());
 	private boolean addNestedDependencies;
 	@Input
 	public boolean includeAT = true;

@@ -36,9 +36,14 @@ repositories {
 		name = "Jitpack"
 		url 'https://jitpack.io/'
 	}
+	maven {
+		url "https://repo.gradle.org/gradle/libs-releases-local"
+	}
 }
 
 dependencies {
+	compileOnly "org.gradle:gradle-core-api:6.1-rc-1"
+
 	// libraries
 	implementation ('commons-io:commons-io:2.6')
 	implementation ('org.zeroturnaround:zt-zip:1.13')
