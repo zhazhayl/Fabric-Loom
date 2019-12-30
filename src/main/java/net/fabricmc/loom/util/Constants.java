@@ -28,6 +28,8 @@ import java.util.List;
 
 import com.google.common.collect.ImmutableList;
 
+import net.fabricmc.loom.dependencies.RemappedConfigurationEntry;
+
 public class Constants {
 	public static final String DEFAULT_FABRIC_CLIENT_TWEAKER = "net.fabricmc.loader.launch.FabricClientTweaker";
 	public static final String DEFAULT_FABRIC_SERVER_TWEAKER = "net.fabricmc.loader.launch.FabricServerTweaker";

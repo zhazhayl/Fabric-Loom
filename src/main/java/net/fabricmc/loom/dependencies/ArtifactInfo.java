@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package net.fabricmc.loom.util;
+package net.fabricmc.loom.dependencies;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;

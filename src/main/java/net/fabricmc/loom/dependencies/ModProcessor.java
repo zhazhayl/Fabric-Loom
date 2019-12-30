@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-package net.fabricmc.loom.util;
+package net.fabricmc.loom.dependencies;
 
 import java.io.File;
 import java.io.IOException;
@@ -53,6 +53,9 @@ import org.zeroturnaround.zip.transform.ZipEntryTransformerEntry;
 import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.providers.MappingsProvider;
 import net.fabricmc.loom.providers.MinecraftMappedProvider;
+import net.fabricmc.loom.util.AccessTransformerHelper;
+import net.fabricmc.loom.util.Constants;
+import net.fabricmc.loom.util.TinyRemapperMappingsHelper;
 import net.fabricmc.tinyremapper.OutputConsumerPath;
 import net.fabricmc.tinyremapper.TinyRemapper;
 

@@ -28,9 +28,11 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.StringJoiner;
 import java.util.function.Consumer;
 
@@ -38,12 +40,13 @@ import org.apache.commons.io.FileUtils;
 import org.gradle.api.Project;
 
 import net.fabricmc.loom.LoomGradleExtension;
+import net.fabricmc.loom.dependencies.DependencyProvider;
+import net.fabricmc.loom.dependencies.LogicalDependencyProvider;
 import net.fabricmc.loom.util.Constants;
-import net.fabricmc.loom.util.DependencyProvider;
 
-public class LaunchProvider extends DependencyProvider {
+public class LaunchProvider extends LogicalDependencyProvider {
 	@Override
-	public void provide(DependencyInfo dependency, Project project, LoomGradleExtension extension, Consumer<Runnable> postPopulationScheduler) throws IOException {
+	public void provide(Project project, LoomGradleExtension extension, Consumer<Runnable> postPopulationScheduler) throws IOException {
 		final LaunchConfig launchConfig = new LaunchConfig()
 				.property("fabric.development", "true")
 
@@ -61,8 +64,8 @@ public class LaunchProvider extends DependencyProvider {
 	}
 
 	@Override
-	public String getTargetConfig() {
-		return Constants.MINECRAFT_NAMED;
+	public Set<Class<? extends DependencyProvider>> getDependencies() {
+		return Collections.emptySet(); //TODO: Fill me in
 	}
 
 	public static class LaunchConfig {
@@ -73,7 +76,7 @@ public class LaunchProvider extends DependencyProvider {
 		}
 
 		public LaunchConfig property(String side, String key, String value) {
-			values.computeIfAbsent(side + "Properties", (s -> new ArrayList<>()))
+			values.computeIfAbsent(side + "Properties", s -> new ArrayList<>())
 					.add(String.format("%s=%s", key, value));
 			return this;
 		}
@@ -83,7 +86,7 @@ public class LaunchProvider extends DependencyProvider {
 		}
 
 		public LaunchConfig argument(String side, String value) {
-			values.computeIfAbsent(side + "Args", (s -> new ArrayList<>()))
+			values.computeIfAbsent(side + "Args", s -> new ArrayList<>())
 					.add(value);
 			return this;
 		}

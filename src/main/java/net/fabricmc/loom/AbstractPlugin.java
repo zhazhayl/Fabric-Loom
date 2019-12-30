@@ -55,6 +55,8 @@ import org.gradle.api.tasks.scala.ScalaCompile;
 import org.gradle.plugins.ide.eclipse.model.EclipseModel;
 import org.gradle.plugins.ide.idea.model.IdeaModel;
 
+import net.fabricmc.loom.dependencies.LoomDependencyManager;
+import net.fabricmc.loom.dependencies.RemappedConfigurationEntry;
 import net.fabricmc.loom.providers.LaunchProvider;
 import net.fabricmc.loom.providers.MappingsProvider;
 import net.fabricmc.loom.providers.MinecraftProvider;
@@ -63,9 +65,7 @@ import net.fabricmc.loom.task.RemapSourcesJarTask;
 import net.fabricmc.loom.util.AccessTransformerHelper;
 import net.fabricmc.loom.util.Constants;
 import net.fabricmc.loom.util.GroovyXmlUtil;
-import net.fabricmc.loom.util.LoomDependencyManager;
 import net.fabricmc.loom.util.NestedJars;
-import net.fabricmc.loom.util.RemappedConfigurationEntry;
 import net.fabricmc.loom.util.SetupIntelijRunConfigs;
 
 public class AbstractPlugin implements Plugin<Project> {

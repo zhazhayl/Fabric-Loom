@@ -45,10 +45,10 @@ import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.Dependency;
 import org.gradle.api.plugins.BasePluginConvention;
 
+import net.fabricmc.loom.dependencies.LoomDependencyManager;
 import net.fabricmc.loom.providers.MappingsProvider;
 import net.fabricmc.loom.providers.MinecraftMappedProvider;
 import net.fabricmc.loom.providers.MinecraftProvider;
-import net.fabricmc.loom.util.LoomDependencyManager;
 
 public class LoomGradleExtension {
 	public String runDir = "run";

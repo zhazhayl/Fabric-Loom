@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-package net.fabricmc.loom.util;
+package net.fabricmc.loom.dependencies;
 
 import org.gradle.api.artifacts.ConfigurationContainer;
 

@@ -48,15 +48,15 @@ import org.zeroturnaround.zip.ZipEntrySource;
 import org.zeroturnaround.zip.ZipUtil;
 
 import net.fabricmc.loom.LoomGradleExtension;
+import net.fabricmc.loom.dependencies.PhysicalDependencyProvider;
 import net.fabricmc.loom.util.Constants;
-import net.fabricmc.loom.util.DependencyProvider;
 import net.fabricmc.loom.util.DownloadUtil;
 import net.fabricmc.mappings.Mappings;
 import net.fabricmc.stitch.Command;
 import net.fabricmc.stitch.commands.CommandProposeFieldNames;
 import net.fabricmc.tinyremapper.IMappingProvider;
 
-public class MappingsProvider extends DependencyProvider {
+public class MappingsProvider extends PhysicalDependencyProvider {
 	public interface MappingFactory {//IOException throwing BiPredicate<String, String, IMappingProvider>
 		IMappingProvider create(String fromMapping, String toMapping) throws IOException;
 	}
@@ -407,5 +407,10 @@ public class MappingsProvider extends DependencyProvider {
 	@Override
 	public String getTargetConfig() {
 		return Constants.MAPPINGS_RAW;
+	}
+
+	@Override
+	public boolean isUnique() {
+		return false;
 	}
 }

@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-package net.fabricmc.loom.util;
+package net.fabricmc.loom.dependencies;
 
 import java.io.File;
 import java.io.IOException;
@@ -35,6 +35,7 @@ import org.gradle.api.artifacts.dsl.DependencyHandler;
 import org.gradle.api.logging.Logger;
 
 import net.fabricmc.loom.LoomGradleExtension;
+import net.fabricmc.loom.util.SourceRemapper;
 
 public class ModCompileRemapper {
 	public static void remapDependencies(Project project, String mappingsSuffix, LoomGradleExtension extension, Configuration modCompile, Configuration modCompileRemapped, Configuration regularCompile, Consumer<Runnable> postPopulationScheduler) {

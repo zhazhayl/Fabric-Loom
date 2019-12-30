@@ -42,17 +42,17 @@ import org.gradle.api.logging.Logger;
 
 import net.fabricmc.loom.AbstractPlugin;
 import net.fabricmc.loom.LoomGradleExtension;
+import net.fabricmc.loom.dependencies.PhysicalDependencyProvider;
 import net.fabricmc.loom.providers.openfine.Openfine;
 import net.fabricmc.loom.util.Checksum;
 import net.fabricmc.loom.util.Constants;
-import net.fabricmc.loom.util.DependencyProvider;
 import net.fabricmc.loom.util.DownloadUtil;
 import net.fabricmc.loom.util.ManifestVersion;
 import net.fabricmc.loom.util.MinecraftVersionInfo;
 import net.fabricmc.loom.util.StaticPathWatcher;
 import net.fabricmc.stitch.merge.JarMerger;
 
-public class MinecraftProvider extends DependencyProvider {
+public class MinecraftProvider extends PhysicalDependencyProvider {
 	public String minecraftVersion;
 
 	public MinecraftVersionInfo versionInfo;
@@ -206,5 +206,10 @@ public class MinecraftProvider extends DependencyProvider {
 	@Override
 	public String getTargetConfig() {
 		return Constants.MINECRAFT;
+	}
+
+	@Override
+	public boolean isUnique() {
+		return true;
 	}
 }

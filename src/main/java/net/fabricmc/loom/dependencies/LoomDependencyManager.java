@@ -22,13 +22,14 @@
  * SOFTWARE.
  */
 
-package net.fabricmc.loom.util;
+package net.fabricmc.loom.dependencies;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.google.gson.JsonObject;
 import org.gradle.api.Project;
@@ -37,13 +38,15 @@ import org.gradle.api.artifacts.ExternalModuleDependency;
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
 
 import net.fabricmc.loom.LoomGradleExtension;
+import net.fabricmc.loom.dependencies.PhysicalDependencyProvider.DependencyInfo;
 import net.fabricmc.loom.providers.MappingsProvider;
-import net.fabricmc.loom.util.DependencyProvider.DependencyInfo;
+import net.fabricmc.loom.util.Constants;
+import net.fabricmc.stitch.util.StitchUtil;
 
 public class LoomDependencyManager {
 	private static class ProviderList {
 		private final String key;
-		private final List<DependencyProvider> providers = new ArrayList<>();
+		private final List<PhysicalDependencyProvider> providers = new ArrayList<>();
 
 		ProviderList(String key) {
 			this.key = key;
@@ -76,24 +79,32 @@ public class LoomDependencyManager {
 	}
 
 	public void handleDependencies(Project project) {
-		List<Runnable> afterTasks = new ArrayList<>();
-
-		MappingsProvider mappingsProvider = null;
-
 		project.getLogger().lifecycle(":setting up loom dependencies");
 		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
-		Map<String, ProviderList> providerListMap = new HashMap<>();
+
+		MappingsProvider mappingsProvider = null;
 		List<ProviderList> targetProviders = new ArrayList<>();
+		Set<LogicalDependencyProvider> linkingProviders = StitchUtil.newIdentityHashSet();
 
-		for (DependencyProvider provider : dependencyProviderList) {
-			providerListMap.computeIfAbsent(provider.getTargetConfig(), (k) -> {
-				ProviderList list = new ProviderList(k);
-				targetProviders.add(list);
-				return list;
-			}).providers.add(provider);
+		Map<String, ProviderList> providerListMap = new HashMap<>();
+		for (DependencyProvider dependencyProvider : dependencyProviderList) {
+			if (dependencyProvider instanceof PhysicalDependencyProvider) {
+				PhysicalDependencyProvider provider = (PhysicalDependencyProvider) dependencyProvider;
 
-			if (provider instanceof MappingsProvider) {
-				mappingsProvider = (MappingsProvider) provider;
+				providerListMap.computeIfAbsent(provider.getTargetConfig(), (k) -> {
+					ProviderList list = new ProviderList(k);
+					targetProviders.add(list);
+					return list;
+				}).providers.add(provider);
+
+				if (provider instanceof MappingsProvider) {
+					assert mappingsProvider == null;
+					mappingsProvider = (MappingsProvider) provider;
+				}
+			} else {
+				LogicalDependencyProvider provider = (LogicalDependencyProvider) dependencyProvider;
+
+				linkingProviders.add(provider);
 			}
 		}
 
@@ -101,11 +112,13 @@ public class LoomDependencyManager {
 			throw new RuntimeException("Could not find MappingsProvider instance!");
 		}
 
+		List<Runnable> afterTasks = new ArrayList<>();
+
 		for (ProviderList list : targetProviders) {
 			Configuration configuration = project.getConfigurations().getByName(list.key);
 			configuration.getDependencies().forEach(dependency -> {
-				for (DependencyProvider provider : list.providers) {
-					DependencyProvider.DependencyInfo info = DependencyInfo.create(project, dependency, configuration);
+				for (PhysicalDependencyProvider provider : list.providers) {
+					DependencyInfo info = DependencyInfo.create(project, dependency, configuration);
 
 					try {
 						provider.provide(info, project, extension, afterTasks::add);
