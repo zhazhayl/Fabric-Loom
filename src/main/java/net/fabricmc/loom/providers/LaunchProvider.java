@@ -46,6 +46,11 @@ import net.fabricmc.loom.util.Constants;
 
 public class LaunchProvider extends LogicalDependencyProvider {
 	@Override
+	public Set<Class<? extends DependencyProvider>> getDependencies() {
+		return Collections.singleton(MinecraftProvider.class);
+	}
+
+	@Override
 	public void provide(Project project, LoomGradleExtension extension, Consumer<Runnable> postPopulationScheduler) throws IOException {
 		final LaunchConfig launchConfig = new LaunchConfig()
 				.property("fabric.development", "true")
@@ -61,11 +66,6 @@ public class LaunchProvider extends LogicalDependencyProvider {
 		FileUtils.writeStringToFile(extension.getDevLauncherConfig(), launchConfig.asString(), StandardCharsets.UTF_8);
 
 		addDependency("net.fabricmc:dev-launch-injector:" + Constants.DEV_LAUNCH_INJECTOR_VERSION, project, "runtimeOnly");
-	}
-
-	@Override
-	public Set<Class<? extends DependencyProvider>> getDependencies() {
-		return Collections.emptySet(); //TODO: Fill me in
 	}
 
 	public static class LaunchConfig {
