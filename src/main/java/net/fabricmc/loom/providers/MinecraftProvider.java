@@ -53,17 +53,18 @@ import net.fabricmc.loom.util.StaticPathWatcher;
 import net.fabricmc.stitch.merge.JarMerger;
 
 public class MinecraftProvider extends PhysicalDependencyProvider {
+	private final Gson gson = new Gson();
 	public String minecraftVersion;
-
 	public MinecraftVersionInfo versionInfo;
-	public MinecraftLibraryProvider libraryProvider;
 
-	File MINECRAFT_JSON;
-	File MINECRAFT_CLIENT_JAR;
-	File MINECRAFT_SERVER_JAR;
-	File MINECRAFT_MERGED_JAR;
+	private File MINECRAFT_JSON;
+	private File MINECRAFT_CLIENT_JAR;
+	private File MINECRAFT_SERVER_JAR;
+	private File MINECRAFT_MERGED_JAR;
 
-	Gson gson = new Gson();
+	public MinecraftProvider() {
+		getDependencyManager().addProvider(new MinecraftLibraryProvider());
+	}
 
 	@Override
 	public void provide(DependencyInfo dependency, Project project, LoomGradleExtension extension, Consumer<Runnable> postPopulationScheduler) throws Exception {
@@ -90,9 +91,6 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 		} else {
 			downloadJars(project.getLogger());
 		}
-
-		libraryProvider = new MinecraftLibraryProvider();
-		libraryProvider.provide(this, project, postPopulationScheduler);
 
 		if (extension.hasOptiFine()) {
 			MINECRAFT_CLIENT_JAR = Openfine.process(project.getLogger(), minecraftVersion, MINECRAFT_CLIENT_JAR, MINECRAFT_SERVER_JAR, extension.getOptiFine());
@@ -201,6 +199,10 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 
 	public File getMergedJar() {
 		return MINECRAFT_MERGED_JAR;
+	}
+
+	public MinecraftLibraryProvider getLibraryProvider() {
+		return getProvider(MinecraftLibraryProvider.class);
 	}
 
 	@Override

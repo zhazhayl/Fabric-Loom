@@ -50,7 +50,7 @@ public class MinecraftMappedProvider extends LogicalDependencyProvider {
 
     @Override
     public Set<Class<? extends DependencyProvider>> getDependencies() {
-    	return ImmutableSet.of(MinecraftProvider.class, MappingsProvider.class);
+    	return ImmutableSet.of(MinecraftProvider.class, MinecraftLibraryProvider.class, MappingsProvider.class);
     }
 
     @Override
@@ -122,7 +122,7 @@ public class MinecraftMappedProvider extends LogicalDependencyProvider {
     }
 
     public Collection<File> getMapperPaths() {
-        return getProvider(MinecraftProvider.class).libraryProvider.getLibraries();
+        return getProvider(MinecraftLibraryProvider.class).getLibraries();
     }
 
 	public File getIntermediaryJar() {

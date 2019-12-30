@@ -26,24 +26,35 @@ package net.fabricmc.loom.providers;
 
 import java.io.File;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import org.gradle.api.Project;
 
 import net.fabricmc.loom.LoomGradleExtension;
+import net.fabricmc.loom.dependencies.DependencyProvider;
+import net.fabricmc.loom.dependencies.LogicalDependencyProvider;
 import net.fabricmc.loom.util.Constants;
 import net.fabricmc.loom.util.MinecraftVersionInfo;
 
-public class MinecraftLibraryProvider {
+public class MinecraftLibraryProvider extends LogicalDependencyProvider {
 	public File MINECRAFT_LIBS;
 
 	private Collection<File> libs = new HashSet<>();
 
-	public void provide(MinecraftProvider minecraftProvider, Project project, Consumer<Runnable> postPopulationScheduler) {
+	@Override
+	public Set<Class<? extends DependencyProvider>> getDependencies() {
+		return Collections.singleton(MinecraftProvider.class);
+	}
+
+	@Override
+	public void provide(Project project, LoomGradleExtension extension, Consumer<Runnable> postPopulationScheduler) throws Exception {
+		MinecraftProvider minecraftProvider = getProvider(MinecraftProvider.class);
 		MinecraftVersionInfo versionInfo = minecraftProvider.versionInfo;
 
-		initFiles(project, minecraftProvider);
+		initFiles(extension, minecraftProvider);
 
 		for (MinecraftVersionInfo.Library library : versionInfo.libraries) {
 			if (library.allowed() && !library.isNative() && library.getFile(MINECRAFT_LIBS) != null) {
@@ -67,8 +78,7 @@ public class MinecraftLibraryProvider {
 		return libs;
 	}
 
-	private void initFiles(Project project, MinecraftProvider minecraftProvider) {
-		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
+	private void initFiles(LoomGradleExtension extension, MinecraftProvider minecraftProvider) {
 		MINECRAFT_LIBS = new File(extension.getUserCache(), "libraries");
 	}
 }
