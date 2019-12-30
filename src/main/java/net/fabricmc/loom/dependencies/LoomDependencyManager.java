@@ -46,6 +46,7 @@ public class LoomDependencyManager {
 	private final List<DependencyProvider> dependencyProviderList = new ArrayList<>();
 	private boolean hasHandled;
 
+	/** Whether there is a registered {@link DependencyProvider} for the given {@link Class} */
 	public boolean hasProvider(Class<? extends DependencyProvider> clazz) {
 		for (DependencyProvider provider : dependencyProviderList) {
 			if (provider.getClass() == clazz) {
@@ -56,6 +57,7 @@ public class LoomDependencyManager {
 		return false;
 	}
 
+	/** Register the given {@link DependencyProvider} */
 	public void addProvider(DependencyProvider provider) {
 		if (dependencyProviderList.contains(provider)) {
 			throw new IllegalArgumentException("Provider is already registered");
@@ -73,6 +75,7 @@ public class LoomDependencyManager {
 		dependencyProviderList.add(provider);
 	}
 
+	/** Gets the registered {@link DependencyProvider} for the given {@link Class} or {@code null} if none are registered */
 	public <T extends DependencyProvider> T getProvider(Class<T> clazz) {
 		for (DependencyProvider provider : dependencyProviderList) {
 			if (provider.getClass() == clazz) {
@@ -83,6 +86,7 @@ public class LoomDependencyManager {
 		return null;
 	}
 
+	/** Evaluate all the registered {@link DependencyProvider}s against the given {@link Project}, preventing the registration of any further */
 	public void handleDependencies(Project project) {
 		project.getLogger().lifecycle(":setting up loom dependencies");
 		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);

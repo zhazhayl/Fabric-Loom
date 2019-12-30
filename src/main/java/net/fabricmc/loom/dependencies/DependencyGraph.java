@@ -183,6 +183,11 @@ class DependencyGraph {
 		currentActive.addAll(roots);
 	}
 
+	/**
+	 * Pops the next available {@link DependencyProvider} out of the queue to be processed
+	 *
+	 * @throws NoSuchElementException If there are no providers available (ie {@link #hasAvailable()} returns <code>false</code>)
+	 */
 	public DependencyProvider nextAvailable() {
 		if (!hasAvailable()) {
 			throw new NoSuchElementException("No more providers");
@@ -192,26 +197,47 @@ class DependencyGraph {
 		return currentActive.poll().getProvider();
 	}
 
+	/**
+	 * Drain all available {@link DependencyProvider}s, designed for threading the processing each
+	 *
+	 * @throws NoSuchElementException If there are no providers available (ie {@link #hasAvailable()} returns <code>false</code>)
+	 */
+	public List<DependencyProvider> allAvailable() {
+		if (!hasAvailable()) {
+			throw new NoSuchElementException("No more providers");
+		}
+
+		assert currentActive.stream().allMatch(node -> node.getDependencies().isEmpty());
+		List<DependencyProvider> out = currentActive.stream().map(DependencyNode::getProvider).collect(Collectors.toList());
+		currentActive.clear();
+		return out;
+	}
+
+	/** Flags the given {@link DependencyProvider} as complete for the purposes of allowing dependent providers to run */
 	public void markComplete(DependencyProvider provider) {
-		for (Iterator<DependencyNode> it = currentActive.iterator(); it.hasNext();) {
-			DependencyNode node = it.next();
+		synchronized (currentActive) {
+			for (Iterator<DependencyNode> it = currentActive.iterator(); it.hasNext();) {
+				DependencyNode node = it.next();
 
-			if (node.getProvider() == provider) {
-				it.remove();
-				currentActive.addAll(node.flagComplete());
+				if (node.getProvider() == provider) {
+					it.remove();
+					currentActive.addAll(node.flagComplete());
 
-				if (currentActive.isEmpty() && !node.getDependents().isEmpty()) {
-					throw new IllegalStateException("All remaining dependencies have dependencies!");
+					if (currentActive.isEmpty() && !node.getDependents().isEmpty()) {
+						throw new IllegalStateException("All remaining dependencies have dependencies!");
+					}
+					break;
 				}
-				break;
 			}
 		}
 	}
 
+	/** Whether there are any more {@link DependencyProvider} currently capable of being processed */
 	public boolean hasAvailable() {
 		return !currentActive.isEmpty();
 	}
 
+	/** {@link Iterable} form of the graph designed to loop over all the {@link DependencyProvider}s in it */
 	public Iterable<DependencyProvider> asIterable() {
 		return () -> new Iterator<DependencyProvider>() {
 			@Override
