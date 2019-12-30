@@ -25,7 +25,6 @@
 package net.fabricmc.loom.providers;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
@@ -33,22 +32,32 @@ import java.util.function.Consumer;
 
 import org.gradle.api.Project;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Files;
 
 import net.fabricmc.loom.LoomGradleExtension;
+import net.fabricmc.loom.dependencies.DependencyProvider;
+import net.fabricmc.loom.dependencies.LogicalDependencyProvider;
 import net.fabricmc.loom.providers.openfine.Openfine;
 import net.fabricmc.loom.util.AccessTransformerHelper;
 import net.fabricmc.loom.util.Constants;
 import net.fabricmc.loom.util.MapJarsTiny;
 import net.fabricmc.stitch.util.Pair;
 
-public class MinecraftMappedProvider {
+public class MinecraftMappedProvider extends LogicalDependencyProvider {
     public File MINECRAFT_MAPPED_JAR;
     public File MINECRAFT_INTERMEDIARY_JAR;
 
-    private MinecraftProvider minecraftProvider;
+    @Override
+    public Set<Class<? extends DependencyProvider>> getDependencies() {
+    	return ImmutableSet.of(MinecraftProvider.class, MappingsProvider.class);
+    }
 
-    public void provide(Project project, LoomGradleExtension extension, MinecraftProvider minecraftProvider, MappingsProvider mappingsProvider, Consumer<Runnable> postPopulationScheduler) throws IOException {
+    @Override
+    public void provide(Project project, LoomGradleExtension extension, Consumer<Runnable> postPopulationScheduler) throws Exception {
+    	MinecraftProvider minecraftProvider = getProvider(MinecraftProvider.class);
+    	MappingsProvider mappingsProvider = getProvider(MappingsProvider.class);
+
         if (!mappingsProvider.MAPPINGS_TINY.exists()) {
             throw new RuntimeException("mappings file not found");
         }
@@ -56,8 +65,6 @@ public class MinecraftMappedProvider {
         if (!minecraftProvider.getMergedJar().exists()) {
             throw new RuntimeException("input merged jar not found");
         }
-
-        this.minecraftProvider = minecraftProvider;
 
         String atOffset; //Explicitly flag AT'd jars differently to vanilla/stock ones
         File cache; //Save to the project cache when ATing to simplify flagging AT changes
@@ -115,7 +122,7 @@ public class MinecraftMappedProvider {
     }
 
     public Collection<File> getMapperPaths() {
-        return minecraftProvider.libraryProvider.getLibraries();
+        return getProvider(MinecraftProvider.class).libraryProvider.getLibraries();
     }
 
 	public File getIntermediaryJar() {

@@ -52,6 +52,12 @@ public abstract class DependencyProvider {
 		return Collections.emptySet();
 	}
 
+	protected <T extends DependencyProvider> T getProvider(Class<T> type) {
+		T provider = getDependencyManager().getProvider(type);
+		if (provider == null) throw new IllegalArgumentException("Could not find " + type + " instance!");
+		return provider;
+	}
+
 	public void addDependency(Object object, Project project) {
 		addDependency(object, project, "compile");
 	}

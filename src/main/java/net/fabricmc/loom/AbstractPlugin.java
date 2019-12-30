@@ -58,7 +58,9 @@ import org.gradle.plugins.ide.idea.model.IdeaModel;
 import net.fabricmc.loom.dependencies.LoomDependencyManager;
 import net.fabricmc.loom.dependencies.RemappedConfigurationEntry;
 import net.fabricmc.loom.providers.LaunchProvider;
+import net.fabricmc.loom.providers.MappedModsProvider;
 import net.fabricmc.loom.providers.MappingsProvider;
+import net.fabricmc.loom.providers.MinecraftMappedProvider;
 import net.fabricmc.loom.providers.MinecraftProvider;
 import net.fabricmc.loom.task.RemapJarTask;
 import net.fabricmc.loom.task.RemapSourcesJarTask;
@@ -279,6 +281,8 @@ public class AbstractPlugin implements Plugin<Project> {
 
 			dependencyManager.addProvider(new MinecraftProvider());
 			dependencyManager.addProvider(new MappingsProvider());
+			dependencyManager.addProvider(new MinecraftMappedProvider());
+			dependencyManager.addProvider(new MappedModsProvider());
 			dependencyManager.addProvider(new LaunchProvider());
 
 			dependencyManager.handleDependencies(project1);

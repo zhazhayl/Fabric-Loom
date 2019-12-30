@@ -40,7 +40,6 @@ import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
 
 import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.dependencies.PhysicalDependencyProvider.DependencyInfo;
-import net.fabricmc.loom.providers.MappingsProvider;
 import net.fabricmc.loom.util.Constants;
 
 public class LoomDependencyManager {
@@ -83,11 +82,6 @@ public class LoomDependencyManager {
 		project.getLogger().lifecycle(":setting up loom dependencies");
 		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
 
-		MappingsProvider mappingsProvider = getProvider(MappingsProvider.class);
-		if (mappingsProvider == null) {
-			throw new RuntimeException("Could not find MappingsProvider instance!");
-		}
-
 		DependencyGraph graph = new DependencyGraph(dependencyProviderList);
 		List<Runnable> afterTasks = new ArrayList<>();
 
@@ -126,14 +120,6 @@ public class LoomDependencyManager {
 			}
 
 			graph.markComplete(provider);
-		}
-
-		{
-			String mappingsKey = mappingsProvider.mappingsName + "." + mappingsProvider.minecraftVersion.replace(' ', '_').replace('.', '_').replace('-', '_') + "." + mappingsProvider.mappingsVersion;
-
-			for (RemappedConfigurationEntry entry : Constants.MOD_COMPILE_ENTRIES) {
-				ModCompileRemapper.remapDependencies(project, mappingsKey, extension, project.getConfigurations().getByName(entry.getSourceConfiguration()), project.getConfigurations().getByName(entry.getRemappedConfiguration()), project.getConfigurations().getByName(entry.getTargetConfiguration(project.getConfigurations())), afterTasks::add);
-			}
 		}
 
 		if (extension.getInstallerJson() == null) {
