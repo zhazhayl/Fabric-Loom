@@ -274,7 +274,7 @@ public class LoomGradleExtension {
 	}
 
 	public MinecraftMappedProvider getMinecraftMappedProvider() {
-		return getMappingsProvider().mappedProvider;
+		return getDependencyManager().getProvider(MinecraftMappedProvider.class);
 	}
 
 	public MappingsProvider getMappingsProvider() {

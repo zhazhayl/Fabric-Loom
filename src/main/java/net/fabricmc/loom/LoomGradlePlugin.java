@@ -39,7 +39,6 @@ import org.gradle.api.plugins.ExtraPropertiesExtension;
 import org.gradle.api.tasks.TaskContainer;
 import org.gradle.api.tasks.TaskProvider;
 
-import net.fabricmc.loom.providers.MappingsProvider;
 import net.fabricmc.loom.providers.MinecraftLibraryProvider;
 import net.fabricmc.loom.providers.MinecraftMappedProvider;
 import net.fabricmc.loom.task.AbstractDecompileTask;
@@ -60,8 +59,7 @@ import net.fabricmc.loom.task.fernflower.FernFlowerTask;
 public class LoomGradlePlugin extends AbstractPlugin {
 	private static File getMappedByproduct(Project project, String suffix) {
 		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
-		MappingsProvider mappingsProvider = extension.getMappingsProvider();
-		File mappedJar = mappingsProvider.mappedProvider.getMappedJar();
+		File mappedJar = extension.getMinecraftMappedProvider().getMappedJar();
 		String path = mappedJar.getAbsolutePath();
 
 		if (!path.toLowerCase(Locale.ROOT).endsWith(".jar")) {

@@ -80,10 +80,9 @@ import net.fabricmc.stitch.commands.CommandProposeFieldNames;
 import net.fabricmc.tinyremapper.IMappingProvider;
 
 public class MappingsProvider extends LogicalDependencyProvider {
-	public interface MappingFactory {//IOException throwing BiPredicate<String, String, IMappingProvider>
+	public interface MappingFactory {//IOException throwing BiFunction<String, String, IMappingProvider>
 		IMappingProvider create(String fromMapping, String toMapping) throws IOException;
 	}
-	public MinecraftMappedProvider mappedProvider;
 	public MappingFactory mcRemappingFactory;
 
 	public String mappingsName;
