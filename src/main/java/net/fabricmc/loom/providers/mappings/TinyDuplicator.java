@@ -47,14 +47,14 @@ public class TinyDuplicator {
 
 			switch (parts[0]) {
 			case "CLASS":
-				assert parts.length >= 2: "Invalid tiny line (extra columns): " + line;
+				assert parts.length >= 2: "Invalid tiny line (missing columns): " + line;
 
 				writer.write(parts[from]);
 				break;
 
 			case "METHOD":
 			case "FIELD":
-				if (parts.length < 4) throw new IOException("Invalid tiny line (missing/extra columns): " + line);
+				if (parts.length < 4) throw new IOException("Invalid tiny line (missing columns): " + line);
 				if (parts[1].isEmpty()) throw new IOException("Invalid tiny line (empty src class): " + line);
 				if (parts[2].isEmpty()) throw new IOException("Invalid tiny line (empty src method desc): " + line);
 
