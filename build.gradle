@@ -98,6 +98,8 @@ license {
 	exclude '**/loom/dependencies/DependencyGraph.java'
 	exclude '**/loom/dependencies/LogicalDependencyProvider.java'
 	exclude '**/loom/dependencies/PhysicalDependencyProvider.java'
+	exclude '**/loom/providers/MappingsProvider.java'
+	exclude '**/loom/providers/StackedMappingsProvider.java'
 	exclude '**/loom/providers/mappings/*.java'
 	exclude '**/loom/providers/openfine/*.java'
 }
