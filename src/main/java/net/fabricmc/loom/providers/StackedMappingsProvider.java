@@ -67,6 +67,8 @@ public class StackedMappingsProvider extends PhysicalDependencyProvider {
 
 	@Override
 	public void provide(DependencyInfo dependency, Project project, LoomGradleExtension extension, Consumer<Runnable> postPopulationScheduler) throws Exception {
+		project.getLogger().info(":stacking mappings (" + dependency.getFullName() + ' ' + dependency.getResolvedVersion() + ')');
+
 		File mappingsFile = dependency.resolveFile().orElseThrow(() -> new RuntimeException("Could not find dependency " + dependency));
 		String mappingsName = dependency.getFullName();
 
