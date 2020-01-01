@@ -66,6 +66,7 @@ import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping;
 import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping.ArgOnlyMethod;
 import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping.CombinedField;
 import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping.CombinedMethod;
+import net.fabricmc.loom.providers.mappings.TinyDuplicator;
 import net.fabricmc.loom.providers.mappings.TinyReader;
 import net.fabricmc.loom.providers.mappings.TinyWriter;
 import net.fabricmc.loom.util.Constants;
@@ -226,7 +227,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 					}
 
 					if (mappingFiles.isEmpty()) {
-						//TODO: Extend intermediaryNames to duplicate intermediary column as the named one too
+						TinyDuplicator.duplicateV1Column(intermediaryNames.toPath(), MAPPINGS_TINY_BASE.toPath(), "intermediary", "named");
 						break free;
 					}
 

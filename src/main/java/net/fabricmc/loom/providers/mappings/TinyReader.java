@@ -25,12 +25,50 @@ package net.fabricmc.loom.providers.mappings;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.zip.GZIPInputStream;
 
 public class TinyReader {
+	static BufferedReader getMappingReader(Path file) throws IOException {
+		InputStream in = Files.newInputStream(file);
+
+		if (file.getFileName().toString().endsWith(".gz")) {
+			in = new GZIPInputStream(in);
+		}
+
+		return new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+	}
+
+	public static List<String> readHeaders(Path file) throws IOException {
+		try (BufferedReader reader = getMappingReader(file)) {
+			return readHeaders(reader);
+		}
+	}
+
+	static List<String> readHeaders(BufferedReader reader) throws IOException {
+		String header = reader.readLine();
+
+		if (header == null) {
+			return Collections.emptyList(); //No headers in an empty file
+		} else if (header.startsWith("v1\t")) {
+			return Arrays.asList(header.substring(3).split(" "));
+		} else if (header.startsWith("tiny\t2\t")) {
+			String[] bits;
+			return Arrays.asList(bits = header.split(" ")).subList(3, bits.length);
+		} else {
+			throw new IOException("Unlikely tiny file given " + header);
+		}
+	}
+
 	public static void readTiny(Path file, IMappingAcceptor mappingAcceptor) throws IOException {
-		try (BufferedReader reader = Files.newBufferedReader(file)) {
+		try (BufferedReader reader = getMappingReader(file)) {
 			readTiny(reader, mappingAcceptor);
 		}
 	}
