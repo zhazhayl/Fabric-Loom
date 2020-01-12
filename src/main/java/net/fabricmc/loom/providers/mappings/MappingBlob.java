@@ -259,7 +259,7 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 					if (field.name() == null) continue;
 					//assert field.desc() != null: mapping.from + '#' + field.fromName + " (" + field.fromDesc + ") changes name without a changed descriptor";
 
-					String desc = field.desc() != null ? field.desc() : MappingSplat.remapDesc(field.fromDesc, classRemapper);
+					String desc = MappingSplat.makeDesc(field, classRemapper);
 					invertion.acceptField(mapping.to, field.name(), desc, mapping.from, field.fromName, field.fromDesc);
 				}
 			}
@@ -269,7 +269,7 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 					if (method.name() == null) continue;
 					//assert method.desc() != null: mapping.from + '#' + method.fromName + method.fromDesc + " changes name without a changed descriptor";
 
-					String desc = method.desc() != null ? method.desc() : MappingSplat.remapDesc(method.fromDesc, classRemapper);
+					String desc = MappingSplat.makeDesc(method, classRemapper);
 					invertion.acceptMethod(mapping.to, method.name(), desc, mapping.from, method.fromName, method.fromDesc);
 					if (doArgs) invertion.get(mapping.to).method(method.name(), desc).args(method.args());
 				}

@@ -341,7 +341,7 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 		}
 	}
 
-	private static String makeDesc(Field method, UnaryOperator<String> remapper) {
+	static String makeDesc(Field method, UnaryOperator<String> remapper) {
 		if (method.desc() != null) {
 			return method.desc();
 		} else {
