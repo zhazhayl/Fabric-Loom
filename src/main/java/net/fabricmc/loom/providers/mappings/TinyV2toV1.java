@@ -1,3 +1,10 @@
+/*
+ * Copyright 2020 Chocohead
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
 package net.fabricmc.loom.providers.mappings;
 
 import java.io.BufferedWriter;
@@ -93,9 +100,7 @@ public class TinyV2toV1 {
 							@Override
 							public ParameterVisitor visitParameter(long offset, String[] names, int index) {
 								if (args.length <= index) {
-									String[] longerArgs = new String[index + 1];
-									System.arraycopy(args, 0, longerArgs, 0, args.length);
-									args = longerArgs;
+									args = Arrays.copyOf(args, index + 1);
 								}
 
 								args[index] = names[named];
