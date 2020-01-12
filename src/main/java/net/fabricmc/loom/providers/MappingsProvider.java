@@ -14,7 +14,6 @@ import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.net.URI;
@@ -34,6 +33,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -125,6 +125,14 @@ public class MappingsProvider extends LogicalDependencyProvider {
 			}
 
 			free: if (!MAPPINGS_TINY_BASE.exists()) {
+				for (ListIterator<MappingFile> it = mappingFiles.listIterator(); it.hasNext();) {
+					MappingFile file = it.next();
+
+					if (file.type.needsEnlightening()) {
+						it.set(file.enlighten()); //Need to work out what the type of the ambiguous mapping files are
+					}
+				}
+
 				//Need to see if any of the mapping files have Intermediaries for the Minecraft version they're going to be running on
 				Optional<MappingFile> interProvider = mappingFiles.stream().filter(file -> file.minecraftVersion.equals(minecraftVersion)).sorted((fileA, fileB) -> {
 					if (fileA.type == fileB.type) return 0;
@@ -147,43 +155,31 @@ public class MappingsProvider extends LogicalDependencyProvider {
 					}
 				}).filter(file -> {
 					try {
-						InputStream in;
+						List<String> headers;
 						switch (file.type) {
 						case Enigma: //Never will (unless it goes Notch <=> Intermediary which is pointless to be in Enigma's format)
 							return false;
 
 						case TinyV1:
 						case TinyV2:
-							try (FileSystem fileSystem = FileSystems.newFileSystem(file.origin.toPath(), null)) {
-								in = Files.newInputStream(fileSystem.getPath("mappings/mappings.tiny"));
-							}
+							headers = file.getNamespaces();
 							break;
 
 						case TinyGz:
-							in = new GZIPInputStream(Files.newInputStream(file.origin.toPath()));
+							try (BufferedReader reader = new BufferedReader(new InputStreamReader(new GZIPInputStream(Files.newInputStream(file.origin.toPath())), StandardCharsets.UTF_8))) {
+								String header = reader.readLine();
+								assert header != null;
+
+								headers = Arrays.asList(header.substring(3).split(" ")); //Should be in V1 format
+							}
 							break;
 
 						default:
 							throw new IllegalArgumentException("Unexpected mapping types to read: " + file.type);
 						}
 
-						try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
-							String header = reader.readLine();
-							assert header != null;
-
-							List<String> headers;
-							if (file.type != MappingType.TinyV2) {
-								assert header.startsWith("v1\t");
-								headers = Arrays.asList(header.substring(3).split(" "));
-							} else {
-								assert header.startsWith("tiny\t2\t");
-								String[] bits;
-								headers = Arrays.asList(bits = header.split(" ")).subList(3, bits.length);
-							}
-
-							assert headers.indexOf("named") >= 0;
-							return headers.indexOf("official") >= 0 && headers.indexOf("intermediary") >= 0;
-						}
+						assert headers.indexOf("named") >= 0; //We should have named mappings, odd file otherwise
+						return headers.indexOf("official") >= 0 && headers.indexOf("intermediary") >= 0;
 					} catch (IOException e) {
 						throw new UncheckedIOException("Error reading mapping file from " + file.origin, e);
 					}
@@ -195,16 +191,15 @@ public class MappingsProvider extends LogicalDependencyProvider {
 						MappingFile mappings = Iterables.getOnlyElement(mappingFiles);
 						assert mappings == interProvider.get();
 
+						project.getLogger().lifecycle(":extracting " + mappings.origin.getName());
 						switch (mappings.type) {
 						case TinyV1:
-							project.getLogger().lifecycle(":extracting " + mappings.origin.getName());
 							try (FileSystem fileSystem = FileSystems.newFileSystem(mappings.origin.toPath(), null)) {
 								Files.copy(fileSystem.getPath("mappings/mappings.tiny"), MAPPINGS_TINY_BASE.toPath());
 							}
 							break free;
 
 						case TinyGz:
-							project.getLogger().lifecycle(":extracting " + mappings.origin.getName());
 							FileUtils.copyInputStreamToFile(new GZIPInputStream(new FileInputStream(mappings.origin)), MAPPINGS_TINY_BASE);
 							break free;
 

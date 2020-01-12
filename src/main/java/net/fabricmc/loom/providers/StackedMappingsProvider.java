@@ -14,7 +14,8 @@ import java.io.IOException;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
-import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
 import java.util.function.Consumer;
 
 import org.apache.commons.io.FilenameUtils;
@@ -29,12 +30,17 @@ import net.fabricmc.loom.util.Constants;
 public class StackedMappingsProvider extends PhysicalDependencyProvider {
 	static final class MappingFile {
 		enum MappingType {
-			TinyV1, TinyV2, TinyGz, Enigma;
+			Tiny, TinyV1, TinyV2, TinyGz, Enigma;
+
+			boolean needsEnlightening() {
+				return this == Tiny;
+			}
 		}
 
 		public final String name, version, minecraftVersion;
 		public final File origin;
 		public final MappingType type;
+		private List<String> namespaces;
 
 		public MappingFile(File origin, String name, String version, String minecraftVersion, MappingType type) {
 			this.origin = origin;
@@ -42,6 +48,47 @@ public class StackedMappingsProvider extends PhysicalDependencyProvider {
 			this.version = version;
 			this.minecraftVersion = minecraftVersion;
 			this.type = type;
+		}
+
+		private MappingFile withEnlightening(MappingType type, List<String> namespaces) {
+			MappingFile out = new MappingFile(origin, name, version, minecraftVersion, type);
+			out.namespaces = namespaces;
+			return out;
+		}
+
+		public MappingFile enlighten() throws IOException {
+			switch (type) {
+			case TinyV1:
+			case TinyV2:
+				assert namespaces != null;
+
+			case Tiny:
+				try (FileSystem fileSystem = FileSystems.newFileSystem(origin.toPath(), null);
+						BufferedReader reader = Files.newBufferedReader(fileSystem.getPath("mappings/mappings.tiny"))) {
+					String header = reader.readLine();
+
+					if (header == null) {
+						throw new EOFException("Empty mappings supplied in " + origin);
+					} else if (header.startsWith("v1\t")) {
+						return withEnlightening(MappingType.TinyV1, Arrays.asList(header.substring(3).split(" ")));
+					} else if (header.startsWith("tiny\t2\t")) {
+						String[] bits;
+						return withEnlightening(MappingType.TinyV2, Arrays.asList(bits = header.split(" ")).subList(3, bits.length));
+					} else {
+						throw new IOException("Unable to guess mapping version from " + header + " in " + origin);
+					}
+				}
+
+			default:
+				return this;
+			}
+		}
+
+		public List<String> getNamespaces() {
+			if (namespaces == null) {
+				throw new IllegalArgumentException("Tried to get namespaces from unenlightened type " + type);
+			}
+			return namespaces;
 		}
 	}
 	private final MappingsProvider realProvider = new MappingsProvider();
@@ -94,13 +141,7 @@ public class StackedMappingsProvider extends PhysicalDependencyProvider {
 			break;
 
 		case "jar": //Downloaded a jar containing the tiny jar
-			try (FileSystem fileSystem = FileSystems.newFileSystem(mappingsFile.toPath(), null)) {
-				if (looksLikeV2(fileSystem.getPath("mappings/mappings.tiny"))) {
-					type = MappingType.TinyV2;
-				} else {
-					type = MappingType.TinyV1;
-				}
-			}
+			type = MappingType.Tiny;
 			break;
 
 		default: //Not sure what we've ended up with, but it's not what we want/expect
@@ -108,21 +149,5 @@ public class StackedMappingsProvider extends PhysicalDependencyProvider {
 		}
 
 		realProvider.stackMappings(new MappingFile(mappingsFile, mappingsName, mappingsVersion, minecraftVersion, type));
-	}
-
-	private static boolean looksLikeV2(Path mappings) throws IOException {
-		try (BufferedReader reader = Files.newBufferedReader(mappings)) {
-			String header = reader.readLine();
-
-			if (header == null) {
-				throw new EOFException("Empty mappings supplied in " + mappings);
-			} else if (header.startsWith("v1\t")) {
-				return false;
-			} else if (header.startsWith("tiny\t2\t")) {
-				return true;
-			} else {
-				throw new IOException("Unable to guess mapping version from " + header + " in " + mappings);
-			}
-		}
 	}
 }
