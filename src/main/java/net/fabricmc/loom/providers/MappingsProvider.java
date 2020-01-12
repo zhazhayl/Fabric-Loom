@@ -68,6 +68,7 @@ import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping.Combine
 import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping.CombinedMethod;
 import net.fabricmc.loom.providers.mappings.TinyDuplicator;
 import net.fabricmc.loom.providers.mappings.TinyReader;
+import net.fabricmc.loom.providers.mappings.TinyV2toV1;
 import net.fabricmc.loom.providers.mappings.TinyWriter;
 import net.fabricmc.loom.util.Constants;
 import net.fabricmc.loom.util.TinyRemapperMappingsHelper;
@@ -204,7 +205,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 							break free;
 
 						case TinyV2:
-							//TODO: Implement V2 -> V1 converter
+							TinyV2toV1.convert(mappings.origin.toPath(), MAPPINGS_TINY_BASE.toPath(), parameterNames.toPath());
 							break free;
 
 						case Enigma:
