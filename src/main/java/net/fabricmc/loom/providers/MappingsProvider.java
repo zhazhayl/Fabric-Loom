@@ -11,8 +11,6 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
@@ -99,7 +97,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 	private File MAPPINGS_TINY_BASE;
 	// The mappings we use in practice
 	public File MAPPINGS_TINY;
-	private File parameterNames;
+	private Path parameterNames;
 
 	public Mappings getMappings() throws IOException {
 		return MappingsCache.INSTANCE.get(MAPPINGS_TINY.toPath());
@@ -205,7 +203,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 							break free;
 
 						case TinyV2:
-							TinyV2toV1.convert(mappings.origin.toPath(), MAPPINGS_TINY_BASE.toPath(), parameterNames.toPath());
+							TinyV2toV1.convert(mappings.origin.toPath(), MAPPINGS_TINY_BASE.toPath(), parameterNames);
 							break free;
 
 						case Enigma:
@@ -233,7 +231,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 				File mappingsFile = null;
 				switch (FilenameUtils.getExtension(mappingsFile.getName())) {
 				case "zip": {//Directly downloaded the enigma file (:enigma@zip)
-					if (parameterNames.exists()) parameterNames.delete();
+					Files.deleteIfExists(parameterNames);
 
 					project.getLogger().lifecycle(":loading " + mappingsFile.getName());
 					MappingBlob enigma = new MappingBlob();
@@ -269,8 +267,8 @@ public class MappingsProvider extends LogicalDependencyProvider {
 						}
 					}
 
-					project.getLogger().lifecycle(":writing " + parameterNames.getName());
-					try (BufferedWriter writer = new BufferedWriter(new FileWriter(parameterNames, false))) {
+					project.getLogger().lifecycle(":writing " + parameterNames.getFileName());
+					try (BufferedWriter writer = Files.newBufferedWriter(parameterNames)) {
 						for (CombinedMapping mapping : combined) {
 							for (ArgOnlyMethod method : mapping.allArgs()) {
 								writer.write(mapping.to + '/' + method.from + method.fromDesc);
@@ -317,11 +315,11 @@ public class MappingsProvider extends LogicalDependencyProvider {
 			});
 		}
 
-		if (parameterNames.exists()) {
+		if (Files.exists(parameterNames)) {
 			//Merge the tiny mappings with parameter names
 			Map<String, String[]> lines = new HashMap<>();
 
-			try (BufferedReader reader = new BufferedReader(new FileReader(parameterNames))) {
+			try (BufferedReader reader = Files.newBufferedReader(parameterNames)) {
 				for (String line = reader.readLine(), current = null; line != null; line = reader.readLine()) {
 					if (current == null || line.charAt(0) != '\t') {
 						current = line;
@@ -530,7 +528,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 		intermediaryNames = new File(MAPPINGS_DIR, INTERMEDIARY + "-intermediary.tiny");
 		MAPPINGS_TINY_BASE = new File(MAPPINGS_DIR, mappingsName + "-tiny-" + minecraftVersion + '-' + mappingsVersion + "-base.tiny");
 		MAPPINGS_TINY = new File(MAPPINGS_DIR, mappingsName + "-tiny-" + minecraftVersion + '-' + mappingsVersion + ".tiny");
-		parameterNames = new File(MAPPINGS_DIR, mappingsName + "-params-" + minecraftVersion + '-' + mappingsVersion);
+		parameterNames = new File(MAPPINGS_DIR, mappingsName + "-params-" + minecraftVersion + '-' + mappingsVersion).toPath();
 
 		MAPPINGS_MIXIN_EXPORT = new File(extension.getProjectBuildCache(), "mixin-map-" + minecraftVersion + '-' + mappingsVersion + ".tiny");
 	}
@@ -539,6 +537,10 @@ public class MappingsProvider extends LogicalDependencyProvider {
 		MAPPINGS_TINY.delete();
 		MAPPINGS_TINY_BASE.delete();
 		intermediaryNames.delete();
-		parameterNames.delete();
+		try {
+			Files.deleteIfExists(parameterNames);
+		} catch (IOException e) {
+			e.printStackTrace(); //That's troublesome
+		}
 	}
 }
