@@ -225,7 +225,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 						break free;
 					}
 
-					TinyReader.readTiny(intermediaryNames.toPath(), intermediaries = new MappingBlob());
+					TinyReader.readTiny(intermediaryNames.toPath(), "official", "intermediary", intermediaries = new MappingBlob());
 				}
 
 				File mappingsFile = null;

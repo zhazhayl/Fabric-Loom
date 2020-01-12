@@ -36,8 +36,6 @@ import java.util.Queue;
 import java.util.stream.Stream;
 
 public class EnigmaReader {
-	static final boolean LEGACY = true;
-
 	public static void readEnigma(Path dir, IMappingAcceptor mappingAcceptor) throws IOException {
 		try (Stream<Path> stream = Files.find(FileSystems.newFileSystem(dir, null).getPath("/"),
 				Integer.MAX_VALUE,
@@ -133,40 +131,56 @@ public class EnigmaReader {
 				}
 				case "ARG":
 				case "VAR": {
-					if (parts.length != 3) throw new IOException("invalid enigma line (missing/extra columns): "+line);
+					if (parts.length < 2 || parts.length > 3) throw new IOException("invalid enigma line (missing/extra columns): "+line);
 					String methodContext = contextStack.poll();
 					if (methodContext == null || methodContext.charAt(0) != 'M') throw new IOException("invalid enigma line (arg without method): "+line);
 					String classContext = contextStack.peek();
 					if (classContext == null || classContext.charAt(0) != 'C') throw new IllegalStateException();
 					contextStack.add(methodContext);
-					int methodDescStart = methodContext.indexOf('(');
-					assert methodDescStart != -1;
 
-					String srcClsName = classContext.substring(1);
-					String srcMethodName = methodContext.substring(1, methodDescStart);
-					String srcMethodDesc = methodContext.substring(methodDescStart);
 					int index = Integer.parseInt(parts[1]);
-					int lvIndex = -1;
-					String name = parts[2];
+					boolean isArg = parts[0].equals("ARG");
 
-					if (LEGACY) {
-						lvIndex = index;
-						index = -1;
-					}
+					if (parts.length == 3) {
+						int methodDescStart = methodContext.indexOf('(');
+						assert methodDescStart != -1;
 
-					if (parts[0].equals("ARG")) {
-						mappingAcceptor.acceptMethodArg(srcClsName, srcMethodName, srcMethodDesc, index, lvIndex, name);
+						String srcClsName = classContext.substring(1);
+						String srcMethodName = methodContext.substring(1, methodDescStart);
+						String srcMethodDesc = methodContext.substring(methodDescStart);
+						String name = parts[2];
+
+						if (isArg) {
+							mappingAcceptor.acceptMethodArg(srcClsName, srcMethodName, srcMethodDesc, index, name);
+						} else {
+							throw new UnsupportedOperationException("Method var " + index + " in " + srcClsName + '#' + methodContext.substring(1));
+						}
+
+						contextNamedStack.add((isArg ? 'A' : 'V') + name);
 					} else {
-						mappingAcceptor.acceptMethodVar(srcClsName, srcMethodName, srcMethodDesc, index, lvIndex, name);
+						contextNamedStack.add(isArg ? "A" : "V");
 					}
 
+					indent++;
+					contextStack.add((isArg ? "A" : "V") + index);
 					break;
 				}
 				case "FIELD":
-					if (parts.length != 4) throw new IOException("invalid enigma line (missing/extra columns): "+line);
+					if (parts.length < 3 || parts.length > 4) throw new IOException("invalid enigma line (missing/extra columns): "+line);
 					String context = contextStack.peek();
 					if (context == null || context.charAt(0) != 'C') throw new IOException("invalid enigma line (field without class): "+line);
-					mappingAcceptor.acceptField(context.substring(1), parts[1], parts[3], contextNamedStack.peek().substring(1), parts[2], null);
+					assert parts[1].indexOf('#') < 0;
+					assert parts[parts.length - 1].indexOf('#') < 0;
+					contextStack.add('F' + parts[1] + '#' + parts[parts.length - 1]);
+					indent++;
+					if (parts.length == 4) {
+						mappingAcceptor.acceptField(context.substring(1), parts[1], parts[3], contextNamedStack.peek().substring(1), parts[2], null);
+						contextNamedStack.add('F' + parts[2]);
+					} else {
+						contextNamedStack.add('F' + parts[1]); //No name, but we still need something to avoid underflowing
+					}
+					break;
+				case "COMMENT":
 					break;
 				default:
 					throw new IOException("invalid enigma line (unknown type): "+line);

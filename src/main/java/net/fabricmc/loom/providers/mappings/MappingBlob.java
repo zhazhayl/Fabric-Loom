@@ -196,13 +196,8 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 	}
 
 	@Override
-	public void acceptMethodArg(String srcClsName, String srcMethodName, String srcMethodDesc, int argIndex, int lvIndex, String dstArgName) {
+	public void acceptMethodArg(String srcClsName, String srcMethodName, String srcMethodDesc, int lvIndex, String dstArgName) {
 		get(srcClsName).method(srcMethodName, srcMethodDesc).addArg(dstArgName, lvIndex);
-	}
-
-	@Override
-	public void acceptMethodVar(String srcClsName, String srcMethodName, String srcMethodDesc, int varIndex, int lvIndex, String dstVarName) {
-		get(srcClsName).method(srcMethodName, srcMethodDesc).addArg(dstVarName, lvIndex);
 	}
 
 	@Override
