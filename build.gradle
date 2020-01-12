@@ -59,7 +59,7 @@ dependencies {
 	implementation 'com.github.Chocohead:OptiSine:cc6da75' //Keep consistent with Openfine.VERSION
 
 	// tinyfile management
-	implementation ('com.github.Chocohead:tiny-remapper:ddc99f7') {
+	implementation ('com.github.Chocohead:tiny-remapper:74df1c7') {
 		transitive = false
 	}
 
