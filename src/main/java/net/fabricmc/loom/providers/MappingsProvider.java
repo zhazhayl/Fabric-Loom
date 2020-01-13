@@ -150,6 +150,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 						return 1;
 
 					default:
+					case Tiny:
 						throw new IllegalArgumentException("Unexpected mapping types to compare: " + fileA.type + " and " + fileB.type);
 					}
 				}).filter(file -> {
@@ -174,6 +175,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 							break;
 
 						default:
+						case Tiny:
 							throw new IllegalArgumentException("Unexpected mapping types to read: " + file.type);
 						}
 
@@ -186,9 +188,10 @@ public class MappingsProvider extends LogicalDependencyProvider {
 
 				MappingBlob intermediaries;
 				if (interProvider.isPresent()) {
+					MappingFile mappings = interProvider.get();
+
 					if (mappingFiles.size() == 1) {
-						MappingFile mappings = Iterables.getOnlyElement(mappingFiles);
-						assert mappings == interProvider.get();
+						assert mappings == Iterables.getOnlyElement(mappingFiles);
 
 						project.getLogger().lifecycle(":extracting " + mappings.origin.getName());
 						switch (mappings.type) {
@@ -207,17 +210,37 @@ public class MappingsProvider extends LogicalDependencyProvider {
 							break free;
 
 						case Enigma:
+						case Tiny:
 						default: //Shouldn't end up here if this is the only mapping file supplied
 							throw new IllegalStateException("Unexpected mappings type " + mappings.type + " from " + mappings.origin);
 						}
 					}
 
-					intermediaries = null; //FIXME
-				} else {
-					project.getLogger().lifecycle(":loading " + intermediaryNames.getName());
+					project.getLogger().lifecycle(":loading intermediaries " + mappings.origin.getName());
+					switch (mappings.type) {
+					case Tiny:
+					case TinyV1:
+					case TinyV2:
+						try (FileSystem fileSystem = FileSystems.newFileSystem(mappings.origin.toPath(), null)) {
+							//Would be nice to extract this out but then the file system is closed before the mappings can be read
+							TinyReader.readTiny(fileSystem.getPath("mappings/mappings.tiny"), "official", "intermediary", intermediaries = new MappingBlob());
+						}
+						break;
 
+					case TinyGz:
+						TinyReader.readTiny(mappings.origin.toPath(), "official", "intermediary", intermediaries = new MappingBlob());
+						break;
+
+					case Enigma:
+					default: //Shouldn't end up here if this is the only mapping file supplied
+						throw new IllegalStateException("Unexpected mappings type " + mappings.type + " from " + mappings.origin);
+					}
+				} else {
 					if (!intermediaryNames.exists()) {//Grab intermediary mappings from Github
+						project.getLogger().lifecycle(":downloading intermediaries " + intermediaryNames.getName());
 						FileUtils.copyURLToFile(new URL("https://github.com/FabricMC/intermediary/raw/master/mappings/" + UrlEscapers.urlPathSegmentEscaper().escape(minecraftVersion) + ".tiny"), intermediaryNames);
+					} else {
+						project.getLogger().lifecycle(":loading intermediaries " + intermediaryNames.getName());
 					}
 
 					if (mappingFiles.isEmpty()) {
