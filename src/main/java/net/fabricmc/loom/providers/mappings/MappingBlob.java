@@ -30,6 +30,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.ObjIntConsumer;
 import java.util.function.UnaryOperator;
 
 import com.google.common.collect.Streams;
@@ -95,6 +96,12 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 						return head + ": " + args[head--];
 					}
 				};
+			}
+
+			public void iterateArgs(ObjIntConsumer<String> argConsumer) {
+				for (int i = 0; i < args.length; i++) {
+					if (args[i] != null) argConsumer.accept(args[i], i);
+				}
 			}
 		}
 		public static class Field {

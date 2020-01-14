@@ -306,6 +306,20 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 		return mappings.values().iterator();
 	}
 
+	public boolean hasArgs() {
+		for (CombinedMapping mapping : mappings.values()) {
+			if (!mapping.bonusArgs.isEmpty()) return true;
+
+			for (CombinedMethod method : mapping.methods()) {
+				if (method.hasArgs()) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
 	private static <T> T either(T prefered, T other) {
 		return prefered != null ? prefered : other;
 	}

@@ -28,6 +28,7 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -59,6 +60,8 @@ import net.fabricmc.loom.providers.mappings.EnigmaReader;
 import net.fabricmc.loom.providers.mappings.MappingBlob;
 import net.fabricmc.loom.providers.mappings.MappingBlob.InvertionTarget;
 import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping;
+import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping.Field;
+import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping.Method;
 import net.fabricmc.loom.providers.mappings.MappingSplat;
 import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping;
 import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping.ArgOnlyMethod;
@@ -232,7 +235,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 						break;
 
 					case Enigma:
-					default: //Shouldn't end up here if this is the only mapping file supplied
+					default: //Shouldn't end up here given Enigma won't be supplying the intermediaries
 						throw new IllegalStateException("Unexpected mappings type " + mappings.type + " from " + mappings.origin);
 					}
 				} else {
@@ -251,45 +254,158 @@ public class MappingsProvider extends LogicalDependencyProvider {
 					TinyReader.readTiny(intermediaryNames.toPath(), "official", "intermediary", intermediaries = new MappingBlob());
 				}
 
-				File mappingsFile = null;
-				switch (FilenameUtils.getExtension(mappingsFile.getName())) {
-				case "zip": {//Directly downloaded the enigma file (:enigma@zip)
-					Files.deleteIfExists(parameterNames);
+				MappingBlob inversion = intermediaries.invert(InvertionTarget.MEMBERS);
+				MappingBlob mappings = new MappingBlob();
+				Map<String, MappingBlob> versionToIntermediaries = new HashMap<>();
 
-					project.getLogger().lifecycle(":loading " + mappingsFile.getName());
-					MappingBlob enigma = new MappingBlob();
-					EnigmaReader.readEnigma(mappingsFile.toPath(), enigma);
+				for (MappingFile mapping : mappingFiles) {
+					project.getLogger().lifecycle(":loading " + mapping.origin.getName());
 
-					if (Streams.stream(enigma.iterator()).parallel().anyMatch(mapping -> mapping.from.startsWith("net/minecraft/class_"))) {
-						assert Streams.stream(enigma.iterator()).parallel().filter(mapping -> mapping.to() != null).allMatch(mapping -> mapping.from.startsWith("net/minecraft/class_") || mapping.from.matches("com\\/mojang\\/.+\\$class_\\d+")):
-							Streams.stream(enigma.iterator()).filter(mapping -> mapping.to() != null && !mapping.from.startsWith("net/minecraft/class_") && !mapping.from.matches("com\\/mojang\\/.+\\$class_\\d+")).map(mapping -> mapping.from).collect(Collectors.joining(", ", "Found unexpected initial mapping classes: [", "]"));
-						assert Streams.stream(enigma.iterator()).map(Mapping::methods).flatMap(Streams::stream).parallel().filter(method -> method.name() != null).allMatch(method -> method.fromName.startsWith("method_") || method.fromName.equals(method.name())):
-							Streams.stream(enigma.iterator()).map(Mapping::methods).flatMap(Streams::stream).parallel().filter(method -> method.name() != null && !method.fromName.startsWith("method_")).map(method -> method.fromName + method.fromDesc).collect(Collectors.joining(", ", "Found unexpected method mappings: ", "]"));
-						assert Streams.stream(enigma.iterator()).map(Mapping::fields).flatMap(Streams::stream).parallel().filter(field -> field.name() != null).allMatch(field -> field.fromName.startsWith("field_")):
-							Streams.stream(enigma.iterator()).map(Mapping::fields).flatMap(Streams::stream).parallel().filter(field -> field.name() != null && !field.fromName.startsWith("field_")).map(field -> field.fromName).collect(Collectors.joining(", ", "Found unexpected field mappings: ", "]"));
+					MappingBlob gains = new MappingBlob();
+					boolean nativeNames = false;
 
-						enigma = enigma.rename(intermediaries.invert(InvertionTarget.MEMBERS));
+					switch (mapping.type) {
+					case TinyV1:
+					case TinyV2: {
+						String origin;
+						if (mapping.getNamespaces().contains("intermediary")) {
+							origin = "intermediary";
+						} else {
+							nativeNames = true;
+							origin = "official";
+						}
+						assert mapping.getNamespaces().contains("named");
+
+						try (FileSystem fileSystem = FileSystems.newFileSystem(mapping.origin.toPath(), null)) {
+							TinyReader.readTiny(fileSystem.getPath("mappings/mappings.tiny"), origin, "named", gains);
+						}
+						break;
 					}
 
-					project.getLogger().lifecycle(":combining mappings");
-					MappingSplat combined = new MappingSplat(enigma, intermediaries);
+					case TinyGz: {
+						Collection<String> namespaces = TinyReader.readHeaders(mapping.origin.toPath());
 
-					project.getLogger().lifecycle(":writing " + MAPPINGS_TINY_BASE.getName());
-					try (TinyWriter writer = new TinyWriter(MAPPINGS_TINY_BASE.toPath())) {
-						for (CombinedMapping mapping : combined) {
-							String notch = mapping.from;
-							writer.acceptClass(notch, mapping.to, mapping.fallback);
+						String origin;
+						if (namespaces.contains("intermediary")) {
+							origin = "intermediary";
+						} else {
+							nativeNames = true;
+							origin = "official";
+						}
+						assert namespaces.contains("named");
 
-							for (CombinedMethod method : mapping.methods()) {
-								writer.acceptMethod(notch, method.from, method.fromDesc, method.to, method.fallback);
+						TinyReader.readTiny(mapping.origin.toPath(), origin, "named", gains);
+						break;
+					}
+
+					case Enigma: {
+						EnigmaReader.readEnigma(mapping.origin.toPath(), gains);
+
+						if (Streams.stream(gains.iterator()).parallel().noneMatch(classMapping -> classMapping.from.startsWith("net/minecraft/class_"))) {
+							nativeNames = true;
+						} else {
+							assert Streams.stream(gains.iterator()).parallel().filter(classMapping -> classMapping.to() != null).allMatch(classMapping -> classMapping.from.startsWith("net/minecraft/class_") || classMapping.from.matches("com\\/mojang\\/.+\\$class_\\d+")):
+								Streams.stream(gains.iterator()).filter(classMapping -> classMapping.to() != null && !classMapping.from.startsWith("net/minecraft/class_") && !classMapping.from.matches("com\\/mojang\\/.+\\$class_\\d+")).map(classMapping -> classMapping.from).collect(Collectors.joining(", ", "Found unexpected initial mapping classes: [", "]"));
+							assert Streams.stream(gains.iterator()).map(Mapping::methods).flatMap(Streams::stream).parallel().filter(method -> method.name() != null).allMatch(method -> method.fromName.startsWith("method_") || method.fromName.equals(method.name())):
+								Streams.stream(gains.iterator()).map(Mapping::methods).flatMap(Streams::stream).parallel().filter(method -> method.name() != null && !method.fromName.startsWith("method_")).map(method -> method.fromName + method.fromDesc).collect(Collectors.joining(", ", "Found unexpected method mappings: ", "]"));
+							assert Streams.stream(gains.iterator()).map(Mapping::fields).flatMap(Streams::stream).parallel().filter(field -> field.name() != null).allMatch(field -> field.fromName.startsWith("field_")):
+								Streams.stream(gains.iterator()).map(Mapping::fields).flatMap(Streams::stream).parallel().filter(field -> field.name() != null && !field.fromName.startsWith("field_")).map(field -> field.fromName).collect(Collectors.joining(", ", "Found unexpected field mappings: ", "]"));
+						}
+						break;
+					}
+
+					case Tiny: //Should have already enlightened this by now
+						throw new IllegalStateException("Unexpected mappings type " + mapping.type + " from " + mapping.origin);
+					}
+
+					if (nativeNames) {
+						MappingBlob renamer;
+						if (!minecraftVersion.equals(mapping.minecraftVersion)) {
+							renamer = versionToIntermediaries.computeIfAbsent(mapping.minecraftVersion, version -> {
+								File intermediaryNames = new File(extension.getUserCache(), "mappings/" + version + '/' + INTERMEDIARY + "-intermediary.tiny");
+
+								if (!intermediaryNames.exists()) {//Grab intermediary mappings from Github
+									try {
+										FileUtils.copyURLToFile(new URL("https://github.com/FabricMC/intermediary/raw/master/mappings/" + UrlEscapers.urlPathSegmentEscaper().escape(minecraftVersion) + ".tiny"), intermediaryNames);
+									} catch (IOException e) {
+										throw new UncheckedIOException("Error downloading Intermediary mappings for " + version, e);
+									}
+								}
+
+								MappingBlob inters = new MappingBlob();
+								try {
+									TinyReader.readTiny(intermediaryNames.toPath(), "official", "intermediary", inters);
+								} catch (IOException e) {
+									throw new UncheckedIOException("Error reading Intermediary mappings for " + version, e);
+								}
+								return inters;
+							});
+						} else {
+							renamer = intermediaries;
+						}
+
+						gains.rename(renamer);
+					}
+
+					for (Mapping classMapping : gains) {
+						//If the name has been lost since it was named there's no point including it
+						if (inversion.tryMapName(classMapping.from) == null) continue;
+						Mapping interMapping = inversion.get(classMapping.from);
+
+						Mapping existingClass = mappings.get(classMapping.from);
+						if (existingClass.to() == null) {
+							mappings.acceptClass(classMapping.from, classMapping.to());
+						}
+
+						for (Method method : classMapping.methods()) {
+							if (!interMapping.hasMethod(method)) continue;
+
+							Method existingMethod = existingClass.method(method);
+							if (existingMethod.name() == null) {
+								mappings.acceptMethod(classMapping.from, method.fromName, method.fromName, existingClass.to(), method.name(), method.desc());
 							}
 
-							for (CombinedField field : mapping.fields()) {
-								writer.acceptField(notch, field.from, field.fromDesc, field.to, field.fallback);
+							if (method.hasArgs()) {
+								method.iterateArgs((arg, index) -> {
+									if (existingMethod.arg(index) == null) {
+										mappings.acceptMethodArg(classMapping.from, method.fromName, method.fromDesc, index, arg);
+									}
+								});
+							}
+						}
+
+						for (Field field : classMapping.fields()) {
+							if (!interMapping.hasField(field)) continue;
+
+							Field existingField = existingClass.field(field);
+							if (existingField.name() == null) {
+								mappings.acceptMethod(classMapping.from, field.fromName, field.fromName, existingClass.to(), field.name(), field.desc());
 							}
 						}
 					}
+				}
 
+				project.getLogger().lifecycle(":combining mappings");
+				mappings.rename(inversion);
+				MappingSplat combined = new MappingSplat(mappings, intermediaries);
+
+				project.getLogger().lifecycle(":writing " + MAPPINGS_TINY_BASE.getName());
+				try (TinyWriter writer = new TinyWriter(MAPPINGS_TINY_BASE.toPath())) {
+					for (CombinedMapping mapping : combined) {
+						String notch = mapping.from;
+						writer.acceptClass(notch, mapping.to, mapping.fallback);
+
+						for (CombinedMethod method : mapping.methods()) {
+							writer.acceptMethod(notch, method.from, method.fromDesc, method.to, method.fallback);
+						}
+
+						for (CombinedField field : mapping.fields()) {
+							writer.acceptField(notch, field.from, field.fromDesc, field.to, field.fallback);
+						}
+					}
+				}
+
+				if (combined.hasArgs()) {
 					project.getLogger().lifecycle(":writing " + parameterNames.getFileName());
 					try (BufferedWriter writer = Files.newBufferedWriter(parameterNames)) {
 						for (CombinedMapping mapping : combined) {
@@ -298,25 +414,13 @@ public class MappingsProvider extends LogicalDependencyProvider {
 								writer.newLine();
 								for (String arg : method.namedArgs()) {
 									assert !arg.endsWith(": null"); //Skip nulls
-									writer.write("\t" + arg);
+									writer.write('\t');
+									writer.write(arg);
 									writer.newLine();
 								}
 							}
 						}
 					}
-					break;
-				}
-				case "gz": //Directly downloaded the tiny file (:tiny@gz)
-
-
-					break;
-
-				case "jar": //Downloaded a jar containing the tiny jar
-
-					break;
-
-				default: //Not sure what we've ended up with, but it's not what we want/expect
-					throw new IllegalStateException("Unexpected mappings base type: " + FilenameUtils.getExtension(mappingsFile.getName()) + "(from " + mappingsFile.getName() + ')');
 				}
 
 				if (MAPPINGS_TINY.exists()) {
