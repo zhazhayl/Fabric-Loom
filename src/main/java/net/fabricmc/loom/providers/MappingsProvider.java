@@ -42,7 +42,6 @@ import java.util.zip.GZIPInputStream;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Streams;
 import com.google.common.net.UrlEscapers;
 
 import org.apache.commons.io.FileUtils;
@@ -301,15 +300,15 @@ public class MappingsProvider extends LogicalDependencyProvider {
 					case Enigma: {
 						EnigmaReader.readEnigma(mapping.origin.toPath(), gains);
 
-						if (Streams.stream(gains.iterator()).parallel().noneMatch(classMapping -> classMapping.from.startsWith("net/minecraft/class_"))) {
+						if (gains.stream().parallel().noneMatch(classMapping -> classMapping.from.startsWith("net/minecraft/class_"))) {
 							nativeNames = true;
 						} else {
-							assert Streams.stream(gains.iterator()).parallel().filter(classMapping -> classMapping.to() != null).allMatch(classMapping -> classMapping.from.startsWith("net/minecraft/class_") || classMapping.from.matches("com\\/mojang\\/.+\\$class_\\d+")):
-								Streams.stream(gains.iterator()).filter(classMapping -> classMapping.to() != null && !classMapping.from.startsWith("net/minecraft/class_") && !classMapping.from.matches("com\\/mojang\\/.+\\$class_\\d+")).map(classMapping -> classMapping.from).collect(Collectors.joining(", ", "Found unexpected initial mapping classes: [", "]"));
-							assert Streams.stream(gains.iterator()).map(Mapping::methods).flatMap(Streams::stream).parallel().filter(method -> method.name() != null).allMatch(method -> method.fromName.startsWith("method_") || method.fromName.equals(method.name())):
-								Streams.stream(gains.iterator()).map(Mapping::methods).flatMap(Streams::stream).parallel().filter(method -> method.name() != null && !method.fromName.startsWith("method_")).map(method -> method.fromName + method.fromDesc).collect(Collectors.joining(", ", "Found unexpected method mappings: ", "]"));
-							assert Streams.stream(gains.iterator()).map(Mapping::fields).flatMap(Streams::stream).parallel().filter(field -> field.name() != null).allMatch(field -> field.fromName.startsWith("field_")):
-								Streams.stream(gains.iterator()).map(Mapping::fields).flatMap(Streams::stream).parallel().filter(field -> field.name() != null && !field.fromName.startsWith("field_")).map(field -> field.fromName).collect(Collectors.joining(", ", "Found unexpected field mappings: ", "]"));
+							assert gains.stream().parallel().filter(classMapping -> classMapping.to() != null).allMatch(classMapping -> classMapping.from.startsWith("net/minecraft/class_") || classMapping.from.matches("com\\/mojang\\/.+\\$class_\\d+")):
+								gains.stream().filter(classMapping -> classMapping.to() != null && !classMapping.from.startsWith("net/minecraft/class_") && !classMapping.from.matches("com\\/mojang\\/.+\\$class_\\d+")).map(classMapping -> classMapping.from).collect(Collectors.joining(", ", "Found unexpected initial mapping classes: [", "]"));
+							assert gains.streamMethods().parallel().filter(method -> method.name() != null).allMatch(method -> method.fromName.startsWith("method_") || method.fromName.equals(method.name())):
+								gains.streamMethods().filter(method -> method.name() != null && !method.fromName.startsWith("method_")).map(method -> method.fromName + method.fromDesc).collect(Collectors.joining(", ", "Found unexpected method mappings: ", "]"));
+							assert gains.streamFields().parallel().filter(field -> field.name() != null).allMatch(field -> field.fromName.startsWith("field_")):
+								gains.streamFields().filter(field -> field.name() != null && !field.fromName.startsWith("field_")).map(field -> field.fromName).collect(Collectors.joining(", ", "Found unexpected field mappings: ", "]"));
 						}
 						break;
 					}

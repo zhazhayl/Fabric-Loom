@@ -32,6 +32,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.ObjIntConsumer;
 import java.util.function.UnaryOperator;
+import java.util.stream.Stream;
 
 import com.google.common.collect.Streams;
 
@@ -215,6 +216,18 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 	@Override
 	public Iterator<Mapping> iterator() {
 		return mappings.values().iterator();
+	}
+
+	public Stream<Mapping> stream() {
+		return mappings.values().stream();
+	}
+
+	public Stream<Method> streamMethods() {
+		return stream().map(Mapping::methods).flatMap(Streams::stream);
+	}
+
+	public Stream<Field> streamFields() {
+		return stream().map(Mapping::fields).flatMap(Streams::stream);
 	}
 
 	public enum InvertionTarget {
