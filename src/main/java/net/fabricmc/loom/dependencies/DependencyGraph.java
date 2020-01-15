@@ -159,21 +159,23 @@ class DependencyGraph {
 				throw new IllegalStateException("Missing dependency type: " + node.type);
 			}
 
-			Set<DependencyNode> allDependents = StitchUtil.newIdentityHashSet();
-			allDependents.addAll(node.getDependents());
+			Set<DependencyNode> checkedDependents = StitchUtil.newIdentityHashSet();
+			Queue<DependencyNode> depenentList = new ArrayDeque<>(node.getDependents());
 
-			Queue<DependencyNode> depenentList = new ArrayDeque<>(allDependents);
 			DependencyNode dependent;
 			while ((dependent = depenentList.poll()) != null) {
 				Set<DependencyNode> depenents = dependent.getDependents();
-				depenents.removeIf(depenentList::contains);
 
 				if (depenents.contains(node)) {
 					throw new IllegalStateException("Circular dependencies on " + node.getClass());
 				}
 
-				allDependents.addAll(depenents);
-				depenentList.addAll(depenents);
+				for (DependencyNode child : depenents) {
+					if (!checkedDependents.contains(child)) {
+						checkedDependents.add(child);
+						depenentList.add(child);
+					}
+				}
 			}
 		}
 
