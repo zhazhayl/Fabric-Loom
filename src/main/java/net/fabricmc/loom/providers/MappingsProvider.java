@@ -336,7 +336,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 							renamer = intermediaries;
 						}
 
-						gains.rename(renamer);
+						gains = gains.rename(renamer);
 					}
 
 					for (Mapping classMapping : gains) {
@@ -378,8 +378,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 				}
 
 				project.getLogger().lifecycle(":combining mappings");
-				mappings.rename(inversion);
-				MappingSplat combined = new MappingSplat(mappings, intermediaries);
+				MappingSplat combined = new MappingSplat(mappings.rename(inversion), intermediaries);
 
 				project.getLogger().lifecycle(":writing " + MAPPINGS_TINY_BASE.getName());
 				try (TinyWriter writer = new TinyWriter(MAPPINGS_TINY_BASE.toPath())) {
