@@ -88,6 +88,7 @@ class DependencyGraph {
 	}
 
 	private final Queue<DependencyNode> currentActive = new ArrayDeque<>();
+	private final Set<DependencyNode> awaiting = StitchUtil.newIdentityHashSet();
 
 	public DependencyGraph(List<DependencyProvider> dependencies) {
 		Set<Class<? extends DependencyProvider>> seenDependencies = StitchUtil.newIdentityHashSet();
@@ -191,13 +192,15 @@ class DependencyGraph {
 	 *
 	 * @throws NoSuchElementException If there are no providers available (ie {@link #hasAvailable()} returns <code>false</code>)
 	 */
-	public DependencyProvider nextAvailable() {
+	public synchronized DependencyProvider nextAvailable() {
 		if (!hasAvailable()) {
 			throw new NoSuchElementException("No more providers");
 		}
 
 		assert currentActive.stream().allMatch(node -> node.getDependencies().isEmpty());
-		return currentActive.poll().getProvider();
+		DependencyNode node = currentActive.poll();
+		awaiting.add(node);
+		return node.getProvider();
 	}
 
 	/**
@@ -205,38 +208,37 @@ class DependencyGraph {
 	 *
 	 * @throws NoSuchElementException If there are no providers available (ie {@link #hasAvailable()} returns <code>false</code>)
 	 */
-	public List<DependencyProvider> allAvailable() {
+	public synchronized List<DependencyProvider> allAvailable() {
 		if (!hasAvailable()) {
 			throw new NoSuchElementException("No more providers");
 		}
 
 		assert currentActive.stream().allMatch(node -> node.getDependencies().isEmpty());
 		List<DependencyProvider> out = currentActive.stream().map(DependencyNode::getProvider).collect(Collectors.toList());
+		awaiting.addAll(currentActive);
 		currentActive.clear();
 		return out;
 	}
 
 	/** Flags the given {@link DependencyProvider} as complete for the purposes of allowing dependent providers to run */
-	public void markComplete(DependencyProvider provider) {
-		synchronized (currentActive) {
-			for (Iterator<DependencyNode> it = currentActive.iterator(); it.hasNext();) {
-				DependencyNode node = it.next();
+	public synchronized void markComplete(DependencyProvider provider) {
+		for (Iterator<DependencyNode> it = awaiting.iterator(); it.hasNext();) {
+			DependencyNode node = it.next();
 
-				if (node.getProvider() == provider) {
-					it.remove();
-					currentActive.addAll(node.flagComplete());
+			if (node.getProvider() == provider) {
+				it.remove();
+				currentActive.addAll(node.flagComplete());
 
-					if (currentActive.isEmpty() && !node.getDependents().isEmpty()) {
-						throw new IllegalStateException("All remaining dependencies have dependencies!");
-					}
-					break;
+				if (currentActive.isEmpty() && !node.getDependents().isEmpty()) {
+					throw new IllegalStateException("All remaining dependencies have dependencies!");
 				}
+				break;
 			}
 		}
 	}
 
 	/** Whether there are any more {@link DependencyProvider} currently capable of being processed */
-	public boolean hasAvailable() {
+	public synchronized boolean hasAvailable() {
 		return !currentActive.isEmpty();
 	}
 
