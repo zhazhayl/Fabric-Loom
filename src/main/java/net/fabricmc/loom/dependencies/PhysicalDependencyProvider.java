@@ -116,6 +116,7 @@ public abstract class PhysicalDependencyProvider extends DependencyProvider {
 		}
 
 		public DependencyInfo isolate() {
+			Dependency dependency = this.dependency.copy();
 			return new DependencyInfo(project, dependency, project.getConfigurations().detachedConfiguration(dependency));
 		}
 
