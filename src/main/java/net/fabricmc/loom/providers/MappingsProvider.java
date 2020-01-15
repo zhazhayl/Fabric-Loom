@@ -348,13 +348,14 @@ public class MappingsProvider extends LogicalDependencyProvider {
 						if (existingClass.to() == null) {
 							mappings.acceptClass(classMapping.from, classMapping.to());
 						}
+						assert interMapping.from.equals(existingClass.from);
 
 						for (Method method : classMapping.methods()) {
 							if (!interMapping.hasMethod(method)) continue;
 
 							Method existingMethod = existingClass.method(method);
 							if (existingMethod.name() == null) {
-								mappings.acceptMethod(classMapping.from, method.fromName, method.fromName, existingClass.to(), method.name(), method.desc());
+								mappings.acceptMethod(classMapping.from, method.fromName, method.fromDesc, existingClass.to(), method.name(), method.desc());
 							}
 
 							if (method.hasArgs()) {
@@ -371,7 +372,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 
 							Field existingField = existingClass.field(field);
 							if (existingField.name() == null) {
-								mappings.acceptMethod(classMapping.from, field.fromName, field.fromName, existingClass.to(), field.name(), field.desc());
+								mappings.acceptField(classMapping.from, field.fromName, field.fromDesc, existingClass.to(), field.name(), field.desc());
 							}
 						}
 					}
