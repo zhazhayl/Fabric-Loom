@@ -133,6 +133,7 @@ class DependencyGraph {
 
 					if (existingBefore == null) {
 						dependenciesGraph.put(beforeType, existingBefore = DependencyNode.emptyOf(beforeType));
+						roots.add(existingBefore); //Without any other information otherwise, the dependency is a root
 					}
 
 					existingBefore.addDependent(existing);
