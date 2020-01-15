@@ -23,6 +23,7 @@ import org.apache.commons.io.FilenameUtils;
 import org.gradle.api.Project;
 
 import net.fabricmc.loom.LoomGradleExtension;
+import net.fabricmc.loom.dependencies.LoomDependencyManager;
 import net.fabricmc.loom.dependencies.PhysicalDependencyProvider;
 import net.fabricmc.loom.providers.StackedMappingsProvider.MappingFile.MappingType;
 import net.fabricmc.loom.util.Constants;
@@ -93,8 +94,11 @@ public class StackedMappingsProvider extends PhysicalDependencyProvider {
 	}
 	private final MappingsProvider realProvider = new MappingsProvider();
 
-	public StackedMappingsProvider() {
-		getDependencyManager().addProvider(realProvider);
+	@Override
+	public void register(LoomDependencyManager dependencyManager) {
+		super.register(dependencyManager);
+
+		dependencyManager.addProvider(realProvider);
 	}
 
 	@Override

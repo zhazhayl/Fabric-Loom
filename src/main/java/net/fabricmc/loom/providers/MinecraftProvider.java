@@ -42,6 +42,7 @@ import org.gradle.api.logging.Logger;
 
 import net.fabricmc.loom.AbstractPlugin;
 import net.fabricmc.loom.LoomGradleExtension;
+import net.fabricmc.loom.dependencies.LoomDependencyManager;
 import net.fabricmc.loom.dependencies.PhysicalDependencyProvider;
 import net.fabricmc.loom.providers.openfine.Openfine;
 import net.fabricmc.loom.util.Checksum;
@@ -62,8 +63,11 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 	private File MINECRAFT_SERVER_JAR;
 	private File MINECRAFT_MERGED_JAR;
 
-	public MinecraftProvider() {
-		getDependencyManager().addProvider(new MinecraftLibraryProvider());
+	@Override
+	public void register(LoomDependencyManager dependencyManager) {
+		super.register(dependencyManager);
+
+		dependencyManager.addProvider(new MinecraftLibraryProvider());
 	}
 
 	@Override
