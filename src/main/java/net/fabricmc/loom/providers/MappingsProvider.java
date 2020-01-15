@@ -12,7 +12,6 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -27,7 +26,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -168,12 +166,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 							break;
 
 						case TinyGz:
-							try (BufferedReader reader = new BufferedReader(new InputStreamReader(new GZIPInputStream(Files.newInputStream(file.origin.toPath())), StandardCharsets.UTF_8))) {
-								String header = reader.readLine();
-								assert header != null;
-
-								headers = Arrays.asList(header.substring(3).split(" ")); //Should be in V1 format
-							}
+							headers = TinyReader.readHeaders(file.origin.toPath());
 							break;
 
 						default:

@@ -71,10 +71,10 @@ public class StackedMappingsProvider extends PhysicalDependencyProvider {
 					if (header == null) {
 						throw new EOFException("Empty mappings supplied in " + origin);
 					} else if (header.startsWith("v1\t")) {
-						return withEnlightening(MappingType.TinyV1, Arrays.asList(header.substring(3).split(" ")));
+						return withEnlightening(MappingType.TinyV1, Arrays.asList(header.substring(3).split("\t")));
 					} else if (header.startsWith("tiny\t2\t")) {
 						String[] bits;
-						return withEnlightening(MappingType.TinyV2, Arrays.asList(bits = header.split(" ")).subList(3, bits.length));
+						return withEnlightening(MappingType.TinyV2, Arrays.asList(bits = header.split("\t")).subList(3, bits.length));
 					} else {
 						throw new IOException("Unable to guess mapping version from " + header + " in " + origin);
 					}

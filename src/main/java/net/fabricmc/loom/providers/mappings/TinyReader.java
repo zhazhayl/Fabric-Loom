@@ -60,10 +60,10 @@ public class TinyReader {
 		if (header == null) {
 			return Collections.emptyList(); //No headers in an empty file
 		} else if (header.startsWith("v1\t")) {
-			return Arrays.asList(header.substring(3).split(" "));
+			return Arrays.asList(header.substring(3).split("\t"));
 		} else if (header.startsWith("tiny\t2\t")) {
 			String[] bits;
-			return Arrays.asList(bits = header.split(" ")).subList(3, bits.length);
+			return Arrays.asList(bits = header.split("\t")).subList(3, bits.length);
 		} else {
 			throw new IOException("Unlikely tiny file given " + header);
 		}
