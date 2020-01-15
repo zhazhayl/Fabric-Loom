@@ -115,6 +115,10 @@ public abstract class PhysicalDependencyProvider extends DependencyProvider {
 			}
 		}
 
+		public DependencyInfo isolate() {
+			return new DependencyInfo(project, dependency, project.getConfigurations().detachedConfiguration(dependency));
+		}
+
 		@Override
 		public String toString() {
 			return getDepString();
@@ -214,6 +218,11 @@ public abstract class PhysicalDependencyProvider extends DependencyProvider {
 		@Override
 		public String getResolvedVersion() {
 			return version;
+		}
+
+		@Override
+		public ConcreteDependencyInfo isolate() {
+			return this;
 		}
 
 		@Override
