@@ -42,7 +42,6 @@ import net.fabricmc.loom.util.AccessTransformerHelper;
 public class RemappingJar extends Jar {
 	public File destination;
 	public boolean nestJar = true;
-	@Input
 	public boolean includeAT = true;
 
 	public RemappingJar() {
@@ -68,6 +67,16 @@ public class RemappingJar extends Jar {
 				throw new RuntimeException("Failed to remap jar", e);
 			}
 		});
+	}
+
+	@Input
+	public boolean isNestJar() {
+		return nestJar;
+	}
+
+	@Input
+	public boolean isIncludeAT() {
+		return includeAT;
 	}
 
 	@OutputFile

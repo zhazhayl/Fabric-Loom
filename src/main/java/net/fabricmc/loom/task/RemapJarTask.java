@@ -35,7 +35,6 @@ import java.util.Set;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.file.RegularFileProperty;
-import org.gradle.api.provider.Property;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.InputFile;
 import org.gradle.api.tasks.TaskAction;
@@ -55,8 +54,7 @@ import net.fabricmc.tinyremapper.TinyUtils;
 public class RemapJarTask extends Jar {
 	private final RegularFileProperty input = GradleSupport.getFileProperty(getProject());
 	private boolean addNestedDependencies;
-	@Input
-	public boolean includeAT = true;
+	private boolean includeAT = true;
 
 	@TaskAction
 	public void doTask() throws Throwable {
@@ -137,6 +135,15 @@ public class RemapJarTask extends Jar {
 	@InputFile
 	public RegularFileProperty getInput() {
 		return input;
+	}
+
+	@Input
+	public boolean isIncludeAT() {
+		return includeAT;
+	}
+
+	public void setIncludeAT(boolean include) {
+		includeAT = include;
 	}
 
 	@Input
