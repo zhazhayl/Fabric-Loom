@@ -33,11 +33,14 @@ import org.gradle.api.Project;
 public abstract class DependencyProvider {
 	private LoomDependencyManager dependencyManager;
 
+	DependencyProvider() {
+	}
+
 	public void register(LoomDependencyManager dependencyManager) {
 		this.dependencyManager = dependencyManager;
 	}
 
-	public LoomDependencyManager getDependencyManager() {
+	protected LoomDependencyManager getDependencyManager() {
 		if (dependencyManager == null) throw new IllegalStateException("Unregistered dependency provider!");
 		return dependencyManager;
 	}
@@ -58,11 +61,11 @@ public abstract class DependencyProvider {
 		return provider;
 	}
 
-	public void addDependency(Object object, Project project) {
+	protected void addDependency(Object object, Project project) {
 		addDependency(object, project, "compile");
 	}
 
-	public void addDependency(Object object, Project project, String target) {
+	protected void addDependency(Object object, Project project, String target) {
 		if (object instanceof File) {
 			object = project.files(object);
 		}

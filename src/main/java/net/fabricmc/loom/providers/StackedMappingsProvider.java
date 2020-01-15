@@ -107,12 +107,12 @@ public class StackedMappingsProvider extends PhysicalDependencyProvider {
 	}
 
 	@Override
-	protected boolean isRequired() {
+	public boolean isRequired() {
 		return false; //Mappings can be inferred from the (required) Minecraft provider
 	}
 
 	@Override
-	protected boolean isUnique() {
+	public boolean isUnique() {
 		return false; //Multiple mappings can be defined then stacked together
 	}
 
