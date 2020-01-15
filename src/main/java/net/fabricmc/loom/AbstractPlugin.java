@@ -306,7 +306,7 @@ public class AbstractPlugin implements Plugin<Project> {
 					jarTask.setClassifier("dev");
 					remapJarTask.setClassifier("");
 					remapJarTask.getInput().set(jarTask.getArchivePath());
-					remapJarTask.includeAT = jarTask.getExtensions().getByType(JarSettings.class).includeAT;
+					remapJarTask.setIncludeAT(jarTask.getExtensions().getByType(JarSettings.class).includeAT);
 				}
 
 				extension.addUnmappedMod(jarTask.getArchivePath().toPath());
