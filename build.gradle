@@ -97,6 +97,7 @@ license {
 	exclude '**/loom/task/RemappingJar.java'
 	exclude '**/loom/util/AccessTransformerHelper.java'
 	exclude '**/loom/dependencies/ArtifactInfo.java'
+	exclude '**/loom/dependencies/ComputedDependency.java'
 	exclude '**/loom/dependencies/DependencyGraph.java'
 	exclude '**/loom/dependencies/LogicalDependencyProvider.java'
 	exclude '**/loom/dependencies/PhysicalDependencyProvider.java'
