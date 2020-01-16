@@ -42,7 +42,7 @@ repositories {
 }
 
 dependencies {
-	compileOnly "org.gradle:gradle-core-api:6.1-rc-3"
+	compileOnly "org.gradle:gradle-core-api:6.1"
 
 	// libraries
 	implementation ('commons-io:commons-io:2.6')
@@ -59,7 +59,7 @@ dependencies {
 	implementation 'com.github.Chocohead:OptiSine:cc6da75' //Keep consistent with Openfine.VERSION
 
 	// tinyfile management
-	implementation ('com.github.Chocohead:tiny-remapper:74df1c7') {
+	implementation ('com.github.Chocohead:tiny-remapper:d4af165') {
 		transitive = false
 	}
 
