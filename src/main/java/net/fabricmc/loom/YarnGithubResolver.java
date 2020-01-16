@@ -22,13 +22,11 @@ import java.util.function.Function;
 import org.gradle.api.Action;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Dependency;
-import org.gradle.api.artifacts.FileCollectionDependency;
-import org.gradle.api.artifacts.component.ComponentIdentifier;
 import org.gradle.api.file.FileCollection;
-import org.gradle.api.internal.artifacts.dependencies.SelfResolvingDependencyInternal;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.tasks.TaskDependency;
 
+import net.fabricmc.loom.dependencies.ComputedDependency;
 import net.fabricmc.loom.util.DownloadUtil;
 
 public class YarnGithubResolver {
@@ -142,38 +140,17 @@ public class YarnGithubResolver {
 		return createFrom(spec, String.format(DOWNLOAD_URL, repo, commit));
 	}
 
-	//Gradle needs the internal interface to avoid class cast exceptions
-	public class GithubDependency implements SelfResolvingDependencyInternal, FileCollectionDependency {
+	public class GithubDependency extends ComputedDependency {
 		protected final DownloadSpec spec;
 		protected final String origin;
 		protected final Path destination;
-		private String reason;
 
 		public GithubDependency(DownloadSpec spec, String origin, Path destination) {
+			super(spec.getGroup(), spec.getName(), spec.getVersion());
 			this.spec = spec;
 			this.origin = origin;
 			this.destination = destination;
-			reason = spec.getReason();
-		}
-
-		@Override
-		public String getGroup() {
-			return spec.getGroup();
-		}
-
-		@Override
-		public String getName() {
-			return spec.getName();
-		}
-
-		@Override
-		public String getVersion() {
-			return spec.getVersion();
-		}
-
-		@Override
-		public ComponentIdentifier getTargetComponentId() {
-			return null;
+			because(spec.getReason());
 		}
 
 		@Override
@@ -189,32 +166,20 @@ public class YarnGithubResolver {
 		}
 
 		@Override
-		public void because(String reason) {
-			this.reason = reason;
-		}
-
-		@Override
-		public String getReason() {
-			return reason;
-		}
-
-		@Override
 		public TaskDependency getBuildDependencies() {
 			logger.info("Computing Github dependency's task dependency for " + spec.originalName + " from " + origin + " to " + destination);
-			return task -> Collections.emptySet();
+			return super.getBuildDependencies();
 		}
 
 		@Override
 		public FileCollection getFiles() {
 			logger.info("Detecting Github dependency's file(s) for " + spec.originalName + " from " + origin + " to " + destination);
-
-			resolve(); //Ensure the destination actually exists, as Gradle doesn't really care either way
-			return fileFactory.apply(destination);
+			return super.getFiles();
 		}
 
 		@Override
-		public Set<File> resolve(boolean transitive) {
-			return resolve();
+		protected FileCollection makeFiles() {
+			return fileFactory.apply(destination);
 		}
 
 		@Override

@@ -31,7 +31,6 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
 import net.fabricmc.loom.LoomGradleExtension;
-import net.fabricmc.loom.YarnGithubResolver.GithubDependency;
 
 /**
  * A {@link DependencyProvider} which handles a {@link Configuration}
@@ -58,8 +57,8 @@ public abstract class PhysicalDependencyProvider extends DependencyProvider {
 
 		public static DependencyInfo create(Project project, Dependency dependency, Configuration sourceConfiguration) {
 			if (dependency instanceof SelfResolvingDependency) {
-				if (dependency instanceof GithubDependency) {
-					return new ConcreteDependencyInfo(project, (GithubDependency) dependency, sourceConfiguration);
+				if (dependency instanceof ComputedDependency) {
+					return new ConcreteDependencyInfo(project, (ComputedDependency) dependency, sourceConfiguration);
 				} else {
 					return ConcreteDependencyInfo.create(project, (SelfResolvingDependency) dependency, sourceConfiguration);
 				}
@@ -116,7 +115,7 @@ public abstract class PhysicalDependencyProvider extends DependencyProvider {
 		}
 
 		public DependencyInfo isolate() {
-			Dependency dependency = this.dependency.copy();
+			Dependency dependency = this.dependency.copy(); //Copy the dependency to merge in any decorating Gradle does
 			return new DependencyInfo(project, dependency, project.getConfigurations().detachedConfiguration(dependency));
 		}
 
@@ -204,7 +203,7 @@ public abstract class PhysicalDependencyProvider extends DependencyProvider {
 			return new ConcreteDependencyInfo(project, dependency, configuration, "net.fabricmc.synthetic", name, version);
 		}
 
-		ConcreteDependencyInfo(Project project, GithubDependency dependency, Configuration configuration) {
+		ConcreteDependencyInfo(Project project, ComputedDependency dependency, Configuration configuration) {
 			this(project, dependency, configuration, dependency.getGroup(), dependency.getName(), dependency.getVersion());
 		}
 
