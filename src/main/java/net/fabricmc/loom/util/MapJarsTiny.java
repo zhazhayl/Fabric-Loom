@@ -78,6 +78,7 @@ public class MapJarsTiny {
 
 			TinyRemapper remapper = TinyRemapper.newRemapper()
 					.withMappings(mappingsProvider.mcRemappingFactory.create(fromM, toM))
+					.ignoreConflicts(extension.shouldBulldozeMappings())
 					.renameInvalidLocals(true)
 					.rebuildSourceFilenames(true)
 					.build();

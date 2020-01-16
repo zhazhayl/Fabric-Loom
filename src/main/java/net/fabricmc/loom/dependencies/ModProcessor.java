@@ -177,6 +177,7 @@ public class ModProcessor {
 
 		TinyRemapper remapper = TinyRemapper.newRemapper()
 						.withMappings(TinyRemapperMappingsHelper.create(mappingsProvider.getMappings(), fromM, toM, false))
+						.ignoreConflicts(extension.shouldBulldozeMappings())
 						.renameInvalidLocals(!sourcesExist)
 						.build();
 

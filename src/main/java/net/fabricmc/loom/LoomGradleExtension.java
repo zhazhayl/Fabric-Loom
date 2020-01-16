@@ -59,6 +59,7 @@ public class LoomGradleExtension {
 	public boolean extractJars = false;
 	public String customManifest = null;
 
+	private boolean bulldozeMappings;
 	private File atFile;
 	private File optifine;
 	private List<Path> unmappedModsBuilt = new ArrayList<>();
@@ -297,6 +298,14 @@ public class LoomGradleExtension {
 
 	public boolean ideSync() {
 		return Boolean.parseBoolean(System.getProperty("idea.sync.active", "false"));
+	}
+
+	public void setBulldozeMappings(boolean force) {
+		bulldozeMappings = force;
+	}
+
+	public boolean shouldBulldozeMappings() {
+		return bulldozeMappings;
 	}
 
 	public void setAT(Object file) {
