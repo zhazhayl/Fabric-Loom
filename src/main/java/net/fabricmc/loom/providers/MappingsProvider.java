@@ -531,7 +531,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 					} else {
 						assert line.charAt(0) == '\t';
 
-						if (currentPosition >= expected.size() || expected.get(currentPosition) != line.substring(1)) {
+						if (currentPosition >= expected.size() || line.regionMatches(1, expected.get(currentPosition), 0, line.length() - 1)) {
 							currentVersion = null;
 						} else {
 							currentPosition++;
