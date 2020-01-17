@@ -15,6 +15,9 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
@@ -27,7 +30,11 @@ import org.gradle.api.logging.Logger;
 import org.gradle.api.tasks.TaskDependency;
 
 import net.fabricmc.loom.dependencies.ComputedDependency;
+import net.fabricmc.loom.providers.mappings.IMappingAcceptor;
+import net.fabricmc.loom.providers.mappings.TinyReader;
+import net.fabricmc.loom.providers.mappings.TinyWriter;
 import net.fabricmc.loom.util.DownloadUtil;
+import net.fabricmc.mappings.EntryTriple;
 
 public class YarnGithubResolver {
 	private static final String DEFAULT_REPO = "FabricMC/yarn";
@@ -35,20 +42,25 @@ public class YarnGithubResolver {
 	private static final Action<DownloadSpec> NOOP = spec -> {
 	};
 	final Function<Path, FileCollection> fileFactory;
-	private final Path cache;
+	private final Path globalCache, projectCache;
 	final Logger logger;
 
-	private static void createDirectory(Path path) {
+	static void createDirectory(Path path) {
 		try {
 			if (Files.notExists(path)) Files.createDirectories(path);
+			assert Files.exists(path) && Files.isDirectory(path);
 		} catch (IOException e) {
 			throw new UncheckedIOException("Unable to create directory", e);
 		}
 	}
 
 	public YarnGithubResolver(Project project) {
-		cache = project.getExtensions().getByType(LoomGradleExtension.class).getUserCache().toPath().resolve("yarn-resolutions");
-		createDirectory(cache);
+		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
+		globalCache = extension.getUserCache().toPath();
+		createDirectory(globalCache);
+		projectCache = extension.getRootProjectPersistentCache().toPath();
+		createDirectory(projectCache);
+
 		logger = project.getLogger();
 		fileFactory = project::files;
 	}
@@ -199,7 +211,7 @@ public class YarnGithubResolver {
 	}
 
 	private Dependency createFrom(DownloadSpec spec, String origin) {
-		Path destination = cache.resolve(spec.originalName + ".zip");
+		Path destination = globalCache.resolve("yarn-resolutions").resolve(spec.originalName + ".zip");
 		createDirectory(destination.getParent());
 
 		if (spec.forceFresh) {
@@ -212,5 +224,171 @@ public class YarnGithubResolver {
 
 		logger.debug("Creating new Github dependency for " + spec.originalName + " from " + origin + " to " + destination);
 		return new GithubDependency(spec, origin, destination);
+	}
+
+	public Dependency extraMappings(Action<ExtraMappings> action) {
+		ExtraMappings mappings = new ExtraMappings(projectCache.resolve("extra-mappings"), fileFactory);
+		action.execute(mappings);
+		return mappings;
+	}
+
+	public static class ExtraMappings extends ComputedDependency {
+		private static class NotaGoto extends RuntimeException {
+			private static final long serialVersionUID = -1268411969286315592L;
+			static final NotaGoto INSTANCE = new NotaGoto();
+
+			private NotaGoto() {//Nothing to do with exception based flow control
+				setStackTrace(new StackTraceElement[0]);
+			}
+
+			@Override
+			public synchronized Throwable fillInStackTrace() {
+				setStackTrace(new StackTraceElement[0]);
+				return this;
+			}
+		}
+		private static volatile int instance = 1;
+		private final Path cache;
+		private final Function<Path, FileCollection> fileFactory;
+		private Map<String, String> classes = new HashMap<>();
+		private Map<EntryTriple, String> methods = new HashMap<>();
+		private Map<EntryTriple, String> fields = new HashMap<>();
+
+		public ExtraMappings(Path cache, Function<Path, FileCollection> fileFactory) {
+			this("instance:" + instance, cache, fileFactory);
+		}
+
+		private ExtraMappings(String instance, Path cache, Function<Path, FileCollection> fileFactory) {
+			super("net.fabricmc.synthetic.extramappings", instance, "1");
+
+			this.cache = cache;
+			this.fileFactory = fileFactory;
+		}
+
+		public void setClass(String from, String to) {
+			classes.put(from, to);
+		}
+
+		public Map<String, String> getClasses() {
+			return classes;
+		}
+
+		public void setClasses(Map<String, String> mappings) {
+			if (mappings == null) throw new NullPointerException("Null class mappings");
+			classes.clear();
+			classes.putAll(mappings);
+		}
+
+		public void setMethod(EntryTriple from, String to) {
+			methods.put(from, to);
+		}
+
+		public Map<EntryTriple, String> getMethods() {
+			return methods;
+		}
+
+		public void setMethods(Map<EntryTriple, String> mappings) {
+			if (mappings == null) throw new NullPointerException("Null method mappings");
+			methods.clear();
+			methods.putAll(mappings);
+		}
+
+		public void setField(EntryTriple from, String to) {
+			fields.put(from, to);
+		}
+
+		public Map<EntryTriple, String> getFields() {
+			return fields;
+		}
+
+		public void setFields(Map<EntryTriple, String> mappings) {
+			if (mappings == null) throw new NullPointerException("Null field mappings");
+			fields.clear();
+			fields.putAll(mappings);
+		}
+
+		@Override
+		public Set<File> resolve() {
+			Path output = cache.resolve("mappings_" + getName().substring(9) + ".gz");
+
+			out: if (Files.exists(output)) {
+				try {
+					TinyReader.readTiny(output, "intermediary", "named", new IMappingAcceptor() {
+						private final Map<String, String> classes = new HashMap<>(ExtraMappings.this.classes);
+						private final Map<EntryTriple, String> methods = new HashMap<>(ExtraMappings.this.methods);
+						private final Map<EntryTriple, String> fields = new HashMap<>(ExtraMappings.this.fields);
+
+						@Override
+						public void acceptClass(String srcName, String dstName) {
+							if (!classes.remove(srcName, dstName)) {
+								throw NotaGoto.INSTANCE;
+							}
+						}
+
+						@Override
+						public void acceptMethod(String srcClsName, String srcName, String srcDesc, String dstClsName, String dstName, String dstDesc) {
+							if (!methods.remove(new EntryTriple(srcClsName, srcName, srcDesc), dstName)) {
+								throw NotaGoto.INSTANCE;
+							}
+						}
+
+						@Override
+						public void acceptMethodArg(String srcClsName, String srcMethodName, String srcMethodDesc, int lvIndex, String dstArgName) {
+						}
+
+						@Override
+						public void acceptField(String srcClsName, String srcName, String srcDesc, String dstClsName, String dstName, String dstDesc) {
+							if (!fields.remove(new EntryTriple(srcClsName, srcName, srcDesc), dstName)) {
+								throw NotaGoto.INSTANCE;
+							}
+						}
+					});
+				} catch (IOException e) {
+					throw new RuntimeException("Error reading extra mappings from " + output, e);
+				} catch (NotaGoto e) {
+					break out;
+				}
+
+				return Collections.singleton(output.toFile());
+			}
+
+			createDirectory(output.getParent());
+			try (TinyWriter writer = new TinyWriter(output, true, "intermediary", "named")) {
+				for (Entry<String, String> entry : classes.entrySet()) {
+					writer.acceptClass(entry.getKey(), entry.getValue());
+				}
+
+				for (Entry<EntryTriple, String> entry : methods.entrySet()) {
+					EntryTriple method = entry.getKey();
+					writer.acceptMethod(method.getOwner(), method.getDesc(), method.getName(), entry.getValue());
+				}
+
+				for (Entry<EntryTriple, String> entry : fields.entrySet()) {
+					EntryTriple field = entry.getKey();
+					writer.acceptField(field.getOwner(), field.getDesc(), field.getName(), entry.getValue());
+				}
+
+				return Collections.singleton(output.toFile());
+			} catch (IOException e) {
+				throw new RuntimeException("Error writing extra mappings to " + output, e);
+			}
+		}
+
+		@Override
+		protected FileCollection makeFiles() {
+			return fileFactory.apply(null);
+		}
+
+		@Override
+		public boolean contentEquals(Dependency dependency) {
+			if (dependency == this) return true;
+			if (!(dependency instanceof ExtraMappings)) return false;
+			return Objects.equals(dependency.getName(), getName());
+		}
+
+		@Override
+		public Dependency copy() {
+			return new ExtraMappings(getName(), cache, fileFactory);
+		}
 	}
 }

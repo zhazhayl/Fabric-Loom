@@ -23,23 +23,30 @@
  */
 package net.fabricmc.loom.providers.mappings;
 
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.io.UncheckedIOException;
 import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.stream.Collectors;
+import java.util.zip.GZIPOutputStream;
 
 public class TinyWriter implements AutoCloseable {
 	private final String[] namespaces;
 	private final Writer writer;
 
 	public TinyWriter(Path file, String... namespaces) throws IOException {
+		this(file, false, namespaces);
+	}
+
+	public TinyWriter(Path file, boolean compress, String... namespaces) throws IOException {
 		Collection<String> uniqueNamespaces = new HashSet<>();
 		Collections.addAll(uniqueNamespaces, namespaces);
 		if (uniqueNamespaces.size() != namespaces.length) {
@@ -47,7 +54,7 @@ public class TinyWriter implements AutoCloseable {
 			throw new IllegalArgumentException(uniqueNamespaces.stream().filter(namespace -> Collections.frequency(namespacePool, namespace) > 1).collect(Collectors.joining(", ", "Duplicate namespaces: ", "")));
 		}
 
-		writer = Files.newBufferedWriter(file, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+		writer = !compress ? Files.newBufferedWriter(file) : new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(Files.newOutputStream(file)), StandardCharsets.UTF_8));
 		writer.write("v1");
 		for (String namespace : this.namespaces = namespaces) {
 			writer.write('\t');
