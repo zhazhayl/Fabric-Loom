@@ -519,7 +519,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 				for (String line = reader.readLine(); line != null; line = reader.readLine()) {
 					assert !line.isEmpty();
 
-					if (currentVersion == null || line.charAt(0) != '\t') {
+					if (line.charAt(0) != '\t') {
 						if (currentPosition == expected.size()) {
 							assert currentVersion != null;
 							knownStack = true;
@@ -528,10 +528,10 @@ public class MappingsProvider extends LogicalDependencyProvider {
 
 						currentVersion = line;
 						currentPosition = 0;
-					} else {
+					} else if (currentVersion != null) {
 						assert line.charAt(0) == '\t';
 
-						if (currentPosition >= expected.size() || line.regionMatches(1, expected.get(currentPosition), 0, line.length() - 1)) {
+						if (currentPosition >= expected.size() || !line.regionMatches(1, expected.get(currentPosition), 0, line.length() - 1)) {
 							currentVersion = null;
 						} else {
 							currentPosition++;
