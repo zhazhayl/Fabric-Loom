@@ -345,7 +345,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 						Mapping interMapping = inversion.get(classMapping.from);
 
 						Mapping existingClass = mappings.get(classMapping.from);
-						if (existingClass.to() == null) {
+						if (existingClass.to() == null && !classMapping.from.equals(classMapping.to())) {
 							mappings.acceptClass(classMapping.from, classMapping.to());
 						}
 						assert interMapping.from.equals(existingClass.from);
@@ -354,7 +354,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 							if (!interMapping.hasMethod(method)) continue;
 
 							Method existingMethod = existingClass.method(method);
-							if (existingMethod.name() == null) {
+							if (existingMethod.name() == null && !existingMethod.fromName.equals(method.name())) {
 								mappings.acceptMethod(classMapping.from, method.fromName, method.fromDesc, existingClass.to(), method.name(), method.desc());
 							}
 
@@ -371,7 +371,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 							if (!interMapping.hasField(field)) continue;
 
 							Field existingField = existingClass.field(field);
-							if (existingField.name() == null) {
+							if (existingField.name() == null && !existingField.fromName.equals(field.name())) {
 								mappings.acceptField(classMapping.from, field.fromName, field.fromDesc, existingClass.to(), field.name(), field.desc());
 							}
 						}
