@@ -286,8 +286,10 @@ public class YarnGithubResolver {
 			return to;
 		}
 
-		public void setClass(String from, String to) {
-			classes.put(from, to);
+		public void methodMissing(String name, Object... args) {
+			if ("class".equals(name) && args.length == 2) {
+				classes.put((String) args[0], (String) args[1]);
+			}
 		}
 
 		public Map<String, String> getClasses() {
