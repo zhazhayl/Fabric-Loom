@@ -229,8 +229,8 @@ public class YarnGithubResolver {
 		return new GithubDependency(spec, origin, destination);
 	}
 
-	public Dependency extraMappings(Action<ExtraMappings> action) {
-		ExtraMappings mappings = new ExtraMappings(projectCache.resolve("extra-mappings"), fileFactory);
+	public Dependency extraMappings(String minecraftVersion, Action<ExtraMappings> action) {
+		ExtraMappings mappings = new ExtraMappings(projectCache.resolve("extra-mappings"), minecraftVersion, fileFactory);
 		action.execute(mappings);
 		return mappings;
 	}
@@ -258,16 +258,16 @@ public class YarnGithubResolver {
 		private Map<EntryTriple, String> methods = new HashMap<>();
 		private Map<EntryTriple, String> fields = new HashMap<>();
 
-		public ExtraMappings(Path cache, Function<Path, FileCollection> fileFactory) {
-			this("instance_" + instance++, cache, fileFactory);
+		public ExtraMappings(Path cache, String minecraftVersion, Function<Path, FileCollection> fileFactory) {
+			this("instance_" + instance++, minecraftVersion, cache, fileFactory);
 		}
 
-		private ExtraMappings(String instance, Path cache, Function<Path, FileCollection> fileFactory) {
-			this(instance, cache.resolve(instance + ".gz"), fileFactory, null);
+		private ExtraMappings(String instance, String minecraftVersion, Path cache, Function<Path, FileCollection> fileFactory) {
+			this(instance, minecraftVersion, cache.resolve(instance + ".gz"), fileFactory, null);
 		}
 
-		private ExtraMappings(String instance, Path output, Function<Path, FileCollection> fileFactory, Void skip) {
-			super("net.fabricmc.synthetic.extramappings", instance, "1");
+		private ExtraMappings(String instance, String minecraftVersion, Path output, Function<Path, FileCollection> fileFactory, Void skip) {
+			super("net.fabricmc.synthetic.extramappings", instance, minecraftVersion + "-1");
 
 			this.output = output;
 			this.fileFactory = fileFactory;
@@ -423,7 +423,7 @@ public class YarnGithubResolver {
 
 		@Override
 		public Dependency copy() {
-			return new ExtraMappings(getName(), output, fileFactory, null);
+			return new ExtraMappings(getName(), getVersion().substring(0, getVersion().length() - 2), output, fileFactory, null);
 		}
 	}
 }
