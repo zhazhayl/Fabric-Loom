@@ -248,7 +248,7 @@ public class YarnGithubResolver {
 			}
 		}
 		private static volatile int instance = 1;
-		private final Path cache;
+		private final Path output;
 		private final Function<Path, FileCollection> fileFactory;
 		private String from = "intermediary", to = "named";
 		private Map<String, String> classes = new HashMap<>();
@@ -256,13 +256,17 @@ public class YarnGithubResolver {
 		private Map<EntryTriple, String> fields = new HashMap<>();
 
 		public ExtraMappings(Path cache, Function<Path, FileCollection> fileFactory) {
-			this("instance:" + instance, cache, fileFactory);
+			this("instance_" + instance++, cache, fileFactory);
 		}
 
 		private ExtraMappings(String instance, Path cache, Function<Path, FileCollection> fileFactory) {
+			this(instance, cache.resolve(instance + ".gz"), fileFactory, null);
+		}
+
+		private ExtraMappings(String instance, Path output, Function<Path, FileCollection> fileFactory, Void skip) {
 			super("net.fabricmc.synthetic.extramappings", instance, "1");
 
-			this.cache = cache;
+			this.output = output;
 			this.fileFactory = fileFactory;
 		}
 
@@ -326,8 +330,6 @@ public class YarnGithubResolver {
 
 		@Override
 		public Set<File> resolve() {
-			Path output = cache.resolve("mappings_" + getName().substring(9) + ".gz");
-
 			out: if (Files.exists(output)) {
 				try {
 					TinyReader.readTiny(output, from, to, new IMappingAcceptor() {
@@ -393,7 +395,7 @@ public class YarnGithubResolver {
 
 		@Override
 		protected FileCollection makeFiles() {
-			return fileFactory.apply(null);
+			return fileFactory.apply(output);
 		}
 
 		@Override
@@ -405,7 +407,7 @@ public class YarnGithubResolver {
 
 		@Override
 		public Dependency copy() {
-			return new ExtraMappings(getName(), cache, fileFactory);
+			return new ExtraMappings(getName(), output, fileFactory, null);
 		}
 	}
 }
