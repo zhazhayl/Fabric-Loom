@@ -348,11 +348,11 @@ public class YarnGithubResolver {
 		public Set<File> resolve() {
 			out: if (Files.exists(output)) {
 				try {
-					TinyReader.readTiny(output, from, to, new IMappingAcceptor() {
-						private final Map<String, String> classes = new HashMap<>(ExtraMappings.this.classes);
-						private final Map<EntryTriple, String> methods = new HashMap<>(ExtraMappings.this.methods);
-						private final Map<EntryTriple, String> fields = new HashMap<>(ExtraMappings.this.fields);
+					Map<String, String> classes = new HashMap<>(this.classes);
+					Map<EntryTriple, String> methods = new HashMap<>(this.methods);
+					Map<EntryTriple, String> fields = new HashMap<>(this.fields);
 
+					TinyReader.readTiny(output, from, to, new IMappingAcceptor() {
 						@Override
 						public void acceptClass(String srcName, String dstName) {
 							if (!classes.remove(srcName, dstName)) {
@@ -378,6 +378,8 @@ public class YarnGithubResolver {
 							}
 						}
 					});
+
+					if (!classes.isEmpty() || !methods.isEmpty() || !fields.isEmpty()) break out;
 				} catch (IOException e) {
 					throw new RuntimeException("Error reading extra mappings from " + output, e);
 				} catch (NotaGoto e) {
