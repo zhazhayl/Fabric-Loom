@@ -250,6 +250,7 @@ public class YarnGithubResolver {
 		private static volatile int instance = 1;
 		private final Path cache;
 		private final Function<Path, FileCollection> fileFactory;
+		private String from = "intermediary", to = "named";
 		private Map<String, String> classes = new HashMap<>();
 		private Map<EntryTriple, String> methods = new HashMap<>();
 		private Map<EntryTriple, String> fields = new HashMap<>();
@@ -263,6 +264,22 @@ public class YarnGithubResolver {
 
 			this.cache = cache;
 			this.fileFactory = fileFactory;
+		}
+
+		public void setFrom(String from) {
+			this.from = from;
+		}
+
+		public String getFrom() {
+			return from;
+		}
+
+		public void setTo(String to) {
+			this.to = to;
+		}
+
+		public String getTo() {
+			return to;
 		}
 
 		public void setClass(String from, String to) {
@@ -313,7 +330,7 @@ public class YarnGithubResolver {
 
 			out: if (Files.exists(output)) {
 				try {
-					TinyReader.readTiny(output, "intermediary", "named", new IMappingAcceptor() {
+					TinyReader.readTiny(output, from, to, new IMappingAcceptor() {
 						private final Map<String, String> classes = new HashMap<>(ExtraMappings.this.classes);
 						private final Map<EntryTriple, String> methods = new HashMap<>(ExtraMappings.this.methods);
 						private final Map<EntryTriple, String> fields = new HashMap<>(ExtraMappings.this.fields);
