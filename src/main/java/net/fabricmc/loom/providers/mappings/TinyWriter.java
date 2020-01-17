@@ -29,65 +29,81 @@ import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.stream.Collectors;
 
 public class TinyWriter implements AutoCloseable {
+	private final String[] namespaces;
 	private final Writer writer;
 
-	public TinyWriter(Path file) throws IOException {
+	public TinyWriter(Path file, String... namespaces) throws IOException {
+		Collection<String> uniqueNamespaces = new HashSet<>();
+		Collections.addAll(uniqueNamespaces, namespaces);
+		if (uniqueNamespaces.size() != namespaces.length) {
+			Collection<String> namespacePool = Arrays.asList(namespaces);
+			throw new IllegalArgumentException(uniqueNamespaces.stream().filter(namespace -> Collections.frequency(namespacePool, namespace) > 1).collect(Collectors.joining(", ", "Duplicate namespaces: ", "")));
+		}
+
 		writer = Files.newBufferedWriter(file, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
-		writer.write("v1\t");
-		writer.write("official");
-		writer.write('\t');
-		writer.write("named");
-		writer.write('\t');
-		writer.write("intermediary");
+		writer.write("v1");
+		for (String namespace : this.namespaces = namespaces) {
+			writer.write('\t');
+			writer.write(namespace);
+		}
 		writer.write('\n');
 	}
 
-	public void acceptClass(String notchName, String namedName, String interName) {
+	private void ensureComplete(String... names) {
+		if (names.length < namespaces.length) {
+			throw new IllegalArgumentException("Missing names for namespaces " + Arrays.asList(namespaces).subList(names.length, namespaces.length));
+		}
+	}
+
+	public void acceptClass(String... names) {
+		ensureComplete(names);
 		try {
-			writer.write("CLASS\t");
-			writer.write(notchName);
-			writer.write('\t');
-			writer.write(namedName);
-			writer.write('\t');
-			writer.write(interName);
+			writer.write("CLASS");
+			for (String name : names) {
+				writer.write('\t');
+				if (name != null) writer.write(name);
+			}
 			writer.write('\n');
 		} catch (IOException e) {
 			throw new UncheckedIOException("Error writing tiny class", e);
 		}
 	}
 
-	public void acceptMethod(String notchClass, String notchName, String desc, String namedName, String interName) {
+	public void acceptMethod(String notchClass, String desc, String... names) {
+		ensureComplete(names);
 		try {
 			writer.write("METHOD\t");
 			writer.write(notchClass);
 			writer.write('\t');
 			writer.write(desc);
-			writer.write('\t');
-			writer.write(notchName);
-			writer.write('\t');
-			writer.write(namedName);
-			writer.write('\t');
-			writer.write(interName);
+			for (String name : names) {
+				writer.write('\t');
+				if (name != null) writer.write(name);
+			}
 			writer.write('\n');
 		} catch (IOException e) {
 			throw new UncheckedIOException("Error writing tiny method", e);
 		}
 	}
 
-	public void acceptField(String notchClass, String notchName, String desc, String namedName, String interName) {
+	public void acceptField(String notchClass, String desc, String... names) {
+		ensureComplete(names);
 		try {
 			writer.write("FIELD\t");
 			writer.write(notchClass);
 			writer.write('\t');
 			writer.write(desc);
-			writer.write('\t');
-			writer.write(notchName);
-			writer.write('\t');
-			writer.write(namedName);
-			writer.write('\t');
-			writer.write(interName);
+			for (String name : names) {
+				writer.write('\t');
+				if (name != null) writer.write(name);
+			}
 			writer.write('\n');
 		} catch (IOException e) {
 			throw new UncheckedIOException("Error writing tiny field", e);

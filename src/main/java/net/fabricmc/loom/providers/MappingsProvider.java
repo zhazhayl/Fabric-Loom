@@ -382,17 +382,17 @@ public class MappingsProvider extends LogicalDependencyProvider {
 				MappingSplat combined = new MappingSplat(mappings.rename(inversion), intermediaries);
 
 				project.getLogger().lifecycle(":writing " + MAPPINGS_TINY_BASE.getName());
-				try (TinyWriter writer = new TinyWriter(MAPPINGS_TINY_BASE.toPath())) {
+				try (TinyWriter writer = new TinyWriter(MAPPINGS_TINY_BASE.toPath(), "official", "named", "intermediary")) {
 					for (CombinedMapping mapping : combined) {
 						String notch = mapping.from;
 						writer.acceptClass(notch, mapping.to, mapping.fallback);
 
 						for (CombinedMethod method : mapping.methods()) {
-							writer.acceptMethod(notch, method.from, method.fromDesc, method.to, method.fallback);
+							writer.acceptMethod(notch, method.fromDesc, method.from, method.to, method.fallback);
 						}
 
 						for (CombinedField field : mapping.fields()) {
-							writer.acceptField(notch, field.from, field.fromDesc, field.to, field.fallback);
+							writer.acceptField(notch, field.fromDesc, field.from, field.to, field.fallback);
 						}
 					}
 				}
