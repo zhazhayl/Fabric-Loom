@@ -29,6 +29,9 @@ import org.gradle.api.file.FileCollection;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.tasks.TaskDependency;
 
+import groovy.lang.Closure;
+import groovy.lang.ExpandoMetaClass;
+
 import net.fabricmc.loom.dependencies.ComputedDependency;
 import net.fabricmc.loom.providers.mappings.IMappingAcceptor;
 import net.fabricmc.loom.providers.mappings.TinyReader;
@@ -268,6 +271,23 @@ public class YarnGithubResolver {
 
 			this.output = output;
 			this.fileFactory = fileFactory;
+
+			ExpandoMetaClass meta = new ExpandoMetaClass(ExtraMappings.class, true, false);
+			meta.registerInstanceMethod("class", new Closure<ExtraMappings>(this) {
+				private static final long serialVersionUID = -1776692419905298264L;
+
+				@Override
+				public ExtraMappings call(Object... args) {
+					classes.put((String) args[0], (String) args[1]);
+					return null;
+				}
+
+				@Override
+				public Class<?>[] getParameterTypes() {
+					return new Class[] {String.class, String.class};
+				}
+			});
+			meta.initialize();
 		}
 
 		public void setFrom(String from) {
@@ -286,12 +306,6 @@ public class YarnGithubResolver {
 			return to;
 		}
 
-		public void methodMissing(String name, Object... args) {
-			if ("class".equals(name) && args.length == 2) {
-				classes.put((String) args[0], (String) args[1]);
-			}
-		}
-
 		public Map<String, String> getClasses() {
 			return classes;
 		}
@@ -302,7 +316,7 @@ public class YarnGithubResolver {
 			classes.putAll(mappings);
 		}
 
-		public void setMethod(EntryTriple from, String to) {
+		public void method(EntryTriple from, String to) {
 			methods.put(from, to);
 		}
 
@@ -316,7 +330,7 @@ public class YarnGithubResolver {
 			methods.putAll(mappings);
 		}
 
-		public void setField(EntryTriple from, String to) {
+		public void field(EntryTriple from, String to) {
 			fields.put(from, to);
 		}
 
