@@ -316,6 +316,10 @@ public class YarnGithubResolver {
 			classes.putAll(mappings);
 		}
 
+		public void method(String owner, String desc, String from, String to) {
+			method(new EntryTriple(owner, from, desc), to);
+		}
+
 		public void method(EntryTriple from, String to) {
 			methods.put(from, to);
 		}
@@ -328,6 +332,10 @@ public class YarnGithubResolver {
 			if (mappings == null) throw new NullPointerException("Null method mappings");
 			methods.clear();
 			methods.putAll(mappings);
+		}
+
+		public void field(String owner, String desc, String from, String to) {
+			field(new EntryTriple(owner, from, desc), to);
 		}
 
 		public void field(EntryTriple from, String to) {
