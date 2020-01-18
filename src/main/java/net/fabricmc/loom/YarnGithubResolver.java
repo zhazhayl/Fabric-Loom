@@ -15,6 +15,7 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -28,6 +29,9 @@ import org.gradle.api.artifacts.Dependency;
 import org.gradle.api.file.FileCollection;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.tasks.TaskDependency;
+
+import com.google.common.hash.Hasher;
+import com.google.common.hash.Hashing;
 
 import groovy.lang.Closure;
 import groovy.lang.ExpandoMetaClass;
@@ -229,55 +233,28 @@ public class YarnGithubResolver {
 		return new GithubDependency(spec, origin, destination);
 	}
 
-	public Dependency extraMappings(String minecraftVersion, Action<ExtraMappings> action) {
-		ExtraMappings mappings = new ExtraMappings(projectCache.resolve("extra-mappings"), minecraftVersion, fileFactory);
+	public Dependency extraMappings(String minecraftVersion, Action<MappingContainer> action) {
+		MappingContainer mappings = new MappingContainer(minecraftVersion);
 		action.execute(mappings);
-		return mappings;
+		return ExtraMappings.create(projectCache.resolve("extra-mappings"), mappings, fileFactory);
 	}
 
-	public static class ExtraMappings extends ComputedDependency {
-		private static class NotaGoto extends RuntimeException {
-			private static final long serialVersionUID = -1268411969286315592L;
-			static final NotaGoto INSTANCE = new NotaGoto();
-
-			private NotaGoto() {//Nothing to do with exception based flow control
-				setStackTrace(new StackTraceElement[0]);
-			}
-
-			@Override
-			public synchronized Throwable fillInStackTrace() {
-				setStackTrace(new StackTraceElement[0]);
-				return this;
-			}
-		}
-		private static volatile int instance = 1;
-		private final Path output;
-		private final Function<Path, FileCollection> fileFactory;
+	public static class MappingContainer {
+		public final String minecraftVersion;
 		private String from = "intermediary", to = "named";
 		private Map<String, String> classes = new HashMap<>();
 		private Map<EntryTriple, String> methods = new HashMap<>();
 		private Map<EntryTriple, String> fields = new HashMap<>();
 
-		public ExtraMappings(Path cache, String minecraftVersion, Function<Path, FileCollection> fileFactory) {
-			this("instance_" + instance++, minecraftVersion, cache, fileFactory);
-		}
+		public MappingContainer(String minecraftVersion) {
+			this.minecraftVersion = minecraftVersion;
 
-		private ExtraMappings(String instance, String minecraftVersion, Path cache, Function<Path, FileCollection> fileFactory) {
-			this(instance, minecraftVersion, cache.resolve(instance + ".gz"), fileFactory, null);
-		}
-
-		private ExtraMappings(String instance, String minecraftVersion, Path output, Function<Path, FileCollection> fileFactory, Void skip) {
-			super("net.fabricmc.synthetic.extramappings", instance, minecraftVersion + "-1");
-
-			this.output = output;
-			this.fileFactory = fileFactory;
-
-			ExpandoMetaClass meta = new ExpandoMetaClass(ExtraMappings.class, true, false);
-			meta.registerInstanceMethod("class", new Closure<ExtraMappings>(this) {
+			ExpandoMetaClass meta = new ExpandoMetaClass(MappingContainer.class, true, false);
+			meta.registerInstanceMethod("class", new Closure<MappingContainer>(this) {
 				private static final long serialVersionUID = -1776692419905298264L;
 
 				@Override
-				public ExtraMappings call(Object... args) {
+				public MappingContainer call(Object... args) {
 					classes.put((String) args[0], (String) args[1]);
 					return null;
 				}
@@ -351,16 +328,58 @@ public class YarnGithubResolver {
 			fields.clear();
 			fields.putAll(mappings);
 		}
+	}
+
+	public static class ExtraMappings extends ComputedDependency {
+		private static class NotaGoto extends RuntimeException {
+			private static final long serialVersionUID = -1268411969286315592L;
+			static final NotaGoto INSTANCE = new NotaGoto();
+
+			private NotaGoto() {//Nothing to do with exception based flow control
+				setStackTrace(new StackTraceElement[0]);
+			}
+
+			@Override
+			public synchronized Throwable fillInStackTrace() {
+				setStackTrace(new StackTraceElement[0]);
+				return this;
+			}
+		}
+		private static volatile int instance = 1;
+		private final Path output;
+		private final MappingContainer mappings;
+		private final Function<Path, FileCollection> fileFactory;
+
+		public static ExtraMappings create(Path cache, MappingContainer mappings, Function<Path, FileCollection> fileFactory) {
+			Hasher hasher = Hashing.murmur3_128().newHasher(); //Not totally free from collisions, but fast enough that the potential is not especially a problem
+
+			mappings.getClasses().entrySet().stream().map(entry -> entry.getKey() + " -> " + entry.getValue()).sorted().forEach(hasher::putUnencodedChars);
+			Comparator<Entry<EntryTriple, String>> memberComparator = Comparator.comparing(Entry::getKey, Comparator.comparing(EntryTriple::getOwner).thenComparing(EntryTriple::getName).thenComparing(EntryTriple::getDesc));
+			mappings.getMethods().entrySet().stream().sorted(memberComparator)
+					.map(entry -> entry.getKey().getOwner() + '/' + entry.getKey().getName() + entry.getKey().getDesc() + " -> " + entry.getValue()).forEach(hasher::putUnencodedChars);
+			mappings.getFields().entrySet().stream().sorted(memberComparator)
+					.map(entry -> entry.getKey().getOwner() + '#' + entry.getKey().getName() + " (" + entry.getKey().getDesc() + ") -> " + entry.getValue()).forEach(hasher::putUnencodedChars);
+
+			return new ExtraMappings(hasher.hash().toString(), mappings, cache.resolve("instance_" + instance++ + ".gz"), fileFactory);
+		}
+
+		private ExtraMappings(String name, MappingContainer mappings, Path output, Function<Path, FileCollection> fileFactory) {
+			super("net.fabricmc.synthetic.extramappings", name, mappings.minecraftVersion.concat("-1"));
+
+			this.output = output;
+			this.mappings = mappings;
+			this.fileFactory = fileFactory;
+		}
 
 		@Override
 		public Set<File> resolve() {
 			out: if (Files.exists(output)) {
 				try {
-					Map<String, String> classes = new HashMap<>(this.classes);
-					Map<EntryTriple, String> methods = new HashMap<>(this.methods);
-					Map<EntryTriple, String> fields = new HashMap<>(this.fields);
+					Map<String, String> classes = new HashMap<>(mappings.getClasses());
+					Map<EntryTriple, String> methods = new HashMap<>(mappings.getMethods());
+					Map<EntryTriple, String> fields = new HashMap<>(mappings.getFields());
 
-					TinyReader.readTiny(output, from, to, new IMappingAcceptor() {
+					TinyReader.readTiny(output, mappings.getFrom(), mappings.getTo(), new IMappingAcceptor() {
 						@Override
 						public void acceptClass(String srcName, String dstName) {
 							if (!classes.remove(srcName, dstName)) {
@@ -377,6 +396,7 @@ public class YarnGithubResolver {
 
 						@Override
 						public void acceptMethodArg(String srcClsName, String srcMethodName, String srcMethodDesc, int lvIndex, String dstArgName) {
+							assert false; //Shouldn't be getting any of these
 						}
 
 						@Override
@@ -398,17 +418,17 @@ public class YarnGithubResolver {
 			}
 
 			createDirectory(output.getParent());
-			try (TinyWriter writer = new TinyWriter(output, true, "intermediary", "named")) {
-				for (Entry<String, String> entry : classes.entrySet()) {
+			try (TinyWriter writer = new TinyWriter(output, true, mappings.getFrom(), mappings.getTo())) {
+				for (Entry<String, String> entry : mappings.getClasses().entrySet()) {
 					writer.acceptClass(entry.getKey(), entry.getValue());
 				}
 
-				for (Entry<EntryTriple, String> entry : methods.entrySet()) {
+				for (Entry<EntryTriple, String> entry : mappings.getMethods().entrySet()) {
 					EntryTriple method = entry.getKey();
 					writer.acceptMethod(method.getOwner(), method.getDesc(), method.getName(), entry.getValue());
 				}
 
-				for (Entry<EntryTriple, String> entry : fields.entrySet()) {
+				for (Entry<EntryTriple, String> entry : mappings.getFields().entrySet()) {
 					EntryTriple field = entry.getKey();
 					writer.acceptField(field.getOwner(), field.getDesc(), field.getName(), entry.getValue());
 				}
@@ -433,7 +453,7 @@ public class YarnGithubResolver {
 
 		@Override
 		public Dependency copy() {
-			return new ExtraMappings(getName(), getVersion().substring(0, getVersion().length() - 2), output, fileFactory, null);
+			return new ExtraMappings(getName(), mappings, output, fileFactory);
 		}
 	}
 }
