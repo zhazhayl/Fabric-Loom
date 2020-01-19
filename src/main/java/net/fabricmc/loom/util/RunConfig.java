@@ -28,7 +28,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
 
@@ -36,7 +36,6 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.TransformerException;
 
 import com.google.common.base.Strings;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -51,7 +50,6 @@ import org.w3c.dom.Node;
 import org.gradle.api.Project;
 
 import net.fabricmc.loom.LoomGradleExtension;
-import net.fabricmc.loom.providers.MinecraftProvider;
 
 public class RunConfig {
 	public String configName;
@@ -100,60 +98,57 @@ public class RunConfig {
 	private static void populate(Project project, LoomGradleExtension extension, RunConfig runConfig, String mode) {
 		runConfig.projectName = project.getName();
 		runConfig.runDir = "file://$PROJECT_DIR$/" + extension.runDir;
-		runConfig.vmArgs = "-Dfabric.development=true";
 
 		switch (extension.getLoaderLaunchMethod()) {
-		case "launchwrapper":
+		case "launchwrapper": {
 			runConfig.mainClass = "net.minecraft.launchwrapper.Launch";
-			runConfig.programArgs = "--tweakClass " + ("client".equals(mode) ? Constants.DEFAULT_FABRIC_CLIENT_TWEAKER : Constants.DEFAULT_FABRIC_SERVER_TWEAKER);
+			StringBuilder programArgs = new StringBuilder("--tweakClass ").append("client".equals(mode) ? Constants.DEFAULT_FABRIC_CLIENT_TWEAKER : Constants.DEFAULT_FABRIC_SERVER_TWEAKER);
+
+			// if installer.json found...
+			JsonObject installerJson = extension.getInstallerJson();
+			if (installerJson != null && installerJson.has("launchwrapper")) {// copy launchwrapper tweakers
+				JsonObject launchwrapperJson = installerJson.getAsJsonObject("launchwrapper");
+
+				if (launchwrapperJson.has("tweakers")) {
+					JsonObject tweakersJson = launchwrapperJson.getAsJsonObject("tweakers");
+
+					for (String s : Arrays.asList(mode, "common")) {
+						if (tweakersJson.has(s)) {
+							for (JsonElement element : tweakersJson.getAsJsonArray(s)) {
+								programArgs.append(" --tweakClass ").append(element.getAsString());
+							}
+						}
+					}
+				}
+			}
+
+			programArgs.append(" --assetIndex \"").append(extension.getMinecraftProvider().versionInfo.assetIndex.getFabricId(extension.getMinecraftProvider().minecraftVersion)).append('"');
+			programArgs.append(" --assetsDir \"").append(new File(extension.getUserCache(), "assets").getAbsolutePath()).append('"');
+			runConfig.programArgs = programArgs.toString();
+			runConfig.vmArgs = "-Dfabric.development=true";
+			break;
+		}
+		case "knot":
+			runConfig.mainClass = getMainClass(mode, extension);
+			runConfig.programArgs = "--assetIndex \"" + extension.getMinecraftProvider().versionInfo.assetIndex.getFabricId(extension.getMinecraftProvider().minecraftVersion) + '"'
+								+ " --assetsDir \"" + new File(extension.getUserCache(), "assets").getAbsolutePath() + '"';
+			runConfig.vmArgs = "-Dfabric.development=true";
 			break;
 		default:
 			runConfig.mainClass = "net.fabricmc.devlaunchinjector.Main";
 			runConfig.programArgs = "";
-			runConfig.vmArgs = "-Dfabric.dli.config=" + quoteIfNeeded(extension.getDevLauncherConfig().getAbsolutePath()) + " -Dfabric.dli.env=" + mode.toLowerCase();
+			runConfig.vmArgs = "-Dfabric.dli.config=" + quoteIfNeeded(extension.getDevLauncherConfig().getAbsolutePath()) + " -Dfabric.dli.env=" + mode.toLowerCase() + " -Dfabric.dli.main=" + getMainClass(mode, extension);
 			break;
-		}
-
-		if (extension.getLoaderLaunchMethod().equals("launchwrapper")) {
-			// if installer.json found...
-			JsonObject installerJson = extension.getInstallerJson();
-
-			if (installerJson != null) {
-				List<String> sideKeys = ImmutableList.of(mode, "common");
-
-				// copy launchwrapper tweakers
-				if (installerJson.has("launchwrapper")) {
-					JsonObject launchwrapperJson = installerJson.getAsJsonObject("launchwrapper");
-
-					if (launchwrapperJson.has("tweakers")) {
-						JsonObject tweakersJson = launchwrapperJson.getAsJsonObject("tweakers");
-						StringBuilder builder = new StringBuilder();
-
-						for (String s : sideKeys) {
-							if (tweakersJson.has(s)) {
-								for (JsonElement element : tweakersJson.getAsJsonArray(s)) {
-									builder.append(" --tweakClass ").append(element.getAsString());
-								}
-							}
-						}
-
-						runConfig.programArgs += builder.toString();
-					}
-				}
-			}
 		}
 	}
 
 	public static RunConfig clientRunConfig(Project project) {
 		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
-		MinecraftProvider minecraftProvider = extension.getMinecraftProvider();
-		MinecraftVersionInfo minecraftVersionInfo = minecraftProvider.versionInfo;
 
 		RunConfig ideaClient = new RunConfig();
 		populate(project, extension, ideaClient, "client");
 		ideaClient.configName = "Minecraft Client";
 		ideaClient.vmArgs += getOSClientJVMArgs();
-		ideaClient.vmArgs += " -Dfabric.dli.main=" + getMainClass("client", extension);
 
 		return ideaClient;
 	}
@@ -164,7 +159,6 @@ public class RunConfig {
 		RunConfig ideaServer = new RunConfig();
 		populate(project, extension, ideaServer, "server");
 		ideaServer.configName = "Minecraft Server";
-		ideaServer.vmArgs += " -Dfabric.dli.main=" + getMainClass("server", extension);
 
 		return ideaServer;
 	}
