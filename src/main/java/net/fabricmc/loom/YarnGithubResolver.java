@@ -360,7 +360,7 @@ public class YarnGithubResolver {
 			mappings.getFields().entrySet().stream().sorted(memberComparator)
 					.map(entry -> entry.getKey().getOwner() + '#' + entry.getKey().getName() + " (" + entry.getKey().getDesc() + ") -> " + entry.getValue()).forEach(hasher::putUnencodedChars);
 
-			return new ExtraMappings(hasher.hash().toString(), mappings, cache.resolve("instance_" + instance++ + ".gz"), fileFactory);
+			return new ExtraMappings(hasher.hash().toString(), mappings, cache.resolve("anonymousExtra_" + instance++ + ".gz"), fileFactory);
 		}
 
 		private ExtraMappings(String name, MappingContainer mappings, Path output, Function<Path, FileCollection> fileFactory) {
