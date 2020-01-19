@@ -37,6 +37,7 @@ import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.dependencies.DependencyProvider;
 import net.fabricmc.loom.dependencies.LogicalDependencyProvider;
 import net.fabricmc.loom.util.Constants;
+import net.fabricmc.loom.util.GradleSupport;
 import net.fabricmc.loom.util.MinecraftVersionInfo;
 
 public class MinecraftLibraryProvider extends LogicalDependencyProvider {
@@ -55,9 +56,10 @@ public class MinecraftLibraryProvider extends LogicalDependencyProvider {
 		MinecraftVersionInfo versionInfo = minecraftProvider.versionInfo;
 
 		initFiles(extension, minecraftProvider);
+		boolean useNatives = !GradleSupport.extractNatives(project);
 
 		for (MinecraftVersionInfo.Library library : versionInfo.libraries) {
-			if (library.allowed() && !library.isNative() && library.getFile(MINECRAFT_LIBS) != null) {
+			if (library.allowed() && (useNatives || !library.isNative()) && library.getFile(MINECRAFT_LIBS) != null) {
 				// TODO: Add custom library locations
 
 				// By default, they are all available on all sides

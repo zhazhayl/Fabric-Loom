@@ -43,6 +43,7 @@ import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.dependencies.DependencyProvider;
 import net.fabricmc.loom.dependencies.LogicalDependencyProvider;
 import net.fabricmc.loom.util.Constants;
+import net.fabricmc.loom.util.GradleSupport;
 
 public class LaunchProvider extends LogicalDependencyProvider {
 	@Override
@@ -55,13 +56,15 @@ public class LaunchProvider extends LogicalDependencyProvider {
 		final LaunchConfig launchConfig = new LaunchConfig()
 				.property("fabric.development", "true")
 
-				.property("client", "java.library.path", extension.getNativesDirectory().getAbsolutePath())
-				.property("client", "org.lwjgl.librarypath", extension.getNativesDirectory().getAbsolutePath())
-
 				.argument("client", "--assetIndex")
 				.argument("client", extension.getMinecraftProvider().versionInfo.assetIndex.getFabricId(extension.getMinecraftProvider().minecraftVersion))
 				.argument("client", "--assetsDir")
 				.argument("client", new File(extension.getUserCache(), "assets").getAbsolutePath());
+
+		if (GradleSupport.extractNatives(project)) {
+			launchConfig.property("client", "java.library.path", extension.getNativesDirectory().getAbsolutePath())
+						.property("client", "org.lwjgl.librarypath", extension.getNativesDirectory().getAbsolutePath());
+		}
 
 		FileUtils.writeStringToFile(extension.getDevLauncherConfig(), launchConfig.asString(), StandardCharsets.UTF_8);
 

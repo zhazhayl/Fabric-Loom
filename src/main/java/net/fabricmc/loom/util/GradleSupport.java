@@ -41,7 +41,41 @@ public class GradleSupport {
 		return Integer.parseUnsignedInt(version.substring(0, split));
 	}
 
-	public static RegularFileProperty getFileProperty(Project project){
+	public static int minorGradleVersion(Project project) {
+		String version = project.getGradle().getGradleVersion();
+
+		int split = version.indexOf('.') + 1;
+		assert split > 1: "Weird Gradle version: " + version;
+
+		int splitSquared = version.indexOf('.', split);
+		if (splitSquared <= split) splitSquared = version.indexOf('-', split);
+		assert splitSquared > split: "Weird Gradle version: " + version;
+
+		return Integer.parseUnsignedInt(version.substring(split, splitSquared));
+	}
+
+	public static int patchGradleVersion(Project project) {
+		String version = project.getGradle().getGradleVersion();
+
+		int split = version.indexOf('.') + 1;
+		assert split > 1: "Weird Gradle version: " + version;
+
+		int splitSquared = version.indexOf('.', split);
+		if (splitSquared <= split) return 0;
+
+		int splitCubed= version.indexOf('.', ++splitSquared);
+		if (splitCubed <= splitSquared) splitCubed = version.indexOf('-', splitSquared);
+		if (splitCubed <= splitSquared) return 0; //Nothing says Gradle must have a patch version
+
+		return Integer.parseUnsignedInt(version.substring(splitSquared, splitCubed));
+	}
+
+	public static boolean extractNatives(Project project) {
+		int major = majorGradleVersion(project);
+		return major > 5 || major == 5 && minorGradleVersion(project) >= 6 && patchGradleVersion(project) >= 3;
+	}
+
+	public static RegularFileProperty getFileProperty(Project project) {
 		try {
 			return project.getObjects().fileProperty();
 		} catch (NoSuchMethodError e) {
