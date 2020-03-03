@@ -149,6 +149,7 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 				if (StaticPathWatcher.INSTANCE.hasFileChanged(manifests.toPath())) {
 					project.getLogger().debug("Downloading version manifests");
 					DownloadUtil.downloadIfChanged(new URL("https://launchermeta.mojang.com/mc/game/version_manifest.json"), manifests, project.getLogger());
+					StaticPathWatcher.INSTANCE.resetFile(manifests.toPath());
 				}
 
 				try (Reader versionManifest = Files.newReader(manifests, StandardCharsets.UTF_8)) {
@@ -199,6 +200,7 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 				if (StaticPathWatcher.INSTANCE.hasFileChanged(MINECRAFT_JSON.toPath())) {
 					project.getLogger().debug("Downloading Minecraft {} manifest", minecraftVersion);
 					DownloadUtil.downloadIfChanged(new URL(versionURL.get()), MINECRAFT_JSON, project.getLogger());
+					StaticPathWatcher.INSTANCE.resetFile(MINECRAFT_JSON.toPath());
 				}
 			} else {
 				throw new RuntimeException("Failed to find minecraft version: " + minecraftVersion);
@@ -210,11 +212,13 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 		if (!MINECRAFT_CLIENT_JAR.exists() || !Checksum.equals(MINECRAFT_CLIENT_JAR, versionInfo.downloads.get("client").sha1) && StaticPathWatcher.INSTANCE.hasFileChanged(MINECRAFT_CLIENT_JAR.toPath())) {
 			logger.debug("Downloading Minecraft {} client jar", minecraftVersion);
 			DownloadUtil.downloadIfChanged(new URL(versionInfo.downloads.get("client").url), MINECRAFT_CLIENT_JAR, logger);
+			StaticPathWatcher.INSTANCE.resetFile(MINECRAFT_CLIENT_JAR.toPath());
 		}
 
 		if (!MINECRAFT_SERVER_JAR.exists() || !Checksum.equals(MINECRAFT_SERVER_JAR, versionInfo.downloads.get("server").sha1) && StaticPathWatcher.INSTANCE.hasFileChanged(MINECRAFT_SERVER_JAR.toPath())) {
 			logger.debug("Downloading Minecraft {} server jar", minecraftVersion);
 			DownloadUtil.downloadIfChanged(new URL(versionInfo.downloads.get("server").url), MINECRAFT_SERVER_JAR, logger);
+			StaticPathWatcher.INSTANCE.resetFile(MINECRAFT_SERVER_JAR.toPath());
 		}
 	}
 
