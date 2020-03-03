@@ -146,11 +146,8 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 			} else {
 				File manifests = new File(extension.getUserCache(), "version_manifest.json");
 
-				if (StaticPathWatcher.INSTANCE.hasFileChanged(manifests.toPath())) {
-					project.getLogger().debug("Downloading version manifests");
-					DownloadUtil.downloadIfChanged(new URL("https://launchermeta.mojang.com/mc/game/version_manifest.json"), manifests, project.getLogger());
-					StaticPathWatcher.INSTANCE.resetFile(manifests.toPath());
-				}
+				project.getLogger().debug("Downloading version manifests");
+				DownloadUtil.downloadIfChanged(new URL("https://launchermeta.mojang.com/mc/game/version_manifest.json"), manifests, project.getLogger());
 
 				try (Reader versionManifest = Files.newReader(manifests, StandardCharsets.UTF_8)) {
 					ManifestVersion mcManifest = gson.fromJson(versionManifest, ManifestVersion.class);
