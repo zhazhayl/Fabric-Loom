@@ -27,6 +27,7 @@ package net.fabricmc.loom.providers;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.Reader;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
@@ -35,8 +36,9 @@ import java.util.zip.ZipError;
 
 import com.google.common.io.Files;
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+
 import org.gradle.api.GradleException;
+import org.gradle.api.InvalidUserDataException;
 import org.gradle.api.Project;
 import org.gradle.api.logging.Logger;
 
@@ -125,58 +127,82 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 	}
 
 	private void downloadMcJson(Project project, boolean offline) throws IOException {
-		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
-		File manifests = new File(extension.getUserCache(), "version_manifest.json");
-
 		if (offline) {
-			if (manifests.exists()) {
-				//If there is the manifests already we'll presume that's good enough
-				project.getLogger().debug("Found version manifests, presuming up-to-date");
+			if (MINECRAFT_JSON.exists()) {
+				//If there is the manifest already we'll presume that's good enough
+				project.getLogger().debug("Found Minecraft {} manifest, presuming up-to-date", minecraftVersion);
 			} else {
 				//If we don't have the manifests then there's nothing more we can do
-				throw new GradleException("Version manifests not found at " + manifests.getAbsolutePath());
+				throw new GradleException("Minecraft " + minecraftVersion + " manifest not found at " + MINECRAFT_JSON.getAbsolutePath());
 			}
 		} else {
-			if (StaticPathWatcher.INSTANCE.hasFileChanged(manifests.toPath())) {
-				project.getLogger().debug("Downloading version manifests");
-				DownloadUtil.downloadIfChanged(new URL("https://launchermeta.mojang.com/mc/game/version_manifest.json"), manifests, project.getLogger());
-			}
-		}
+			LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
 
-		String versionManifest = Files.asCharSource(manifests, StandardCharsets.UTF_8).read();
-		ManifestVersion mcManifest = new GsonBuilder().create().fromJson(versionManifest, ManifestVersion.class);
+			Optional<String> versionURL;
+			if (extension.customManifest != null) {
+				project.getLogger().lifecycle("Using custom minecraft manifest");
 
-		Optional<ManifestVersion.Versions> optionalVersion = Optional.empty();
-
-		if (extension.customManifest != null) {
-			ManifestVersion.Versions customVersion = new ManifestVersion.Versions();
-			customVersion.id = minecraftVersion;
-			customVersion.url = extension.customManifest;
-			optionalVersion = Optional.of(customVersion);
-			project.getLogger().lifecycle("Using custom minecraft manifest");
-		}
-
-		if (!optionalVersion.isPresent()) {
-			optionalVersion = mcManifest.versions.stream().filter(versions -> versions.id.equalsIgnoreCase(minecraftVersion)).findFirst();
-		}
-
-		if (optionalVersion.isPresent()) {
-			if (offline) {
-				if (MINECRAFT_JSON.exists()) {
-					//If there is the manifest already we'll presume that's good enough
-					project.getLogger().debug("Found Minecraft {} manifest, presuming up-to-date", minecraftVersion);
-				} else {
-					//If we don't have the manifests then there's nothing more we can do
-					throw new GradleException("Minecraft " + minecraftVersion + " manifest not found at " + MINECRAFT_JSON.getAbsolutePath());
-				}
+				versionURL = Optional.of(extension.customManifest);
 			} else {
+				File manifests = new File(extension.getUserCache(), "version_manifest.json");
+
+				if (StaticPathWatcher.INSTANCE.hasFileChanged(manifests.toPath())) {
+					project.getLogger().debug("Downloading version manifests");
+					DownloadUtil.downloadIfChanged(new URL("https://launchermeta.mojang.com/mc/game/version_manifest.json"), manifests, project.getLogger());
+				}
+
+				try (Reader versionManifest = Files.newReader(manifests, StandardCharsets.UTF_8)) {
+					ManifestVersion mcManifest = gson.fromJson(versionManifest, ManifestVersion.class);
+					versionURL = mcManifest.versions.stream().filter(versions -> versions.id.equalsIgnoreCase(minecraftVersion)).findFirst().map(version -> version.url);
+				}
+
+				out: if (!versionURL.isPresent()) {
+					String url;
+					switch (minecraftVersion) {
+					case "1.14.3 - Combat Test":
+					case "1.14_combat-212796": //Combat Test 1
+						//Extracted from https://launcher.mojang.com/experiments/combat/610f5c9874ba8926d5ae1bcce647e5f0e6e7c889/1_14_combat-212796.zip
+						url = "https://gist.github.com/Chocohead/b62b1e94d8d4b32ef3326df63cf407f2/raw/bdc1f968b3529ebca9b197a5b2612f57b6354624/1.14_combat-212796.json";
+
+						//No Intermediaries as https://github.com/FabricMC/intermediary/pull/7 was never fully merged
+						throw new InvalidUserDataException("No Intermediaries for first combat snapshot!");
+
+					case "1.14_combat-0": //Combat Test 2
+						//Extracted from https://launcher.mojang.com/experiments/combat/d164bb6ecc5fca9ac02878c85f11befae61ac1ca/1_14_combat-0.zip
+						url = "https://gist.github.com/Chocohead/b62b1e94d8d4b32ef3326df63cf407f2/raw/bdc1f968b3529ebca9b197a5b2612f57b6354624/1.14_combat-0.json";
+						break;
+
+					case "1.14_combat-3": //Combat Test 3
+						//Extracted from https://launcher.mojang.com/experiments/combat/0f209c9c84b81c7d4c88b4632155b9ae550beb89/1_14_combat-3.zip
+						url = "https://gist.github.com/Chocohead/b62b1e94d8d4b32ef3326df63cf407f2/raw/bdc1f968b3529ebca9b197a5b2612f57b6354624/1.14_combat-3.json";
+						break;
+
+					case "1.15_combat-1": //Combat Test 4
+						//Extracted from https://launcher.mojang.com/experiments/combat/ac11ea96f3bb2fa2b9b76ab1d20cacb1b1f7ef60/1_15_combat-1.zip
+						url = "https://gist.github.com/Chocohead/b62b1e94d8d4b32ef3326df63cf407f2/raw/bdc1f968b3529ebca9b197a5b2612f57b6354624/1.15_combat-1.json";
+						break;
+
+					case "1_15_combat-6": //Combat Test 5
+						//Extracted from https://launcher.mojang.com/experiments/combat/52263d42a626b40c947e523128f7a195ec5af76a/1_15_combat-6.zip
+						url = "https://gist.github.com/Chocohead/b62b1e94d8d4b32ef3326df63cf407f2/raw/bdc1f968b3529ebca9b197a5b2612f57b6354624/1.15_combat-6.json";
+						break;
+
+					default:
+						break out;
+					}
+
+					versionURL = Optional.of(url);
+				}
+			}
+
+			if (versionURL.isPresent()) {
 				if (StaticPathWatcher.INSTANCE.hasFileChanged(MINECRAFT_JSON.toPath())) {
 					project.getLogger().debug("Downloading Minecraft {} manifest", minecraftVersion);
-					DownloadUtil.downloadIfChanged(new URL(optionalVersion.get().url), MINECRAFT_JSON, project.getLogger());
+					DownloadUtil.downloadIfChanged(new URL(versionURL.get()), MINECRAFT_JSON, project.getLogger());
 				}
+			} else {
+				throw new RuntimeException("Failed to find minecraft version: " + minecraftVersion);
 			}
-		} else {
-			throw new RuntimeException("Failed to find minecraft version: " + minecraftVersion);
 		}
 	}
 
