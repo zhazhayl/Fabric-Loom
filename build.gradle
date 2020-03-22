@@ -56,7 +56,9 @@ dependencies {
 		exclude module: 'tiny-mappings-parser'
 	}
 	implementation 'com.github.Chocohead:Tiny-Mappings-Parser:d5b3b4a'
-	implementation 'com.github.Chocohead:OptiSine:cc6da75' //Keep consistent with Openfine.VERSION
+	implementation ('com.github.Chocohead:OptiSine:cc6da75') {//Keep consistent with Openfine.VERSION
+		transitive = false
+	}
 
 	// tinyfile management
 	implementation ('com.github.Chocohead:tiny-remapper:15ddc5f') {
