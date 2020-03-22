@@ -59,10 +59,6 @@ public class StackedMappingsProvider extends PhysicalDependencyProvider {
 
 		public MappingFile enlighten() throws IOException {
 			switch (type) {
-			case TinyV1:
-			case TinyV2:
-				assert namespaces != null;
-
 			case Tiny:
 				try (FileSystem fileSystem = FileSystems.newFileSystem(origin.toPath(), null);
 						BufferedReader reader = Files.newBufferedReader(fileSystem.getPath("mappings/mappings.tiny"))) {
@@ -79,6 +75,10 @@ public class StackedMappingsProvider extends PhysicalDependencyProvider {
 						throw new IOException("Unable to guess mapping version from " + header + " in " + origin);
 					}
 				}
+
+			case TinyV1:
+			case TinyV2:
+				assert namespaces != null;
 
 			default:
 				return this;

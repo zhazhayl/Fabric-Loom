@@ -214,6 +214,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 					project.getLogger().lifecycle(":loading intermediaries " + mappings.origin.getName());
 					switch (mappings.type) {
 					case Tiny:
+						assert false: "Unexpected mappings type " + mappings.type + " from " + mappings.origin;
 					case TinyV1:
 					case TinyV2:
 						try (FileSystem fileSystem = FileSystems.newFileSystem(mappings.origin.toPath(), null)) {
@@ -318,7 +319,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 
 								if (!intermediaryNames.exists()) {//Grab intermediary mappings from Github
 									try {
-										FileUtils.copyURLToFile(new URL("https://github.com/FabricMC/intermediary/raw/master/mappings/" + UrlEscapers.urlPathSegmentEscaper().escape(minecraftVersion) + ".tiny"), intermediaryNames);
+										FileUtils.copyURLToFile(new URL("https://github.com/FabricMC/intermediary/raw/master/mappings/" + UrlEscapers.urlPathSegmentEscaper().escape(version) + ".tiny"), intermediaryNames);
 									} catch (IOException e) {
 										throw new UncheckedIOException("Error downloading Intermediary mappings for " + version, e);
 									}
@@ -481,7 +482,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 		}
 
 		File mappingJar;
-		if (mappingFiles.size() == 1 && Iterables.getOnlyElement(mappingFiles).type == MappingType.TinyV1) {
+		if (mappingFiles.size() == 1 && Iterables.getOnlyElement(mappingFiles).enlighten().type == MappingType.TinyV1) {
 			mappingJar = Iterables.getOnlyElement(mappingFiles).origin;
 			if (MAPPINGS_TINY.lastModified() < mappingJar.lastModified()) MAPPINGS_TINY.setLastModified(mappingJar.lastModified() - 1);
 		} else {
