@@ -18,13 +18,13 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 
+import net.fabricmc.mappings.TinyV2Visitor;
 import net.fabricmc.mappings.visitor.ClassVisitor;
 import net.fabricmc.mappings.visitor.FieldVisitor;
 import net.fabricmc.mappings.visitor.LocalVisitor;
 import net.fabricmc.mappings.visitor.MappingsVisitor;
 import net.fabricmc.mappings.visitor.MethodVisitor;
 import net.fabricmc.mappings.visitor.ParameterVisitor;
-import net.fabricmc.mappings.visitor.TinyV2Visitor;
 
 public class TinyV2toV1 {
 	public static void convert(Path input, Path output) {
