@@ -56,11 +56,11 @@ import net.fabricmc.loom.util.StaticPathWatcher;
 import net.fabricmc.stitch.merge.JarMerger;
 
 public class MinecraftProvider extends PhysicalDependencyProvider {
-	private final Gson gson = new Gson();
+	private static final byte DOWNLOAD_ATTEMPTS = 3;
+	static final Gson GSON = new Gson();
 	public String minecraftVersion;
 	public MinecraftVersionInfo versionInfo;
 
-	private File MINECRAFT_JSON;
 	private File MINECRAFT_CLIENT_JAR;
 	private File MINECRAFT_SERVER_JAR;
 	private File MINECRAFT_MERGED_JAR;
@@ -79,10 +79,8 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 
 		initFiles(project);
 
-		downloadMcJson(project, offline);
-
-		try (FileReader reader = new FileReader(MINECRAFT_JSON)) {
-			versionInfo = gson.fromJson(reader, MinecraftVersionInfo.class);
+		try (FileReader reader = new FileReader(downloadMcJson(project, extension, offline))) {
+			versionInfo = GSON.fromJson(reader, MinecraftVersionInfo.class);
 		}
 
 		if (offline) {
@@ -95,13 +93,14 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 				throw new GradleException("Missing jar(s); Client: " + MINECRAFT_CLIENT_JAR.exists() + ", Server: " + MINECRAFT_SERVER_JAR.exists());
 			}
 		} else {
-			downloadJars(project.getLogger());
+			downloadJar(project.getLogger(), MINECRAFT_CLIENT_JAR, "client");
+			downloadJar(project.getLogger(), MINECRAFT_SERVER_JAR, "server");
 		}
 
 		if (extension.hasOptiFine()) {
 			MINECRAFT_CLIENT_JAR = Openfine.process(project.getLogger(), minecraftVersion, MINECRAFT_CLIENT_JAR, MINECRAFT_SERVER_JAR, extension.getOptiFine());
 			MINECRAFT_MERGED_JAR = new File(MINECRAFT_CLIENT_JAR.getParentFile(), MINECRAFT_CLIENT_JAR.getName().replace("client", "merged"));
-			project.getDependencies().add(Constants.MINECRAFT_DEPENDENCIES, project.getDependencies().module("com.github.Chocohead:OptiSine:" + Openfine.VERSION));
+			addDependency("com.github.Chocohead:OptiSine:" + Openfine.VERSION, project, Constants.MINECRAFT_DEPENDENCIES);
 			AbstractPlugin.addMavenRepo(project, "Jitpack", "https://jitpack.io/"); //Needed to fetch OptiSine from
 		}
 
@@ -120,37 +119,45 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 
 	private void initFiles(Project project) {
 		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
-		MINECRAFT_JSON = new File(extension.getUserCache(), "minecraft-" + minecraftVersion + "-info.json");
+
 		MINECRAFT_CLIENT_JAR = new File(extension.getUserCache(), "minecraft-" + minecraftVersion + "-client.jar");
 		MINECRAFT_SERVER_JAR = new File(extension.getUserCache(), "minecraft-" + minecraftVersion + "-server.jar");
 		MINECRAFT_MERGED_JAR = new File(extension.getUserCache(), "minecraft-" + minecraftVersion + "-merged.jar");
 	}
 
-	private void downloadMcJson(Project project, boolean offline) throws IOException {
+	private File downloadMcJson(Project project, LoomGradleExtension extension, boolean offline) throws IOException {
+		return downloadMcJson(project.getLogger(), extension, minecraftVersion, offline, extension.customManifest);
+	}
+
+	public static File downloadMcJson(Logger logger, LoomGradleExtension extension, String minecraftVersion, boolean offline) throws IOException {
+		return downloadMcJson(logger, extension, minecraftVersion, offline, null);
+	}
+
+	public static File downloadMcJson(Logger logger, LoomGradleExtension extension, String minecraftVersion, boolean offline, String customManifest) throws IOException {
+		File MINECRAFT_JSON = new File(extension.getUserCache(), "minecraft-" + minecraftVersion + "-info.json");
+
 		if (offline) {
 			if (MINECRAFT_JSON.exists()) {
 				//If there is the manifest already we'll presume that's good enough
-				project.getLogger().debug("Found Minecraft {} manifest, presuming up-to-date", minecraftVersion);
+				logger.debug("Found Minecraft {} manifest, presuming up-to-date", minecraftVersion);
 			} else {
 				//If we don't have the manifests then there's nothing more we can do
 				throw new GradleException("Minecraft " + minecraftVersion + " manifest not found at " + MINECRAFT_JSON.getAbsolutePath());
 			}
 		} else {
-			LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
-
 			Optional<String> versionURL;
-			if (extension.customManifest != null) {
-				project.getLogger().lifecycle("Using custom minecraft manifest");
+			if (customManifest != null) {
+				logger.lifecycle("Using custom minecraft manifest");
 
-				versionURL = Optional.of(extension.customManifest);
+				versionURL = Optional.of(customManifest);
 			} else {
 				File manifests = new File(extension.getUserCache(), "version_manifest.json");
 
-				project.getLogger().debug("Downloading version manifests");
-				DownloadUtil.downloadIfChanged(new URL("https://launchermeta.mojang.com/mc/game/version_manifest.json"), manifests, project.getLogger());
+				logger.debug("Downloading version manifests");
+				DownloadUtil.downloadIfChanged(new URL("https://launchermeta.mojang.com/mc/game/version_manifest.json"), manifests, logger);
 
 				try (Reader versionManifest = Files.newReader(manifests, StandardCharsets.UTF_8)) {
-					ManifestVersion mcManifest = gson.fromJson(versionManifest, ManifestVersion.class);
+					ManifestVersion mcManifest = GSON.fromJson(versionManifest, ManifestVersion.class);
 					versionURL = mcManifest.versions.stream().filter(versions -> versions.id.equalsIgnoreCase(minecraftVersion)).findFirst().map(version -> version.url);
 				}
 
@@ -195,31 +202,49 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 
 			if (versionURL.isPresent()) {
 				if (StaticPathWatcher.INSTANCE.hasFileChanged(MINECRAFT_JSON.toPath())) {
-					project.getLogger().debug("Downloading Minecraft {} manifest", minecraftVersion);
-					DownloadUtil.downloadIfChanged(new URL(versionURL.get()), MINECRAFT_JSON, project.getLogger());
+					logger.debug("Downloading Minecraft {} manifest", minecraftVersion);
+					DownloadUtil.downloadIfChanged(new URL(versionURL.get()), MINECRAFT_JSON, logger);
 					StaticPathWatcher.INSTANCE.resetFile(MINECRAFT_JSON.toPath());
 				}
 			} else {
 				throw new RuntimeException("Failed to find minecraft version: " + minecraftVersion);
 			}
 		}
+
+		return MINECRAFT_JSON;
 	}
 
-	private void downloadJars(Logger logger) throws IOException {
-		if (!MINECRAFT_CLIENT_JAR.exists() || !Checksum.equals(MINECRAFT_CLIENT_JAR, versionInfo.downloads.get("client").sha1) && StaticPathWatcher.INSTANCE.hasFileChanged(MINECRAFT_CLIENT_JAR.toPath())) {
-			logger.debug("Downloading Minecraft {} client jar", minecraftVersion);
-			DownloadUtil.downloadIfChanged(new URL(versionInfo.downloads.get("client").url), MINECRAFT_CLIENT_JAR, logger);
-			StaticPathWatcher.INSTANCE.resetFile(MINECRAFT_CLIENT_JAR.toPath());
-		}
+	private void downloadJar(Logger logger, File to, String name) throws IOException {
+		downloadJar(logger, minecraftVersion, versionInfo, to, name);
+	}
 
-		if (!MINECRAFT_SERVER_JAR.exists() || !Checksum.equals(MINECRAFT_SERVER_JAR, versionInfo.downloads.get("server").sha1) && StaticPathWatcher.INSTANCE.hasFileChanged(MINECRAFT_SERVER_JAR.toPath())) {
-			logger.debug("Downloading Minecraft {} server jar", minecraftVersion);
-			DownloadUtil.downloadIfChanged(new URL(versionInfo.downloads.get("server").url), MINECRAFT_SERVER_JAR, logger);
-			StaticPathWatcher.INSTANCE.resetFile(MINECRAFT_SERVER_JAR.toPath());
+	public static void downloadJar(Logger logger, String minecraftVersion, MinecraftVersionInfo versionInfo, File to, String name) throws IOException {
+		downloadJar(logger, minecraftVersion, new URL(versionInfo.downloads.get(name).url), to, name, versionInfo.downloads.get(name).sha1);
+	}
+
+	private static void downloadJar(Logger logger, String minecraftVersion, URL from, File to, String name, String hash) throws IOException {
+		if (!to.exists() || !Checksum.equals(to, hash) && StaticPathWatcher.INSTANCE.hasFileChanged(to.toPath())) {
+			logger.debug("Downloading Minecraft {} {} jar", minecraftVersion, name);
+
+			int attempt = 1;
+			do {
+				DownloadUtil.delete(to); //Clear the existing (wrong) contents out of the way
+				DownloadUtil.downloadIfChanged(from, to, logger);
+			} while (attempt++ <= DOWNLOAD_ATTEMPTS && !Checksum.equals(to, hash));
+
+			if (attempt > DOWNLOAD_ATTEMPTS) {//Apparently we just couldn't get a jar which had the right hash
+				throw new IllegalStateException("Unable to successfully download an intact " + minecraftVersion + ' ' + name + " jar!");
+			}
+
+			StaticPathWatcher.INSTANCE.resetFile(to.toPath());
 		}
 	}
 
 	private void mergeJars(Logger logger) throws IOException {
+		mergeJars(logger, MINECRAFT_CLIENT_JAR, MINECRAFT_SERVER_JAR, MINECRAFT_MERGED_JAR);
+	}
+
+	public static void mergeJars(Logger logger, File MINECRAFT_CLIENT_JAR, File MINECRAFT_SERVER_JAR, File MINECRAFT_MERGED_JAR) throws IOException {
 		logger.lifecycle(":merging jars");
 
 		try (JarMerger jarMerger = new JarMerger(MINECRAFT_CLIENT_JAR, MINECRAFT_SERVER_JAR, MINECRAFT_MERGED_JAR)) {

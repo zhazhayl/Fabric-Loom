@@ -28,9 +28,9 @@ repositories {
 		name = "Fabric"
 		url = 'https://maven.fabricmc.net/'
 	}
-	maven {
-		name = "Voldemaven"
-		url = "https://files.minecraftforge.net/maven/"
+	ivy {
+		name "Darcula"
+		artifactPattern "https://raw.githubusercontent.com/bulenkov/Darcula/master/build/[module].[ext]"
 	}
 	maven { 
 		name = "Jitpack"
@@ -64,10 +64,12 @@ dependencies {
 	implementation ('com.github.Chocohead:tiny-remapper:15ddc5f') {
 		transitive = false
 	}
+	implementation 'cuchaz:enigma:0.15.152:lib'
+	implementation name: "darcula", version: "1.0.0"
 
 	// decompilers
 	implementation ('net.fabricmc:procyon-fabric-compilertools:0.5.35.+')
-	implementation ('net.minecraftforge:forgeflower:1.5.380.38')
+	implementation ('com.github.Chocohead:ForgedFlower:c864803')
 
 	// source code remapping
 	implementation ('org.cadixdev:mercury:0.1.0.fabric-SNAPSHOT')
@@ -104,6 +106,7 @@ license {
 	exclude '**/loom/dependencies/LogicalDependencyProvider.java'
 	exclude '**/loom/dependencies/PhysicalDependencyProvider.java'
 	exclude '**/loom/providers/MappingsProvider.java'
+	exclude '**/loom/providers/SnappyRemapper.java'
 	exclude '**/loom/providers/StackedMappingsProvider.java'
 	exclude '**/loom/providers/mappings/*.java'
 	exclude '**/loom/providers/openfine/*.java'

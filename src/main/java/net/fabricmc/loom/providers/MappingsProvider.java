@@ -42,6 +42,8 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.net.UrlEscapers;
 
+import cuchaz.enigma.command.MapSpecializedMethodsCommand;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 
@@ -80,7 +82,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 	}
 	public MappingFactory mcRemappingFactory;
 
-	private static final String INTERMEDIARY = "net.fabricmc.intermediary";
+	static final String INTERMEDIARY = "net.fabricmc.intermediary";
 	private final List<MappingFile> mappingFiles = new ArrayList<>();
 
 	public String mappingsName;
@@ -124,62 +126,44 @@ public class MappingsProvider extends LogicalDependencyProvider {
 			}
 
 			free: if (!MAPPINGS_TINY_BASE.exists()) {
+				Map<String, List<MappingFile>> versionToMappings = new HashMap<>();
+
 				for (ListIterator<MappingFile> it = mappingFiles.listIterator(); it.hasNext();) {
 					MappingFile file = it.next();
 
 					if (file.type.needsEnlightening()) {
-						it.set(file.enlighten()); //Need to work out what the type of the ambiguous mapping files are
+						it.set(file = file.enlighten()); //Need to work out what the type of the ambiguous mapping files are
 					}
+
+					versionToMappings.computeIfAbsent(file.minecraftVersion, k -> new ArrayList<>()).add(file);
 				}
 
-				//Need to see if any of the mapping files have Intermediaries for the Minecraft version they're going to be running on
-				Optional<MappingFile> interProvider = mappingFiles.stream().filter(file -> file.minecraftVersion.equals(minecraftVersion)).sorted((fileA, fileB) -> {
-					if (fileA.type == fileB.type) return 0;
+				for (List<MappingFile> mappings : versionToMappings.values()) {
+					mappings.sort((fileA, fileB) -> {
+						if (fileA.type == fileB.type) return 0;
 
-					switch (fileA.type) {//Sort by ease of ability to extract headers
-					case TinyGz:
-						return -1;
-
-					case TinyV1:
-						return fileB.type == MappingType.TinyGz ? 1 : -1;
-
-					case TinyV2:
-						return fileB.type == MappingType.Enigma ? -1 : 1;
-
-					case Enigma:
-						return 1;
-
-					default:
-					case Tiny:
-						throw new IllegalArgumentException("Unexpected mapping types to compare: " + fileA.type + " and " + fileB.type);
-					}
-				}).filter(file -> {
-					try {
-						List<String> headers;
-						switch (file.type) {
-						case Enigma: //Never will (unless it goes Notch <=> Intermediary which is pointless to be in Enigma's format)
-							return false;
-
+						switch (fileA.type) {//Sort by ease of ability to extract headers
 						case TinyV1:
+							return -1;
+
 						case TinyV2:
-							headers = file.getNamespaces();
-							break;
+							return fileB.type == MappingType.TinyV1 ? 1 : -1;
 
 						case TinyGz:
-							headers = TinyReader.readHeaders(file.origin.toPath());
-							break;
+							return fileB.type == MappingType.Enigma ? -1 : 1;
+
+						case Enigma:
+							return 1;
 
 						default:
 						case Tiny:
-							throw new IllegalArgumentException("Unexpected mapping types to read: " + file.type);
+							throw new IllegalArgumentException("Unexpected mapping types to compare: " + fileA.type + " and " + fileB.type);
 						}
+					});
+				}
 
-						assert headers.indexOf("named") >= 0; //We should have named mappings, odd file otherwise
-						return headers.indexOf("official") >= 0 && headers.indexOf("intermediary") >= 0;
-					} catch (IOException e) {
-						throw new UncheckedIOException("Error reading mapping file from " + file.origin, e);
-					}
-				}).findFirst();
+				//Need to see if any of the mapping files have Intermediaries for the Minecraft version they're going to be running on
+				Optional<MappingFile> interProvider = searchForIntermediaries(versionToMappings.getOrDefault(minecraftVersion, Collections.emptyList()));
 
 				MappingBlob intermediaries;
 				if (interProvider.isPresent()) {
@@ -304,6 +288,26 @@ public class MappingsProvider extends LogicalDependencyProvider {
 							assert gains.streamFields().parallel().filter(field -> field.name() != null).allMatch(field -> field.fromName.startsWith("field_")):
 								gains.streamFields().filter(field -> field.name() != null && !field.fromName.startsWith("field_")).map(field -> field.fromName).collect(Collectors.joining(", ", "Found unexpected field mappings: ", "]"));
 						}
+
+						Path contextJar;
+						if (minecraftVersion.equals(mapping.minecraftVersion)) {
+							if (nativeNames) {
+								contextJar = minecraftProvider.getMergedJar().toPath();
+							} else {
+								contextJar = SnappyRemapper.remapCurrentJar(project, extension, minecraftProvider, interProvider.map(mappingFile -> mappingFile.origin.toPath()));
+							}
+						} else {
+							if (nativeNames) {
+								contextJar = SnappyRemapper.makeMergedJar(project, extension, mapping.minecraftVersion).getRight();
+							} else {
+								contextJar = SnappyRemapper.makeInterJar(project, extension, mapping.minecraftVersion, //See if we've actually got the old Intermediaries per chance too
+										searchForIntermediaries(versionToMappings.getOrDefault(mapping.minecraftVersion, Collections.emptyList())).map(mappingFile -> mappingFile.origin.toPath()));
+							}
+						}
+
+						Path specialisedMappings = MAPPINGS_DIR.toPath().resolve(FilenameUtils.removeExtension(mapping.origin.getName()) + "-specialised.tiny");
+						MapSpecializedMethodsCommand.run(contextJar, "enigma", mapping.origin.toPath(), "tinyv2:intermediary:named", specialisedMappings);
+						TinyReader.readTiny(specialisedMappings, nativeNames ? "official" : "intermediary", "named", gains = new MappingBlob());
 						break;
 					}
 
@@ -504,6 +508,36 @@ public class MappingsProvider extends LogicalDependencyProvider {
 
 		assert mappingJar.exists() && mappingJar.lastModified() >= MAPPINGS_TINY.lastModified();
 		addDependency(mappingJar, project, Constants.MAPPINGS);
+	}
+
+	private static Optional<MappingFile> searchForIntermediaries(List<MappingFile> mappings) {
+		return mappings.stream().filter(file -> {
+			try {
+				List<String> headers;
+				switch (file.type) {
+				case Enigma: //Never will (unless it goes Notch <=> Intermediary which is pointless to be in Enigma's format)
+					return false;
+
+				case TinyV1:
+				case TinyV2:
+					headers = file.getNamespaces();
+					break;
+
+				case TinyGz:
+					headers = TinyReader.readHeaders(file.origin.toPath());
+					break;
+
+				default:
+				case Tiny:
+					throw new IllegalArgumentException("Unexpected mapping types to read: " + file.type);
+				}
+
+				assert headers.indexOf("named") >= 0; //We should have named mappings, odd file otherwise
+				return headers.indexOf("official") >= 0 && headers.indexOf("intermediary") >= 0;
+			} catch (IOException e) {
+				throw new UncheckedIOException("Error reading mapping file from " + file.origin, e);
+			}
+		}).findFirst();
 	}
 
 	private String readStackHistory() {
