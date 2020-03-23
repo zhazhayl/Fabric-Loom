@@ -319,19 +319,23 @@ public class MappingsProvider extends LogicalDependencyProvider {
 						MappingBlob renamer;
 						if (!minecraftVersion.equals(mapping.minecraftVersion)) {
 							renamer = versionToIntermediaries.computeIfAbsent(mapping.minecraftVersion, version -> {
-								File intermediaryNames = new File(extension.getUserCache(), "mappings/" + version + '/' + INTERMEDIARY + "-intermediary.tiny");
+								Path intermediaryNames = searchForIntermediaries(versionToMappings.getOrDefault(version, Collections.emptyList())).map(mappingFile -> mappingFile.origin.toPath()).orElseGet(() -> {
+									File inters = new File(extension.getUserCache(), "mappings/" + version + '/' + INTERMEDIARY + "-intermediary.tiny");
 
-								if (!intermediaryNames.exists()) {//Grab intermediary mappings from Github
-									try {
-										FileUtils.copyURLToFile(new URL("https://github.com/FabricMC/intermediary/raw/master/mappings/" + UrlEscapers.urlPathSegmentEscaper().escape(version) + ".tiny"), intermediaryNames);
-									} catch (IOException e) {
-										throw new UncheckedIOException("Error downloading Intermediary mappings for " + version, e);
+									if (!inters.exists()) {//Grab intermediary mappings from Github
+										try {
+											FileUtils.copyURLToFile(new URL("https://github.com/FabricMC/intermediary/raw/master/mappings/" + UrlEscapers.urlPathSegmentEscaper().escape(version) + ".tiny"), inters);
+										} catch (IOException e) {
+											throw new UncheckedIOException("Error downloading Intermediary mappings for " + version, e);
+										}
 									}
-								}
+
+									return inters.toPath();
+								});
 
 								MappingBlob inters = new MappingBlob();
 								try {
-									TinyReader.readTiny(intermediaryNames.toPath(), "official", "intermediary", inters);
+									TinyReader.readTiny(intermediaryNames, "official", "intermediary", inters);
 								} catch (IOException e) {
 									throw new UncheckedIOException("Error reading Intermediary mappings for " + version, e);
 								}
