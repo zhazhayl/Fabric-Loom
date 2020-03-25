@@ -148,10 +148,6 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 			return fields.values();
 		}
 
-		Stream<CombinedField> fieldStream() {
-			return fields.values().stream();
-		}
-
 		public Iterable<CombinedField> fieldsWithNames() {
 			return Iterables.filter(fields(), CombinedField::hasNameChange);
 		}
@@ -315,39 +311,15 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 	}
 
 	public boolean hasArgs() {
-		for (CombinedMapping mapping : mappings.values()) {
-			for (CombinedMethod method : mapping.methods()) {
-				if (method.hasArgs()) {
-					return true;
-				}
-			}
-		}
-
-		return false;
+		return mappings.values().stream().flatMap(CombinedMapping::methodStream).anyMatch(CombinedMethod::hasArgs);
 	}
 
 	public boolean hasArgNames() {
-		for (CombinedMapping mapping : mappings.values()) {
-			for (CombinedMethod method : mapping.methods()) {
-				if (method.hasArgNames()) {
-					return true;
-				}
-			}
-		}
-
-		return false;
+		return mappings.values().stream().flatMap(CombinedMapping::methodStream).anyMatch(CombinedMethod::hasArgNames);
 	}
 
 	public boolean hasArgComments() {
-		for (CombinedMapping mapping : mappings.values()) {
-			for (CombinedMethod method : mapping.methods()) {
-				if (method.hasArgComments()) {
-					return true;
-				}
-			}
-		}
-
-		return false;
+		return mappings.values().stream().flatMap(CombinedMapping::methodStream).anyMatch(CombinedMethod::hasArgComments);
 	}
 
 	private static String findName(String name, String inter, String notch, MappingBlob mappings) {
