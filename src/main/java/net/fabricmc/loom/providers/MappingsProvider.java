@@ -63,7 +63,6 @@ import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping.Field;
 import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping.Method;
 import net.fabricmc.loom.providers.mappings.MappingSplat;
 import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping;
-import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping.ArgOnlyMethod;
 import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping.CombinedField;
 import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping.CombinedMethod;
 import net.fabricmc.loom.providers.mappings.TinyDuplicator;
@@ -367,10 +366,21 @@ public class MappingsProvider extends LogicalDependencyProvider {
 								mappings.acceptMethod(classMapping.from, method.fromName, method.fromDesc, existingClass.to(), method.name(), method.desc());
 							}
 
+							if (!existingMethod.comment().isPresent()) {
+								method.comment().ifPresent(comment -> {
+									mappings.acceptMethodComment(classMapping.from, method.fromName, method.fromDesc, comment);
+								});
+							}
+
 							if (method.hasArgs()) {
 								method.iterateArgs((arg, index) -> {
 									if (existingMethod.arg(index) == null) {
 										mappings.acceptMethodArg(classMapping.from, method.fromName, method.fromDesc, index, arg);
+									}
+								});
+								method.iterateArgComments((comment, index) -> {
+									if (!existingMethod.argComment(index).isPresent()) {
+										mappings.acceptMethodArgComment(classMapping.from, method.fromName, method.fromDesc, index, comment);
 									}
 								});
 							}
@@ -383,6 +393,12 @@ public class MappingsProvider extends LogicalDependencyProvider {
 							if (existingField.name() == null && !existingField.fromName.equals(field.name())) {
 								mappings.acceptField(classMapping.from, field.fromName, field.fromDesc, existingClass.to(), field.name(), field.desc());
 							}
+
+							if (!existingField.comment().isPresent()) {
+								field.comment().ifPresent(comment -> {
+									mappings.acceptMethodComment(classMapping.from, field.fromName, field.fromDesc, comment);
+								});
+							}
 						}
 					}
 				}
@@ -394,31 +410,41 @@ public class MappingsProvider extends LogicalDependencyProvider {
 				try (TinyWriter writer = new TinyWriter(MAPPINGS_TINY_BASE.toPath(), "official", "named", "intermediary")) {
 					for (CombinedMapping mapping : combined) {
 						String notch = mapping.from;
-						writer.acceptClass(notch, mapping.to, mapping.fallback);
+						if (mapping.hasNameChange()) writer.acceptClass(notch, mapping.to, mapping.fallback);
 
-						for (CombinedMethod method : mapping.methods()) {
+						for (CombinedMethod method : mapping.methodsWithNames()) {
 							writer.acceptMethod(notch, method.fromDesc, method.from, method.to, method.fallback);
 						}
 
-						for (CombinedField field : mapping.fields()) {
+						for (CombinedField field : mapping.fieldsWithNames()) {
 							writer.acceptField(notch, field.fromDesc, field.from, field.to, field.fallback);
 						}
 					}
 				}
 
-				if (combined.hasArgs()) {
+				if (combined.hasArgNames()) {
 					project.getLogger().lifecycle(":writing " + parameterNames.getFileName());
 					try (BufferedWriter writer = Files.newBufferedWriter(parameterNames)) {
 						for (CombinedMapping mapping : combined) {
-							for (ArgOnlyMethod method : mapping.allArgs()) {
-								writer.write(mapping.to + '/' + method.from + method.fromDesc);
+							for (CombinedMethod method : mapping.methodsWithArgs()) {
+								if (!method.hasArgNames()) continue; //Just comments for the arguments
+
+								writer.write(mapping.to);
+								writer.write('/');
+								writer.write(method.from);
+								writer.write(method.fromDesc);
 								writer.newLine();
-								for (String arg : method.namedArgs()) {
-									assert !arg.endsWith(": null"); //Skip nulls
+
+								method.<IOException>iterateArgs((index, arg) -> {
+									assert arg != null; //Should be skipping nulls
+
 									writer.write('\t');
+									writer.write(Integer.toString(index));
+									writer.write(':');
+									writer.write(' ');
 									writer.write(arg);
 									writer.newLine();
-								}
+								});
 							}
 						}
 					}

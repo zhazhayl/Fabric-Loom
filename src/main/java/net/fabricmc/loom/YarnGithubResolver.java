@@ -388,10 +388,20 @@ public class YarnGithubResolver {
 						}
 
 						@Override
+						public void acceptClassComment(String className, String comment) {
+							assert false; //Shouldn't be getting any of these
+						}
+
+						@Override
 						public void acceptMethod(String srcClsName, String srcName, String srcDesc, String dstClsName, String dstName, String dstDesc) {
 							if (!methods.remove(new EntryTriple(srcClsName, srcName, srcDesc), dstName)) {
 								throw NotaGoto.INSTANCE;
 							}
+						}
+
+						@Override
+						public void acceptMethodComment(String className, String methodName, String desc, String comment) {
+							assert false; //Shouldn't be getting any of these
 						}
 
 						@Override
@@ -400,10 +410,20 @@ public class YarnGithubResolver {
 						}
 
 						@Override
+						public void acceptMethodArgComment(String className, String methodName, String desc, int lvIndex, String comment) {
+							assert false; //Shouldn't be getting any of these
+						}
+
+						@Override
 						public void acceptField(String srcClsName, String srcName, String srcDesc, String dstClsName, String dstName, String dstDesc) {
 							if (!fields.remove(new EntryTriple(srcClsName, srcName, srcDesc), dstName)) {
 								throw NotaGoto.INSTANCE;
 							}
+						}
+
+						@Override
+						public void acceptFieldComment(String className, String fieldName, String desc, String comment) {
+							assert false; //Shouldn't be getting any of these
 						}
 					});
 
