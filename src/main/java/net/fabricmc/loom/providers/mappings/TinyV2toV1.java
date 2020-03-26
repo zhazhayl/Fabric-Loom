@@ -150,7 +150,7 @@ public class TinyV2toV1 {
 									paramOut.write(desc);
 									paramOut.newLine();
 
-									for (int i = args.length - 1; i > 0; i--) {
+									for (int i = args.length - 1; i >= 0; i--) {
 										if (args[i] != null) {
 											paramOut.write('\t');
 											paramOut.write(args[i]);
