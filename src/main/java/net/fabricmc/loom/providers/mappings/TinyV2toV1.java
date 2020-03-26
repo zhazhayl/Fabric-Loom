@@ -343,6 +343,8 @@ public class TinyV2toV1 {
 				EntryTriple entry = new EntryTriple(mapping.to, field.to, field.toDesc);
 				comment.fieldComments.add(new Field(Collections.singletonList(field.comment), entry));
 			}
+
+			comments.add(comment);
 		}
 
 		writeMappings(out, comments);
