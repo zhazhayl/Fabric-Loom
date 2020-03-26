@@ -28,10 +28,6 @@ repositories {
 		name = "Fabric"
 		url = 'https://maven.fabricmc.net/'
 	}
-	ivy {
-		name "Darcula"
-		artifactPattern "https://raw.githubusercontent.com/bulenkov/Darcula/master/build/[module].[ext]"
-	}
 	maven { 
 		name = "Jitpack"
 		url 'https://jitpack.io/'
@@ -39,11 +35,6 @@ repositories {
 	maven {
 		url "https://repo.gradle.org/gradle/libs-releases-local"
 	}
-}
-
-configurations {
-	shadowStuff
-    compile.extendsFrom shadowStuff
 }
 
 dependencies {
@@ -70,7 +61,7 @@ dependencies {
 		transitive = false
 	}
 	implementation 'cuchaz:enigma:0.15.152:lib'
-	shadowStuff name: "darcula", version: "1.0.0", ext: "jar"
+	implementation 'com.bulenkov:darcula:2018.2'
 
 	// decompilers
 	implementation ('net.fabricmc:procyon-fabric-compilertools:0.5.35.+')
@@ -85,9 +76,6 @@ jar {
 	manifest {
 		attributes 'Implementation-Title': "Loom $version"
 		attributes 'Implementation-Version': version + " Build(" + build + ")"
-	}
-	from {
-		configurations.shadowStuff.collect { it.isDirectory() ? it : zipTree(it) }
 	}
 }
 
