@@ -35,9 +35,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.net.UrlEscapers;
@@ -245,39 +247,6 @@ public class MappingsProvider extends LogicalDependencyProvider {
 					boolean nativeNames = false;
 
 					switch (mapping.type) {
-					case TinyV1:
-					case TinyV2: {
-						String origin;
-						if (mapping.getNamespaces().contains("intermediary")) {
-							origin = "intermediary";
-						} else {
-							nativeNames = true;
-							origin = "official";
-						}
-						assert mapping.getNamespaces().contains("named");
-
-						try (FileSystem fileSystem = FileSystems.newFileSystem(mapping.origin.toPath(), null)) {
-							TinyReader.readTiny(fileSystem.getPath("mappings/mappings.tiny"), origin, "named", gains);
-						}
-						break;
-					}
-
-					case TinyGz: {
-						Collection<String> namespaces = TinyReader.readHeaders(mapping.origin.toPath());
-
-						String origin;
-						if (namespaces.contains("intermediary")) {
-							origin = "intermediary";
-						} else {
-							nativeNames = true;
-							origin = "official";
-						}
-						assert namespaces.contains("named");
-
-						TinyReader.readTiny(mapping.origin.toPath(), origin, "named", gains);
-						break;
-					}
-
 					case Enigma: {
 						EnigmaReader.readEnigma(mapping.origin.toPath(), gains);
 
@@ -308,9 +277,67 @@ public class MappingsProvider extends LogicalDependencyProvider {
 							}
 						}
 
-						Path specialisedMappings = MAPPINGS_DIR.toPath().resolve(FilenameUtils.removeExtension(mapping.origin.getName()) + "-specialised.tiny");
-						MapSpecializedMethodsCommand.run(contextJar, "enigma", mapping.origin.toPath(), "tinyv2:intermediary:named", specialisedMappings);
-						TinyReader.readTiny(specialisedMappings, nativeNames ? "official" : "intermediary", "named", gains = new MappingBlob());
+						String from = nativeNames ? "official" : "intermediary";
+						Path specialisedMappings = MAPPINGS_DIR.toPath().resolve(FilenameUtils.removeExtension(mapping.origin.getName()) + "-specialised.jar");
+						try (FileSystem fs = FileSystems.newFileSystem(new URI("jar:" + specialisedMappings.toUri()), Collections.singletonMap("create", "true"))) {
+							Path destination = fs.getPath("mappings/mappings.tiny");
+
+							Files.createDirectories(destination.getParent());
+							MapSpecializedMethodsCommand.run(contextJar, "enigma", mapping.origin.toPath(), "tinyv2:" + from + ":named", destination);
+						} catch (URISyntaxException e) {
+							throw new IllegalStateException("Cannot convert jar path to URI?", e);
+						} catch (IOException e) {
+							throw new UncheckedIOException("Error creating mappings jar", e);
+						}
+
+						mapping = new MappingFile(specialisedMappings.toFile(), mapping.name, mapping.version, mapping.minecraftVersion, MappingType.TinyV2, ImmutableList.of(from, "named"));
+					}
+
+					case TinyV1:
+					case TinyV2: {
+						String origin;
+						if (mapping.getNamespaces().contains("intermediary")) {
+							origin = "intermediary";
+						} else {
+							nativeNames = true;
+							origin = "official";
+						}
+						assert mapping.getNamespaces().contains("named");
+
+						try (FileSystem fileSystem = FileSystems.newFileSystem(mapping.origin.toPath(), null)) {
+							TinyReader.readTiny(fileSystem.getPath("mappings/mappings.tiny"), origin, "named", gains);
+
+							if (mapping.type == MappingType.TinyV2) {
+								UnaryOperator<String> classRemapper;
+								if (!origin.equals(mapping.getNamespaces().get(0))) {
+									MappingBlob nativeToOrigin = new MappingBlob();
+									TinyReader.readTiny(fileSystem.getPath("mappings/mappings.tiny"), mapping.getNamespaces().get(0), origin, nativeToOrigin);
+									classRemapper = name -> {
+										String remap = nativeToOrigin.tryMapName(name);
+										return remap != null ? remap : name;
+									};
+								} else {
+									classRemapper = null; //Origin column is the main column, descriptors won't need to be renamed
+								}
+								TinyReader.readComments(fileSystem.getPath("mappings/mappings.tiny"), origin, classRemapper, gains);
+							}
+						}
+						break;
+					}
+
+					case TinyGz: {
+						Collection<String> namespaces = TinyReader.readHeaders(mapping.origin.toPath());
+
+						String origin;
+						if (namespaces.contains("intermediary")) {
+							origin = "intermediary";
+						} else {
+							nativeNames = true;
+							origin = "official";
+						}
+						assert namespaces.contains("named");
+
+						TinyReader.readTiny(mapping.origin.toPath(), origin, "named", gains);
 						break;
 					}
 
