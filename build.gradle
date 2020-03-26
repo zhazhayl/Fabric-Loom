@@ -41,6 +41,11 @@ repositories {
 	}
 }
 
+configurations {
+	shadowStuff
+    compile.extendsFrom shadowStuff
+}
+
 dependencies {
 	compileOnly "org.gradle:gradle-core-api:6.1"
 
@@ -65,7 +70,7 @@ dependencies {
 		transitive = false
 	}
 	implementation 'cuchaz:enigma:0.15.152:lib'
-	implementation name: "darcula", version: "1.0.0"
+	shadowStuff name: "darcula", version: "1.0.0", ext: "jar"
 
 	// decompilers
 	implementation ('net.fabricmc:procyon-fabric-compilertools:0.5.35.+')
@@ -80,6 +85,9 @@ jar {
 	manifest {
 		attributes 'Implementation-Title': "Loom $version"
 		attributes 'Implementation-Version': version + " Build(" + build + ")"
+	}
+	from {
+		configurations.shadowStuff.collect { it.isDirectory() ? it : zipTree(it) }
 	}
 }
 
