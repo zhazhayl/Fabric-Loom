@@ -132,7 +132,7 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 			}
 
 			public Optional<String> argComment(int index) {
-				return args.length > index ? Optional.ofNullable(args[index]).map(arg -> arg.comment) : null;
+				return args.length > index ? Optional.ofNullable(args[index]).map(arg -> arg.comment) : Optional.empty();
 			}
 
 			public void iterateArgs(ObjIntConsumer<String> argConsumer) {
