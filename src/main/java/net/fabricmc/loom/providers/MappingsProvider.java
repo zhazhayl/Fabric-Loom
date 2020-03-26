@@ -98,10 +98,14 @@ public class MappingsProvider extends LogicalDependencyProvider {
 	private File MAPPINGS_TINY_BASE;
 	// The mappings we use in practice
 	public File MAPPINGS_TINY;
-	private Path parameterNames;
+	private Path parameterNames, decompileComments;
 
 	public Mappings getMappings() throws IOException {
 		return MappingsCache.INSTANCE.get(MAPPINGS_TINY.toPath());
+	}
+
+	public Path getDecompileMappings() {
+		return decompileComments;
 	}
 
 	@Override
@@ -450,6 +454,13 @@ public class MappingsProvider extends LogicalDependencyProvider {
 					}
 				}
 
+				if (combined.hasComments()) {
+					project.getLogger().lifecycle(":writing " + decompileComments.getFileName());
+					try (BufferedWriter writer = Files.newBufferedWriter(decompileComments)) {
+						TinyV2toV1.writeComments(writer, combined);
+					}
+				}
+
 				if (MAPPINGS_TINY.exists()) {
 					MAPPINGS_TINY.delete();
 				}
@@ -713,6 +724,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 		MAPPINGS_TINY_BASE = new File(MAPPINGS_DIR, mappingsName + "-tiny-" + minecraftVersion + '-' + mappingsVersion + "-base.tiny");
 		MAPPINGS_TINY = new File(MAPPINGS_DIR, mappingsName + "-tiny-" + minecraftVersion + '-' + mappingsVersion + ".tiny");
 		parameterNames = new File(MAPPINGS_DIR, mappingsName + "-params-" + minecraftVersion + '-' + mappingsVersion).toPath();
+		decompileComments = parameterNames.resolveSibling(mappingsName + "-tiny-" + minecraftVersion + '-' + mappingsVersion + "-decomp.tiny");
 
 		MAPPINGS_MIXIN_EXPORT = new File(extension.getProjectBuildCache(), "mixin-map-" + minecraftVersion + '-' + mappingsVersion + ".tiny");
 	}
@@ -723,6 +735,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 		intermediaryNames.delete();
 		try {
 			Files.deleteIfExists(parameterNames);
+			Files.deleteIfExists(decompileComments);
 		} catch (IOException e) {
 			e.printStackTrace(); //That's troublesome
 		}

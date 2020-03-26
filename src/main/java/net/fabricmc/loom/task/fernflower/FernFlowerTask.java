@@ -83,7 +83,7 @@ public class FernFlowerTask extends AbstractDecompileTask implements ForkingJava
 		}
 
 		args.add("-t=" + getNumThreads());
-		args.add("-m=" + getExtension().getMappingsProvider().MAPPINGS_TINY.getAbsolutePath());
+		args.add("-m=" + getExtension().getMappingsProvider().getDecompileMappings().toAbsolutePath());
 
 		//TODO, Decompiler breaks on jemalloc, J9 module-info.class?
 		getLibraries().forEach(f -> args.add("-e=" + f.getAbsolutePath()));
