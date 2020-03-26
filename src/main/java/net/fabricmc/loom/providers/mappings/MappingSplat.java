@@ -128,6 +128,24 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 			return comment != null;
 		}
 
+		public boolean hasAnyComments() {
+			if (hasComment()) return true;
+
+			for (CombinedMethod method : methods()) {
+				if (method.hasAnyComments()) {
+					return true;
+				}
+			}
+
+			for (CombinedField field : fields()) {
+				if (field.hasComment()) {
+					return true;
+				}
+			}
+
+			return false;
+		}
+
 		public Iterable<CombinedMethod> methods() {
 			return methods.values();
 		}
@@ -291,23 +309,7 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 	}
 
 	public boolean hasComments() {
-		for (CombinedMapping mapping : mappings.values()) {
-			if (mapping.hasComment()) return true;
-
-			for (CombinedMethod method : mapping.methods()) {
-				if (method.hasAnyComments()) {
-					return true;
-				}
-			}
-
-			for (CombinedField field : mapping.fields()) {
-				if (field.hasComment()) {
-					return true;
-				}
-			}
-		}
-
-		return false;
+		return mappings.values().stream().anyMatch(CombinedMapping::hasAnyComments);
 	}
 
 	public boolean hasArgs() {

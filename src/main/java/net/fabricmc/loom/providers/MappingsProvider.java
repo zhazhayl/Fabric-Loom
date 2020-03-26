@@ -184,7 +184,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 							break free;
 
 						case TinyV2:
-							TinyV2toV1.convert(mappings.origin.toPath(), MAPPINGS_TINY_BASE.toPath(), parameterNames);
+							TinyV2toV1.convert(mappings.origin.toPath(), MAPPINGS_TINY_BASE.toPath(), parameterNames, decompileComments);
 							break free;
 
 						case Enigma:
