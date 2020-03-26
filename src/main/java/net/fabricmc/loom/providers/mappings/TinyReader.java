@@ -33,7 +33,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.UnaryOperator;
 import java.util.zip.GZIPInputStream;
 
@@ -80,16 +82,19 @@ public class TinyReader {
 
 	public static void readTiny(Path file, String from, String to, IMappingAcceptor mappingAcceptor) throws IOException {
 		try (BufferedReader reader = getMappingReader(file)) {
+			Map<String, String> reverser = new HashMap<>();
+
 			TinyUtils.read(reader, from, to, (classFrom, name) -> {
 				mappingAcceptor.acceptClass(classFrom, name);
+				reverser.put(name, classFrom);
 			}, (fieldFrom, name) -> {
 				mappingAcceptor.acceptField(fieldFrom.owner, fieldFrom.name, fieldFrom.desc, null, name, null);
 			}, (methodFrom, name) -> {
 				mappingAcceptor.acceptMethod(methodFrom.owner, methodFrom.name, methodFrom.desc, null, name, null);
 			}, (methodFrom, args) -> {
-				for (int i = args.length - 1; i > 0; i--) {
+				for (int i = args.length - 1; i >= 0; i--) {
 					if (args[i] != null) {
-						mappingAcceptor.acceptMethodArg(methodFrom.owner, methodFrom.name, methodFrom.desc, i, args[i]);
+						mappingAcceptor.acceptMethodArg(reverser.getOrDefault(methodFrom.owner, methodFrom.owner), methodFrom.name, methodFrom.desc, i, args[i]);
 					}
 				}
 			});
