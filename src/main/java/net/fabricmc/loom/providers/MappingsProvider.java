@@ -390,7 +390,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 						assert interMapping.from.equals(existingClass.from);
 
 						for (Method method : classMapping.methods()) {
-							if (!interMapping.hasMethod(method)) continue;
+							if (!interMapping.hasMethod(method) && method.fromName.charAt(0) != '<') continue;
 
 							Method existingMethod = existingClass.method(method);
 							if (existingMethod.name() == null && !existingMethod.fromName.equals(method.name())) {
