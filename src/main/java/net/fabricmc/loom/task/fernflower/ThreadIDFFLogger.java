@@ -56,6 +56,9 @@ public class ThreadIDFFLogger extends IFernflowerLogger {
 
     @Override
     public void writeMessage(String message, Severity severity, Throwable t) {
+    	String currentClass = workingClass.get().peek();
+    	String currentMethod = line.get().peek();
+    	stdErr.println("Error thrown whilst " + currentClass == null ? "out of class" : " in " + currentClass + (currentMethod != null ? '#' + currentMethod : ""));
         stdErr.println(message);
         t.printStackTrace(stdErr);
     }
