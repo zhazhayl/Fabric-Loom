@@ -47,7 +47,7 @@ public class ProgressLogger {
 		this.startedArg = getMethod("started", String.class);
 		this.progress = getMethod("progress", String.class);
 		this.completed = getMethod("completed");
-		this.completedArg = getMethod("completed", String.class);
+		this.completedArg = getMethod("completed", String.class, boolean.class);
 	}
 
 	private static Class<?> getFactoryClass() {
@@ -181,8 +181,9 @@ public class ProgressLogger {
 	 * Logs the completion of the operation, with a final status. This is generally logged along with the description.
 	 *
 	 * @param status The final status message. Can be null or empty.
+	 * @param failed Whether the operation failed.
 	 */
-	public void completed(String status) {
-		invoke(completedArg, status);
+	public void completed(String status, boolean failed) {
+		invoke(completedArg, status, failed);
 	}
 }
