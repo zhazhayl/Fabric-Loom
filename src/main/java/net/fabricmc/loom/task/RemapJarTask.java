@@ -61,7 +61,7 @@ public class RemapJarTask extends Jar {
 		Path input = getInput().getAsFile().get().toPath();
 		Path output = getArchivePath().toPath();
 
-		remap(this, input, output, addNestedDependencies, includeAT);
+		remap(this, input, output, addNestedDependencies, !includeAT);
 		getProject().getExtensions().getByType(LoomGradleExtension.class).addUnmappedMod(input);
 	}
 
