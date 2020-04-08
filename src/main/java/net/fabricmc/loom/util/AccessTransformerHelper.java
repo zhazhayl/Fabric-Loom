@@ -111,9 +111,7 @@ public class AccessTransformerHelper {
 		return ZipUtil.transformEntry(jar, new ZipEntryTransformerEntry(MAGIC_AT_NAME, new StreamZipEntryTransformer() {
 			@Override
 			protected void transform(ZipEntry zipEntry, InputStream in, OutputStream out) throws IOException {
-				try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(out, StandardCharsets.UTF_8))) {
-					readATs(new InputStreamReader(in, StandardCharsets.UTF_8), writer, tiny.getRemapper());
-				}
+				readATs(new InputStreamReader(in, StandardCharsets.UTF_8), new BufferedWriter(new OutputStreamWriter(out, StandardCharsets.UTF_8)), tiny.getRemapper());
 			}
 		}));
 	}
