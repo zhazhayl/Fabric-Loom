@@ -42,6 +42,7 @@ import java.util.concurrent.ForkJoinTask;
 import java.util.function.Consumer;
 import java.util.zip.ZipError;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Files;
 import com.google.gson.Gson;
 
@@ -51,6 +52,7 @@ import org.gradle.api.logging.Logger;
 
 import net.fabricmc.loom.AbstractPlugin;
 import net.fabricmc.loom.LoomGradleExtension;
+import net.fabricmc.loom.LoomGradleExtension.JarMergeOrder;
 import net.fabricmc.loom.dependencies.LoomDependencyManager;
 import net.fabricmc.loom.dependencies.PhysicalDependencyProvider;
 import net.fabricmc.loom.providers.openfine.Openfine;
@@ -72,6 +74,7 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 	private File MINECRAFT_SERVER_JAR;
 	private File MINECRAFT_MERGED_JAR;
 
+	private JarMergeOrder mergeOrder;
 	private ForkJoinTask<File> jarMerger;
 	private final Object mappingLock = new Object();
 	private Path mappings;
@@ -95,51 +98,43 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 		}
 		SpecialCases.enhanceVersion(minecraftVersion, versionInfo);
 
+		boolean needClient = extension.getJarMergeOrder() != JarMergeOrder.SERVER_ONLY;
+		boolean needServer = extension.getJarMergeOrder() != JarMergeOrder.CLIENT_ONLY;
+
 		if (offline) {
-			if (MINECRAFT_CLIENT_JAR.exists() && MINECRAFT_SERVER_JAR.exists()) {
-				project.getLogger().debug("Found client and server jars, presuming up-to-date");
-			} else if (MINECRAFT_MERGED_JAR.exists()) {
+			if ((!needClient || MINECRAFT_CLIENT_JAR.exists()) && (!needServer || MINECRAFT_SERVER_JAR.exists())) {
+				project.getLogger().debug("Found necessary game jars, presuming up-to-date");
+			} else if (MINECRAFT_MERGED_JAR.exists() && needClient == needServer) {
 				//Strictly we don't need the split jars if the merged one exists, let's try go on
-				project.getLogger().warn("Missing game jar but merged jar present, things might end badly");
+				project.getLogger().warn("Missing game jar(s) but merged jar present, things might end badly");
 			} else {
 				throw new GradleException("Missing jar(s); Client: " + MINECRAFT_CLIENT_JAR.exists() + ", Server: " + MINECRAFT_SERVER_JAR.exists());
 			}
 		} else {
-			downloadJar(project.getLogger(), MINECRAFT_CLIENT_JAR, "client");
-			downloadJar(project.getLogger(), MINECRAFT_SERVER_JAR, "server");
+			if (needClient) downloadJar(project.getLogger(), MINECRAFT_CLIENT_JAR, "client");
+			if (needServer) downloadJar(project.getLogger(), MINECRAFT_SERVER_JAR, "server");
 		}
 
-		if (extension.hasOptiFine()) {
+		if (needClient && extension.hasOptiFine()) {
 			MINECRAFT_CLIENT_JAR = Openfine.process(project.getLogger(), minecraftVersion, MINECRAFT_CLIENT_JAR, MINECRAFT_SERVER_JAR, extension.getOptiFine());
 			MINECRAFT_MERGED_JAR = new File(MINECRAFT_CLIENT_JAR.getParentFile(), MINECRAFT_CLIENT_JAR.getName().replace("client", "merged"));
 			addDependency("com.github.Chocohead:OptiSine:" + Openfine.VERSION, project, Constants.MINECRAFT_DEPENDENCIES);
 			AbstractPlugin.addMavenRepo(project, "Jitpack", "https://jitpack.io/"); //Needed to fetch OptiSine from
 		}
 
-		if (!MINECRAFT_MERGED_JAR.exists()) {
-			boolean quickMerge;
-			switch (extension.getJarMergeOrder()) {
-			case FIRST:
-				quickMerge = true;
-				break;
+		if (extension.getJarMergeOrder() == JarMergeOrder.INDIFFERENT) {
+			Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("Europe/Stockholm"));
+			calendar.set(2012, Calendar.JULY, 22); //Day before 12w30a
+			mergeOrder = calendar.getTime().before(versionInfo.releaseTime) ? JarMergeOrder.FIRST : JarMergeOrder.LAST;
+		} else {
+			mergeOrder = extension.getJarMergeOrder();
+		}
 
-			case INDIFFERENT:
-				Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("Europe/Stockholm"));
-				calendar.set(2012, Calendar.JULY, 22); //Day before 12w30a
-				quickMerge = calendar.getTime().before(versionInfo.releaseTime);
-				break;
-
-			case LAST:
-				quickMerge = false;
-				break;
-
-			default:
-				throw new IllegalStateException("Unexpected jar merge order " + extension.getJarMergeOrder());
-			}
-
-			Callable<File> task;
-			if (quickMerge) {
-				task = () -> {
+		Callable<File> task;
+		switch (mergeOrder) {
+		case FIRST:
+			task = () -> {
+				if (!MINECRAFT_MERGED_JAR.exists()) {
 					try {
 						mergeJars(project.getLogger());
 					} catch (ZipError e) {
@@ -149,40 +144,55 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 						project.getLogger().error("Could not merge JARs! Deleting source JARs - please re-run the command and move on.", e);
 						throw new RuntimeException(e);
 					}
+				}
 
-					return MINECRAFT_MERGED_JAR;
-				};
-			} else {
-				task = () -> {//TODO: Account for Openfine (or any other jar interfering tasks) changing the merged jar name
-					File mergedJar = new File(extension.getUserCache(), "minecraft-" + minecraftVersion + "-intermediary-net.fabricmc.yarn.jar");
+				return MINECRAFT_MERGED_JAR;
+			};
+			break;
 
-					if (!mergedJar.exists()) {
-						synchronized (mappingLock) {
-							while (mappings == null) {
-								mappingLock.wait();
-							}
+		case LAST:
+			task = () -> {//TODO: Account for Openfine (or any other jar interfering tasks) changing the merged jar name
+				File mergedJar = new File(extension.getUserCache(), "minecraft-" + minecraftVersion + "-intermediary-net.fabricmc.yarn.jar");
+
+				if (!mergedJar.exists()) {
+					synchronized (mappingLock) {
+						while (mappings == null) {
+							mappingLock.wait();
 						}
-
-						Path interClient = extension.getUserCache().toPath().resolve("minecraft-" + minecraftVersion + "-client-intermediary.jar");
-						//Can't use the library provider yet as the configuration might need more things adding to it
-						Set<File> libraries = SnappyRemapper.libsForVersion(project, versionInfo);
-						SnappyRemapper.remapJar(project.getLogger(), libraries, MINECRAFT_CLIENT_JAR.toPath(), "client", mappings, interClient);
-
-						Path interServer = interClient.resolveSibling("minecraft-" + minecraftVersion + "-server-intermediary.jar");
-						libraries = Collections.emptySet(); //The server contains all its own dependencies
-						SnappyRemapper.remapJar(project.getLogger(), libraries, MINECRAFT_SERVER_JAR.toPath(), "server", mappings, interServer);
-
-						mergeJars(project.getLogger(), interClient.toFile(), interServer.toFile(), mergedJar);
 					}
 
-					return mergedJar;
-				};
+					Path interClient = extension.getUserCache().toPath().resolve("minecraft-" + minecraftVersion + "-client-intermediary.jar");
+					//Can't use the library provider yet as the configuration might need more things adding to it
+					Set<File> libraries = SnappyRemapper.libsForVersion(project, versionInfo);
+					SnappyRemapper.remapJar(project.getLogger(), libraries, MINECRAFT_CLIENT_JAR.toPath(), "client", mappings, interClient);
 
-				mappings = SnappyRemapper.getIntermediaries(extension, minecraftVersion); //TODO: Pull these straight from MappingsProvider
-			}
+					Path interServer = interClient.resolveSibling("minecraft-" + minecraftVersion + "-server-intermediary.jar");
+					libraries = Collections.emptySet(); //The server contains all its own dependencies
+					SnappyRemapper.remapJar(project.getLogger(), libraries, MINECRAFT_SERVER_JAR.toPath(), "server", mappings, interServer);
 
-			jarMerger = ForkJoinPool.commonPool().submit(task);
+					mergeJars(project.getLogger(), interClient.toFile(), interServer.toFile(), mergedJar);
+				}
+
+				return mergedJar;
+			};
+
+			mappings = SnappyRemapper.getIntermediaries(extension, minecraftVersion); //TODO: Pull these straight from MappingsProvider
+			break;
+
+		case CLIENT_ONLY:
+			task = () -> MINECRAFT_CLIENT_JAR;
+			break;
+
+		case SERVER_ONLY:
+			task = () -> MINECRAFT_SERVER_JAR;
+			break;
+
+		case INDIFFERENT:
+		default:
+			throw new IllegalStateException("Unexpected jar merge order " + mergeOrder);
 		}
+
+		jarMerger = ForkJoinPool.commonPool().submit(task);
 	}
 
 	private void initFiles(Project project) {

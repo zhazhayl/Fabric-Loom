@@ -62,7 +62,11 @@ public class LoomGradleExtension {
 		/** Always merge jars before mappings are present, regardless of version */
 		FIRST,
 		/** Always remap jars before merging, regardless of version */
-		LAST;
+		LAST,
+		/** Don't merge the jars at all, instead just use the client jar */
+		CLIENT_ONLY,
+		/** Don't merge the jars at all, instead just use the server jar */
+		SERVER_ONLY;
 	}
 	public String runDir = "run";
 	public String refmapName;
