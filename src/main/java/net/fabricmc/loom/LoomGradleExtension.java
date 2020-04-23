@@ -27,6 +27,7 @@ package net.fabricmc.loom;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -54,6 +55,15 @@ import net.fabricmc.loom.providers.MinecraftMappedProvider;
 import net.fabricmc.loom.providers.MinecraftProvider;
 
 public class LoomGradleExtension {
+	/** The order in which the Minecraft client and server jars should be merged together and remapped */
+	public enum JarMergeOrder {
+		/** Run based on whether the Minecraft version is from before 23th July 2012 */
+		INDIFFERENT,
+		/** Always merge jars before mappings are present, regardless of version */
+		FIRST,
+		/** Always remap jars before merging, regardless of version */
+		LAST;
+	}
 	public String runDir = "run";
 	public String refmapName;
 	public final Map<String, String> taskToRefmap = new HashMap<>();
@@ -63,6 +73,7 @@ public class LoomGradleExtension {
 	public boolean extractJars = false;
 	public String customManifest = null;
 
+	private JarMergeOrder mergeOrder = JarMergeOrder.INDIFFERENT;
 	private boolean bulldozeMappings;
 	private File atFile;
 	private File optifine;
@@ -304,6 +315,25 @@ public class LoomGradleExtension {
 
 	public boolean ideSync() {
 		return Boolean.parseBoolean(System.getProperty("idea.sync.active", "false"));
+	}
+
+	public void setJarMergeOrder(String order) {
+		for (JarMergeOrder mergeOrder : JarMergeOrder.values()) {
+			if (mergeOrder.name().equalsIgnoreCase(order)) {
+				setJarMergeOrder(mergeOrder);
+				return;
+			}
+		}
+
+		throw new IllegalArgumentException("Unknown merge order " + order + ", expected one of " + Arrays.toString(JarMergeOrder.values()));
+	}
+
+	public void setJarMergeOrder(JarMergeOrder order) {
+		mergeOrder = order;
+	}
+
+	public JarMergeOrder getJarMergeOrder() {
+		return mergeOrder;
 	}
 
 	public void setBulldozeMappings(boolean force) {
