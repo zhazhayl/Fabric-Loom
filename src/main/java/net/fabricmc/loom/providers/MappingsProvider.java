@@ -42,7 +42,6 @@ import java.util.zip.GZIPInputStream;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.net.UrlEscapers;
 
 import cuchaz.enigma.command.MapSpecializedMethodsCommand;
 
@@ -223,7 +222,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 				} else {
 					if (!intermediaryNames.exists()) {//Grab intermediary mappings from Github
 						project.getLogger().lifecycle(":downloading intermediaries " + intermediaryNames.getName());
-						FileUtils.copyURLToFile(new URL("https://github.com/FabricMC/intermediary/raw/master/mappings/" + UrlEscapers.urlPathSegmentEscaper().escape(minecraftVersion) + ".tiny"), intermediaryNames);
+						FileUtils.copyURLToFile(new URL(SpecialCases.intermediaries(minecraftVersion)), intermediaryNames);
 					} else {
 						project.getLogger().lifecycle(":loading intermediaries " + intermediaryNames.getName());
 					}
@@ -348,20 +347,10 @@ public class MappingsProvider extends LogicalDependencyProvider {
 					if (nativeNames) {
 						MappingBlob renamer;
 						if (!minecraftVersion.equals(mapping.minecraftVersion)) {
+
 							renamer = versionToIntermediaries.computeIfAbsent(mapping.minecraftVersion, version -> {
-								Path intermediaryNames = searchForIntermediaries(versionToMappings.getOrDefault(version, Collections.emptyList())).map(mappingFile -> mappingFile.origin.toPath()).orElseGet(() -> {
-									File inters = new File(extension.getUserCache(), "mappings/" + version + '/' + INTERMEDIARY + "-intermediary.tiny");
-
-									if (!inters.exists()) {//Grab intermediary mappings from Github
-										try {
-											FileUtils.copyURLToFile(new URL("https://github.com/FabricMC/intermediary/raw/master/mappings/" + UrlEscapers.urlPathSegmentEscaper().escape(version) + ".tiny"), inters);
-										} catch (IOException e) {
-											throw new UncheckedIOException("Error downloading Intermediary mappings for " + version, e);
-										}
-									}
-
-									return inters.toPath();
-								});
+								Path intermediaryNames = searchForIntermediaries(versionToMappings.getOrDefault(version, Collections.emptyList()))
+										.map(mappingFile -> mappingFile.origin.toPath()).orElseGet(() -> SnappyRemapper.getIntermediaries(extension, version));
 
 								MappingBlob inters = new MappingBlob();
 								try {

@@ -16,6 +16,7 @@ import java.io.UncheckedIOException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.Set;
 
@@ -23,8 +24,7 @@ import org.apache.commons.io.FileUtils;
 import org.gradle.api.GradleException;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Dependency;
-
-import com.google.common.net.UrlEscapers;
+import org.gradle.api.logging.Logger;
 
 import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.util.MinecraftVersionInfo;
@@ -80,41 +80,49 @@ public class SnappyRemapper {
 		Path remappedJar = extension.getUserCache().toPath().resolve("minecraft-" + minecraftVersion + "-intermediary-net.fabricmc.yarn.jar");
 
 		if (Files.notExists(remappedJar)) {
-			remapJar(project, version, mergedJar, intermediaryMappings.orElseGet(() -> {
-				File intermediaryNames = new File(extension.getUserCache(), "mappings/" + minecraftVersion + '/' + INTERMEDIARY + "-intermediary.tiny");
-
-				if (!intermediaryNames.exists()) {
-					try {
-						FileUtils.copyURLToFile(new URL("https://github.com/FabricMC/intermediary/raw/master/mappings/" + UrlEscapers.urlPathSegmentEscaper().escape(minecraftVersion) + ".tiny"), intermediaryNames);
-					} catch (IOException e) {
-						throw new UncheckedIOException("Error downloading Intermediary mappings for " + version, e);
-					}
-				}
-
-				return intermediaryNames.toPath();
-			}), remappedJar);
+			remapJar(project, version, mergedJar, intermediaryMappings.orElseGet(() -> getIntermediaries(extension, minecraftVersion)), remappedJar);
 		}
 
 		return remappedJar;
 	}
 
-	private static void remapJar(Project project, MinecraftVersionInfo version, Path mergedJar, Path intermediaryMappings, Path remappedJar) {
-		Set<File> libraries = project.getConfigurations().detachedConfiguration(version.libraries.stream().filter(library -> library.allowed() && !library.isNative())
-				.map(library -> project.getDependencies().module(library.getArtifactName())).toArray(Dependency[]::new)).getFiles();
+	static Path getIntermediaries(LoomGradleExtension extension, String version) {
+		File intermediaryNames = new File(extension.getUserCache(), "mappings/" + version + '/' + INTERMEDIARY + "-intermediary.tiny");
 
-		project.getLogger().lifecycle("Remapping minecraft (TinyRemapper, official -> intermediary)");
+		if (!intermediaryNames.exists()) {
+			try {
+				FileUtils.copyURLToFile(new URL(SpecialCases.intermediaries(version)), intermediaryNames);
+			} catch (IOException e) {
+				throw new UncheckedIOException("Error downloading Intermediary mappings for " + version, e);
+			}
+		}
+
+		return intermediaryNames.toPath();
+	}
+
+	static Set<File> libsForVersion(Project project, MinecraftVersionInfo version) {
+		return project.getConfigurations().detachedConfiguration(version.libraries.stream().filter(library -> library.allowed() && !library.isNative())
+				.map(library -> project.getDependencies().module(library.getArtifactName())).toArray(Dependency[]::new)).getFiles();
+	}
+
+	private static void remapJar(Project project, MinecraftVersionInfo version, Path mergedJar, Path intermediaryMappings, Path remappedJar) {
+		remapJar(project.getLogger(), libsForVersion(project, version), mergedJar, "official", intermediaryMappings, remappedJar);
+	}
+
+	static void remapJar(Logger logger, Collection<File> libraries, Path originJar, String originMappings, Path intermediaryMappings, Path remappedJar) {
+		logger.lifecycle("Remapping minecraft (TinyRemapper, " + originMappings + " -> intermediary)");
 
 		TinyRemapper remapper = TinyRemapper.newRemapper()
-				.withMappings(TinyUtils.createTinyMappingProvider(intermediaryMappings, "official", "intermediary"))
+				.withMappings(TinyUtils.createTinyMappingProvider(intermediaryMappings, originMappings, "intermediary"))
 				.build();
 
 		try (OutputConsumerPath outputConsumer = new OutputConsumerPath(remappedJar)) {
-			outputConsumer.addNonClassFiles(mergedJar);
-			remapper.readClassPath(libraries.stream().map(File::toPath).toArray(Path[]::new));
-			remapper.readInputs(mergedJar);
+			outputConsumer.addNonClassFiles(originJar);
+			remapper.readClassPath(libraries.stream().map(File::toPath).distinct().toArray(Path[]::new));
+			remapper.readInputs(originJar);
 			remapper.apply(outputConsumer);
 		} catch (IOException e) {
-			throw new RuntimeException("Failed to remap JAR " + mergedJar + " with mappings from " + intermediaryMappings, e);
+			throw new RuntimeException("Failed to remap JAR " + originJar + " with mappings from " + intermediaryMappings, e);
 		} finally {
 			remapper.finish();
 		}

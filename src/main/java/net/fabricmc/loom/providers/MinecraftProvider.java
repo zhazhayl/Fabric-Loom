@@ -81,6 +81,7 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 		try (FileReader reader = new FileReader(downloadMcJson(project, extension, offline))) {
 			versionInfo = GSON.fromJson(reader, MinecraftVersionInfo.class);
 		}
+		SpecialCases.enhanceVersion(minecraftVersion, versionInfo);
 
 		if (offline) {
 			if (MINECRAFT_CLIENT_JAR.exists() && MINECRAFT_SERVER_JAR.exists()) {
