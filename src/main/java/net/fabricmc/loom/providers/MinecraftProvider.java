@@ -96,7 +96,7 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 		try (FileReader reader = new FileReader(downloadMcJson(project, extension, offline))) {
 			versionInfo = GSON.fromJson(reader, MinecraftVersionInfo.class);
 		}
-		SpecialCases.enhanceVersion(minecraftVersion, versionInfo);
+		SpecialCases.enhanceVersion(extension, versionInfo);
 
 		boolean needClient = extension.getJarMergeOrder() != JarMergeOrder.SERVER_ONLY;
 		boolean needServer = extension.getJarMergeOrder() != JarMergeOrder.CLIENT_ONLY;

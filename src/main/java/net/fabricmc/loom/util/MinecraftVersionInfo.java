@@ -33,6 +33,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 public class MinecraftVersionInfo {
+	public String id;
 	public Date releaseTime;
 	public List<Library> libraries;
 	public Map<String, Downloads> downloads;

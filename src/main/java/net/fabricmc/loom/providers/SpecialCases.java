@@ -9,20 +9,22 @@ package net.fabricmc.loom.providers;
 
 import com.google.common.net.UrlEscapers;
 
+import net.fabricmc.loom.LoomGradleExtension;
+import net.fabricmc.loom.LoomGradleExtension.JarMergeOrder;
 import net.fabricmc.loom.util.MinecraftVersionInfo;
 import net.fabricmc.loom.util.MinecraftVersionInfo.Downloads;
 
 /** It's not hard coded, it's just inflexible */
 class SpecialCases {
-	static void enhanceVersion(String versionID, MinecraftVersionInfo version) {
-		fixMissingServer(versionID, version);
+	static void enhanceVersion(LoomGradleExtension extension, MinecraftVersionInfo version) {
+		fixMissingServer(extension, version);
 	}
 
-	private static void fixMissingServer(String versionID, MinecraftVersionInfo version) {
+	private static void fixMissingServer(LoomGradleExtension extension, MinecraftVersionInfo version) {
 		if (version.downloads.containsKey("server")) return;
 
 		String serverVersion;
-		switch (versionID) {
+		switch (version.id) {
 		case "1.2.4":
 		case "1.2.3":
 		case "1.2.2":
@@ -47,7 +49,7 @@ class SpecialCases {
 		case "b1.2":
 		case "b1.1_02":
 		case "b1.1_01":
-			serverVersion = versionID;
+			serverVersion = version.id;
 			break;
 
 		case "1.0": //Expects 1.0.0, although servers had an additional hot patch version too
@@ -157,18 +159,19 @@ class SpecialCases {
 		case "c0.0.13a":
 		case "c0.0.13a_03":
 		case "c0.0.11a":
-			throw new IllegalArgumentException("Minecraft version does't have an (obvious) server equivalent");
-
 		case "inf-20100618":
 		case "rd-161348":
 		case "rd-160052":
 		case "rd-20090515":
 		case "rd-132328":
 		case "rd-132211":
-			throw new IllegalArgumentException("Loom doesn't (currently) support client only use");
+			if (extension.getJarMergeOrder() != JarMergeOrder.CLIENT_ONLY) {
+				throw new IllegalArgumentException("Can only use Minecraft version " + version.id + " with client merge only");
+			}
+			return;
 
 		default:
-			throw new IllegalArgumentException("Unexpected Minecraft version " + versionID);
+			throw new IllegalArgumentException("Unexpected Minecraft version " + version.id + " without server jar");
 		}
 
 		Downloads server = version.new Downloads();
