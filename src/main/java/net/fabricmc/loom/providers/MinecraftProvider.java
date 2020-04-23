@@ -30,7 +30,15 @@ import java.io.IOException;
 import java.io.Reader;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.Calendar;
+import java.util.Collections;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TimeZone;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
 import java.util.function.Consumer;
 import java.util.zip.ZipError;
 
@@ -63,6 +71,10 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 	private File MINECRAFT_CLIENT_JAR;
 	private File MINECRAFT_SERVER_JAR;
 	private File MINECRAFT_MERGED_JAR;
+
+	private ForkJoinTask<File> jarMerger;
+	private final Object mappingLock = new Object();
+	private Path mappings;
 
 	@Override
 	public void register(LoomDependencyManager dependencyManager) {
@@ -105,15 +117,71 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 		}
 
 		if (!MINECRAFT_MERGED_JAR.exists()) {
-			try {
-				mergeJars(project.getLogger());
-			} catch (ZipError e) {
-				DownloadUtil.delete(MINECRAFT_CLIENT_JAR);
-				DownloadUtil.delete(MINECRAFT_SERVER_JAR);
+			boolean quickMerge;
+			switch (extension.getJarMergeOrder()) {
+			case FIRST:
+				quickMerge = true;
+				break;
 
-				project.getLogger().error("Could not merge JARs! Deleting source JARs - please re-run the command and move on.", e);
-				throw new RuntimeException();
+			case INDIFFERENT:
+				Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("Europe/Stockholm"));
+				calendar.set(2012, Calendar.JULY, 22); //Day before 12w30a
+				quickMerge = calendar.getTime().before(versionInfo.releaseTime);
+				break;
+
+			case LAST:
+				quickMerge = false;
+				break;
+
+			default:
+				throw new IllegalStateException("Unexpected jar merge order " + extension.getJarMergeOrder());
 			}
+
+			Callable<File> task;
+			if (quickMerge) {
+				task = () -> {
+					try {
+						mergeJars(project.getLogger());
+					} catch (ZipError e) {
+						DownloadUtil.delete(MINECRAFT_CLIENT_JAR);
+						DownloadUtil.delete(MINECRAFT_SERVER_JAR);
+
+						project.getLogger().error("Could not merge JARs! Deleting source JARs - please re-run the command and move on.", e);
+						throw new RuntimeException(e);
+					}
+
+					return MINECRAFT_MERGED_JAR;
+				};
+			} else {
+				task = () -> {//TODO: Account for Openfine (or any other jar interfering tasks) changing the merged jar name
+					File mergedJar = new File(extension.getUserCache(), "minecraft-" + minecraftVersion + "-intermediary-net.fabricmc.yarn.jar");
+
+					if (!mergedJar.exists()) {
+						synchronized (mappingLock) {
+							while (mappings == null) {
+								mappingLock.wait();
+							}
+						}
+
+						Path interClient = extension.getUserCache().toPath().resolve("minecraft-" + minecraftVersion + "-client-intermediary.jar");
+						//Can't use the library provider yet as the configuration might need more things adding to it
+						Set<File> libraries = SnappyRemapper.libsForVersion(project, versionInfo);
+						SnappyRemapper.remapJar(project.getLogger(), libraries, MINECRAFT_CLIENT_JAR.toPath(), "client", mappings, interClient);
+
+						Path interServer = interClient.resolveSibling("minecraft-" + minecraftVersion + "-server-intermediary.jar");
+						libraries = Collections.emptySet(); //The server contains all its own dependencies
+						SnappyRemapper.remapJar(project.getLogger(), libraries, MINECRAFT_SERVER_JAR.toPath(), "server", mappings, interServer);
+
+						mergeJars(project.getLogger(), interClient.toFile(), interServer.toFile(), mergedJar);
+					}
+
+					return mergedJar;
+				};
+
+				mappings = SnappyRemapper.getIntermediaries(extension, minecraftVersion); //TODO: Pull these straight from MappingsProvider
+			}
+
+			jarMerger = ForkJoinPool.commonPool().submit(task);
 		}
 	}
 
@@ -238,6 +306,15 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 		}
 	}
 
+	void giveIntermediaries(Path mappings) {
+		if (!jarMerger.isDone()) {
+			synchronized (mappingLock) {
+				this.mappings = mappings;
+				mappingLock.notify();
+			}
+		}
+	}
+
 	private void mergeJars(Logger logger) throws IOException {
 		mergeJars(logger, MINECRAFT_CLIENT_JAR, MINECRAFT_SERVER_JAR, MINECRAFT_MERGED_JAR);
 	}
@@ -252,7 +329,7 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 	}
 
 	public File getMergedJar() {
-		return MINECRAFT_MERGED_JAR;
+		return jarMerger.join();
 	}
 
 	public MinecraftLibraryProvider getLibraryProvider() {

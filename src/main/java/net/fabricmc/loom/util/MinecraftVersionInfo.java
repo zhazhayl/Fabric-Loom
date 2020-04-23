@@ -25,6 +25,7 @@
 package net.fabricmc.loom.util;
 
 import java.io.File;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -32,6 +33,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 public class MinecraftVersionInfo {
+	public Date releaseTime;
 	public List<Library> libraries;
 	public Map<String, Downloads> downloads;
 	public AssetIndex assetIndex;
