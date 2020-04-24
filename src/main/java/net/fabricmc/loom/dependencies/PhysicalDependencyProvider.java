@@ -188,13 +188,13 @@ public abstract class PhysicalDependencyProvider extends DependencyProvider {
 				if (split > 0) {
 					project.getLogger().debug("Inferring versioning from file dependency: " + root);
 
-					name = name.substring(0, split);
 					version = name.substring(split + 1);
+					name = name.substring(0, split);
 
 					project.getLogger().debug("Read dependency as " + name + '-' + version + " (from split point " + split + ')');
 				} else {
 					project.getLogger().warn("Unable to infer versioning from file dependency: " + root);
-					project.getLogger().warn("Renaming the file to the format \"name-version." + FilenameUtils.getExtension(name) + "\" would be advisable");
+					project.getLogger().warn("Renaming the file to the format \"name-version." + FilenameUtils.getExtension(root.getName()) + "\" would be advisable");
 
 					version = "1.0";
 				}
