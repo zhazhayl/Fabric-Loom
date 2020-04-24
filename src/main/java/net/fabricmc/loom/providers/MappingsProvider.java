@@ -503,11 +503,29 @@ public class MappingsProvider extends LogicalDependencyProvider {
 			assert !MAPPINGS_TINY.exists();
 
 			project.getLogger().lifecycle(":populating field names");
-			new CommandProposeFieldNames().run(new String[] {
-					minecraftProvider.getMergedJar().getAbsolutePath(),
-					MAPPINGS_TINY_BASE.getAbsolutePath(),
-					MAPPINGS_TINY.getAbsolutePath()
-			});
+			String namespace;
+			switch (minecraftProvider.getMergeStrategy()) {
+			case FIRST:
+				namespace = "official";
+				break;
+
+			case LAST:
+				namespace = "intermediary";
+				break;
+
+			case CLIENT_ONLY:
+				namespace = "client";
+				break;
+
+			case SERVER_ONLY:
+				namespace = "server";
+				break;
+
+			case INDIFFERENT:
+			default:
+				throw new IllegalStateException("Unexpected jar merge strategy " + minecraftProvider.getMergeStrategy());
+			}
+			CommandProposeFieldNames.run(minecraftProvider.getMergedJar(), MAPPINGS_TINY_BASE, MAPPINGS_TINY, namespace, "named");
 		}
 
 		if (Files.exists(parameterNames)) {

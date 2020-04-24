@@ -47,7 +47,7 @@ dependencies {
 	implementation ('com.google.guava:guava:28.0-jre')
 
 	// game handling utils
-	implementation ('net.fabricmc:stitch:0.4.3.71') {
+	implementation ('com.github.Chocohead:Stitch:ab75b5d') {
 		exclude module: 'enigma'
 		exclude module: 'tiny-mappings-parser'
 	}
