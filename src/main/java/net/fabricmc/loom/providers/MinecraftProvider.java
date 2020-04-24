@@ -338,6 +338,30 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 		}
 	}
 
+	public JarMergeOrder getMergeStrategy() {
+		return mergeOrder;
+	}
+
+	public Set<String> getNeededHeaders() {
+		switch (mergeOrder) {
+		case FIRST:
+			return ImmutableSet.of("official", "intermediary");
+
+		case LAST:
+			return ImmutableSet.of("client", "server", "intermediary");
+
+		case CLIENT_ONLY:
+			return ImmutableSet.of("client", "intermediary");
+
+		case SERVER_ONLY:
+			return ImmutableSet.of("server", "intermediary");
+
+		case INDIFFERENT:
+		default:
+			throw new IllegalStateException("Unexpected jar merge order " + mergeOrder);
+		}
+	}
+
 	public File getMergedJar() {
 		return jarMerger.join();
 	}

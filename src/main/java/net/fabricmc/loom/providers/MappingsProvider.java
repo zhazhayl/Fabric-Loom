@@ -52,6 +52,7 @@ import org.gradle.api.Project;
 import org.gradle.api.logging.Logger;
 
 import net.fabricmc.loom.LoomGradleExtension;
+import net.fabricmc.loom.LoomGradleExtension.JarMergeOrder;
 import net.fabricmc.loom.dependencies.DependencyProvider;
 import net.fabricmc.loom.dependencies.LogicalDependencyProvider;
 import net.fabricmc.loom.providers.StackedMappingsProvider.MappingFile;
@@ -167,7 +168,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 				}
 
 				//Need to see if any of the mapping files have Intermediaries for the Minecraft version they're going to be running on
-				Optional<MappingFile> interProvider = searchForIntermediaries(versionToMappings.getOrDefault(minecraftVersion, Collections.emptyList()));
+				Optional<MappingFile> interProvider = searchForIntermediaries(versionToMappings.getOrDefault(minecraftVersion, Collections.emptyList()), minecraftProvider.getNeededHeaders());
 
 				MappingBlob intermediaries;
 				if (interProvider.isPresent()) {
@@ -197,6 +198,10 @@ public class MappingsProvider extends LogicalDependencyProvider {
 						default: //Shouldn't end up here if this is the only mapping file supplied
 							throw new IllegalStateException("Unexpected mappings type " + mappings.type + " from " + mappings.origin);
 						}
+					}
+
+					if (minecraftProvider.getMergeStrategy() != JarMergeOrder.FIRST) {
+						throw new UnsupportedOperationException("Mapping stacking only currently supports immediately merged jars");
 					}
 
 					project.getLogger().lifecycle(":loading intermediaries " + mappings.origin.getName());
@@ -230,6 +235,10 @@ public class MappingsProvider extends LogicalDependencyProvider {
 					if (mappingFiles.isEmpty()) {
 						TinyDuplicator.duplicateV1Column(intermediaryNames.toPath(), MAPPINGS_TINY_BASE.toPath(), "intermediary", "named");
 						break free;
+					}
+
+					if (minecraftProvider.getMergeStrategy() != JarMergeOrder.FIRST) {
+						throw new UnsupportedOperationException("Mapping stacking only currently supports immediately merged jars");
 					}
 
 					TinyReader.readTiny(intermediaryNames.toPath(), "official", "intermediary", intermediaries = new MappingBlob());
@@ -347,7 +356,6 @@ public class MappingsProvider extends LogicalDependencyProvider {
 					if (nativeNames) {
 						MappingBlob renamer;
 						if (!minecraftVersion.equals(mapping.minecraftVersion)) {
-
 							renamer = versionToIntermediaries.computeIfAbsent(mapping.minecraftVersion, version -> {
 								Path intermediaryNames = searchForIntermediaries(versionToMappings.getOrDefault(version, Collections.emptyList()))
 										.map(mappingFile -> mappingFile.origin.toPath()).orElseGet(() -> SnappyRemapper.getIntermediaries(extension, version));
@@ -531,11 +539,8 @@ public class MappingsProvider extends LogicalDependencyProvider {
 				@Override
 				public void load(Map<String, String> classMap, Map<String, String> fieldMap, Map<String, String> methodMap, Map<String, String[]> localMap) {
 					load(classMap, fieldMap, methodMap);
-					if ("official".equals(fromM)) {
+					if ("intermediary".equals(fromM)) {
 						localMap.putAll(lines);
-					} else {
-						//If we're not going from notch names to something else the line map is useless
-						project.getLogger().warn("Missing param map from " + fromM + " to " + toM);
 					}
 				}
 
@@ -573,7 +578,12 @@ public class MappingsProvider extends LogicalDependencyProvider {
 		addDependency(mappingJar, project, Constants.MAPPINGS);
 	}
 
+	@Deprecated
 	private static Optional<MappingFile> searchForIntermediaries(List<MappingFile> mappings) {
+		return searchForIntermediaries(mappings, ImmutableSet.of("official", "intermediary"));
+	}
+
+	private static Optional<MappingFile> searchForIntermediaries(List<MappingFile> mappings, Set<String> interHeaders) {
 		return mappings.stream().filter(file -> {
 			try {
 				List<String> headers;
@@ -595,8 +605,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 					throw new IllegalArgumentException("Unexpected mapping types to read: " + file.type);
 				}
 
-				assert headers.indexOf("named") >= 0; //We should have named mappings, odd file otherwise
-				return headers.indexOf("official") >= 0 && headers.indexOf("intermediary") >= 0;
+				return headers.containsAll(interHeaders);
 			} catch (IOException e) {
 				throw new UncheckedIOException("Error reading mapping file from " + file.origin, e);
 			}

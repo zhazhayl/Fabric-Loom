@@ -42,7 +42,10 @@ import java.util.stream.Collectors;
 
 import org.gradle.api.InvalidUserDataException;
 import org.gradle.api.Project;
+import org.gradle.api.logging.Logger;
 import org.zeroturnaround.zip.ZipUtil;
+
+import com.google.common.io.Files;
 
 import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.providers.MappingsProvider;
@@ -60,39 +63,64 @@ import net.fabricmc.tinyremapper.TinyRemapper;
 
 public class MapJarsTiny {
 	public void mapJars(MinecraftProvider jarProvider, MinecraftMappedProvider mapProvider, Project project) throws IOException {
-		String fromM = "official";
-
 		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
 		MappingsProvider mappingsProvider = extension.getMappingsProvider();
 
 		Path[] classpath = mapProvider.getMapperPaths().stream().map(File::toPath).toArray(Path[]::new);
 
-		Path input = jarProvider.getMergedJar().toPath();
-		Path outputMapped = mapProvider.getMappedJar().toPath();
-		Path outputIntermediary = mapProvider.getIntermediaryJar().toPath();
+		interJar: {
+			String fromM;
+			switch (jarProvider.getMergeStrategy()) {
+			case FIRST:
+				fromM = "official";
+				break;
 
-		for (String toM : Arrays.asList("named", "intermediary")) {
-			Path output = "named".equals(toM) ? outputMapped : outputIntermediary;
+			case CLIENT_ONLY:
+				fromM = "client";
+				break;
 
-			project.getLogger().lifecycle(":remapping minecraft (TinyRemapper, " + fromM + " -> " + toM + ")");
+			case SERVER_ONLY:
+				fromM = "server";
+				break;
 
-			TinyRemapper remapper = TinyRemapper.newRemapper()
-					.withMappings(mappingsProvider.mcRemappingFactory.create(fromM, toM))
-					.ignoreConflicts(extension.shouldBulldozeMappings())
-					.renameInvalidLocals(true)
-					.rebuildSourceFilenames(true)
-					.build();
+			case LAST:
+				if (!mapProvider.getIntermediaryJar().exists()) {//It may already exist if the merged jar is purely in Intermediary names
+					Files.copy(jarProvider.getMergedJar(), mapProvider.getIntermediaryJar());
+				} else {
+					assert jarProvider.getMergedJar().equals(mapProvider.getIntermediaryJar());
+				}
+				break interJar;
 
-			try (OutputConsumerPath outputConsumer = new OutputConsumerPath(output)) {
-				outputConsumer.addNonClassFiles(input);
-				remapper.readClassPath(classpath);
-				remapper.readInputs(input);
-				remapper.apply(outputConsumer);
-			} catch (Exception e) {
-				throw new RuntimeException("Failed to remap JAR " + input + " with mappings from " + mappingsProvider.MAPPINGS_TINY, e);
-			} finally {
-				remapper.finish();
+			case INDIFFERENT:
+			default:
+				throw new IllegalStateException("Unexpected jar merge strategy " + jarProvider.getMergeStrategy());
 			}
+
+			mapJar(project.getLogger(), extension, mappingsProvider, jarProvider.getMergedJar(), classpath, mapProvider.getIntermediaryJar(), fromM, "intermediary");
+		}
+
+		mapJar(project.getLogger(), extension, mappingsProvider, mapProvider.getIntermediaryJar(), classpath, mapProvider.getMappedJar(), "intermediary", "named");
+	}
+
+	private static void mapJar(Logger logger, LoomGradleExtension extension, MappingsProvider mappingsProvider, File input, Path[] classpath, File output, String fromM, String toM) throws IOException {
+		logger.lifecycle(":remapping minecraft (TinyRemapper, " + fromM + " -> " + toM + ')');
+
+		TinyRemapper remapper = TinyRemapper.newRemapper()
+				.withMappings(mappingsProvider.mcRemappingFactory.create(fromM, toM))
+				.ignoreConflicts(extension.shouldBulldozeMappings())
+				.renameInvalidLocals(true)
+				.rebuildSourceFilenames(true)
+				.build();
+
+		try (OutputConsumerPath outputConsumer = new OutputConsumerPath(output.toPath())) {
+			outputConsumer.addNonClassFiles(input.toPath());
+			remapper.readClassPath(classpath);
+			remapper.readInputs(input.toPath());
+			remapper.apply(outputConsumer);
+		} catch (Exception e) {
+			throw new RuntimeException("Failed to remap JAR " + input + " with mappings from " + mappingsProvider.MAPPINGS_TINY, e);
+		} finally {
+			remapper.finish();
 		}
 	}
 

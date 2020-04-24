@@ -112,7 +112,7 @@ public class TinyV2toV1 {
 					if (finaliser != null) finaliser.run(); //Ensure last parameters have definitely been written
 					return new ClassVisitor() {
 						class ParamHolder implements MethodVisitor {
-							private final int named = namespaces.indexOf("named"), official = namespaces.indexOf("official");
+							private final int named = namespaces.indexOf("named"), official = namespaces.indexOf("intermediary");
 							private final String className = names[named];
 							private final String method, desc;
 							private String[] args;
