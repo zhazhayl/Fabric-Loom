@@ -37,6 +37,7 @@ import org.gradle.api.artifacts.Dependency;
 import org.gradle.api.artifacts.DependencySet;
 import org.gradle.api.artifacts.ExternalModuleDependency;
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
+import org.gradle.api.plugins.JavaPlugin;
 
 import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.dependencies.PhysicalDependencyProvider.DependencyInfo;
@@ -168,7 +169,7 @@ public class LoomDependencyManager {
 
 		JsonObject libraries = jsonObject.get("libraries").getAsJsonObject();
 		Configuration mcDepsConfig = project.getConfigurations().getByName(Constants.MINECRAFT_DEPENDENCIES);
-		Configuration apDepsConfig = project.getConfigurations().getByName("annotationProcessor");
+		Configuration apDepsConfig = project.getConfigurations().getByName(JavaPlugin.ANNOTATION_PROCESSOR_CONFIGURATION_NAME);
 
 		libraries.get("common").getAsJsonArray().forEach(jsonElement -> {
 			String name = jsonElement.getAsJsonObject().get("name").getAsString();
