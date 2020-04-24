@@ -20,6 +20,7 @@ import java.util.function.Consumer;
 
 import org.apache.commons.io.FilenameUtils;
 
+import org.gradle.api.InvalidUserDataException;
 import org.gradle.api.Project;
 
 import net.fabricmc.loom.LoomGradleExtension;
@@ -137,9 +138,13 @@ public class StackedMappingsProvider extends PhysicalDependencyProvider {
 			minecraftVersion = version.substring(0, version.lastIndexOf('+'));
 			mappingsVersion = version.substring(version.lastIndexOf('.') + 1);
 		} else {
-			char splitter = version.contains("-") ? '-' : '.';
-			minecraftVersion = version.substring(0, version.lastIndexOf(splitter));
-			mappingsVersion = version.substring(version.lastIndexOf(splitter) + 1);
+			try {
+				char splitter = version.contains("-") ? '-' : '.';
+				minecraftVersion = version.substring(0, version.lastIndexOf(splitter));
+				mappingsVersion = version.substring(version.lastIndexOf(splitter) + 1);
+			} catch (IndexOutOfBoundsException e) {
+				throw new InvalidUserDataException("Mapping dependency with invalid version given: " + dependency, e);
+			}
 		}
 
 		MappingType type;
