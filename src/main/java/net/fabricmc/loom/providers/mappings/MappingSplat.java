@@ -187,7 +187,7 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 		//Fallback should cover all of mapping's class names, with the potential for more it doesn't have
 		for (Mapping mapping : fallback) {
 			String notch = mapping.from;
-			Mapping other = mappings.get(notch);
+			Mapping other = mappings.getOrDummy(notch);
 
 			String inter = mapping.toOr(notch);
 			String name = findName(other.to, inter, notch, mappings);
@@ -237,12 +237,12 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 		for (Mapping mapping : mappings) {
 			String notch = mapping.from;
 
-			Mapping other = fallback.get(notch);
 			CombinedMapping combined = this.mappings.get(notch);
-			if (other == null || combined == null) {
-				System.err.println("Missing " + (other == null ? combined == null ? "both" : "from mappings" : "from combined"));
-				throw new IllegalStateException("Extra mappings missing from fallback! Unable to find " + notch + " (" + mapping.to + ')');
+			if (combined == null) {
+				assert fallback.tryMapName(notch) == null;
+				throw new IllegalStateException("Extra class mapping missing from fallback! Unable to find " + notch + " (mapped as " + mapping.to + ')');
 			}
+			Mapping other = fallback.getOrDummy(notch); //Won't be a dummy if combined is not null
 
 			for (Method method : mapping.methods()) {
 				if (other.hasMethod(method)) continue;
@@ -337,12 +337,12 @@ public class MappingSplat implements Iterable<CombinedMapping> {
 						nameBits.add(segments[i]);
 					}
 
-					Mapping parent = mappings.get(nameBits.toString());
-					if (parent.to != null) {
+					String parent = mappings.tryMapName(nameBits.toString());
+					if (parent != null) {
 						String[] extra = inter.split("\\$");
 
 						nameBits = new StringJoiner("$");
-						nameBits.add(parent.to);
+						nameBits.add(parent);
 						for (int extraEnd = extra.length, i = extraEnd - depth; i < extraEnd; i++) {
 							nameBits.add(extra[i]);
 						}
