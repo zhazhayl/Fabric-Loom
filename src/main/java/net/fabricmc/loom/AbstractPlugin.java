@@ -150,7 +150,10 @@ public class AbstractPlugin implements Plugin<Project> {
 		extendsFrom(Constants.MINECRAFT_INTERMEDIARY, Constants.MINECRAFT_DEPENDENCIES);
 
 		extendsFrom("compile", Constants.MAPPINGS);
-		if (!extension.ideSync()) extendsFrom("annotationProcessor", Constants.MAPPINGS);
+
+		if (!extension.ideSync()) {
+			extendsFrom("annotationProcessor", Constants.MAPPINGS);
+		}
 
 		configureIDEs();
 		configureCompile();
