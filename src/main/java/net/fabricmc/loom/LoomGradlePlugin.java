@@ -25,17 +25,14 @@
 package net.fabricmc.loom;
 
 import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Locale;
 import java.util.function.BiConsumer;
 
 import org.gradle.api.Action;
-import org.gradle.api.DefaultTask;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.plugins.ExtraPropertiesExtension;
+import org.gradle.api.tasks.Copy;
 import org.gradle.api.tasks.TaskContainer;
 import org.gradle.api.tasks.TaskProvider;
 
@@ -92,8 +89,10 @@ public class LoomGradlePlugin extends AbstractPlugin {
 
 		tasks.register("remapJar", RemapJarTask.class);
 
-		TaskProvider<FernFlowerTask> decompileTask = register("genSourcesDecompile", FernFlowerTask.class, t -> {
-			t.getOutputs().upToDateWhen((o) -> false);
+		TaskProvider<FernFlowerTask> decompileTask = register("genSourcesDecompile", FernFlowerTask.class, task -> {
+			task.getOutputs().upToDateWhen(t -> false);
+			boolean shouldRun = task.shouldRun();
+			task.onlyIf(t -> shouldRun);
 		}, (project, task) -> {
 			LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
 			MinecraftLibraryProvider libraryProvider = extension.getMinecraftProvider().getLibraryProvider();
@@ -109,37 +108,30 @@ public class LoomGradlePlugin extends AbstractPlugin {
 			task.setLibraries(libraryProvider.getLibraries());
 		});
 
-		TaskProvider<RemapLineNumbersTask> remapLineNumbersTask = register("genSourcesRemapLineNumbers", RemapLineNumbersTask.class, t -> {
-			t.getOutputs().upToDateWhen((o) -> false);
+		TaskProvider<RemapLineNumbersTask> remapLineNumbersTask = register("genSourcesRemapLineNumbers", RemapLineNumbersTask.class, task -> {
+			task.getOutputs().upToDateWhen(t -> false);
 		}, (project, task) -> {
-			task.dependsOn(decompileTask);
-
 			AbstractDecompileTask decompile = decompileTask.get();
+
+			task.dependsOn(decompile);
+			task.onlyIf(t -> !decompile.getState().getSkipped());
+
 			task.setInput(decompile.getInput());
 			task.setLineMapFile(decompile.getLineMapFile());
 			task.setOutput(getMappedByproduct(project, "-linemapped.jar"));
 		});
 
-		register("genSources", DefaultTask.class, t -> {
-			t.setGroup("fabric");
-			t.getOutputs().upToDateWhen((o) -> false);
+		register("genSources", Copy.class, task -> {
+			task.setGroup("fabric");
+			task.getOutputs().upToDateWhen(t -> false);
 		}, (project, task) -> {
-			task.dependsOn(remapLineNumbersTask);
-
 			RemapLineNumbersTask lineNumbers = remapLineNumbersTask.get();
-			Path mappedJarPath = lineNumbers.getInput().toPath();
-			Path linemappedJarPath = lineNumbers.getOutput().toPath();
 
-			task.doLast(t -> {
-				if (Files.exists(linemappedJarPath)) {
-					try {
-						Files.deleteIfExists(mappedJarPath);
-						Files.copy(linemappedJarPath, mappedJarPath);
-					} catch (IOException e) {
-						throw new RuntimeException(e);
-					}
-				}
-			});
+			task.dependsOn(lineNumbers);
+			task.onlyIf(t -> !lineNumbers.getState().getSkipped());
+
+			task.from(lineNumbers.getInput());
+			task.into(lineNumbers.getOutput());
 		});
 
 		tasks.register("downloadAssets", DownloadAssetsTask.class, t -> {

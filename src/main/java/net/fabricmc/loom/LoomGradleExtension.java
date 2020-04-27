@@ -46,7 +46,10 @@ import org.cadixdev.mercury.Mercury;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.artifacts.Configuration;
+import org.gradle.api.artifacts.ConfigurationContainer;
 import org.gradle.api.artifacts.Dependency;
+import org.gradle.api.file.FileCollection;
+import org.gradle.api.initialization.dsl.ScriptHandler;
 import org.gradle.api.plugins.BasePluginConvention;
 
 import net.fabricmc.loom.dependencies.LoomDependencyManager;
@@ -279,6 +282,21 @@ public class LoomGradleExtension {
 		}
 
 		return null;
+	}
+
+	public FileCollection getFernFlowerClasspath() {
+		return recurseProjects(project -> {
+			ConfigurationContainer configurations = project.getBuildscript().getConfigurations();
+			Configuration fileClasspath = configurations.getByName(ScriptHandler.CLASSPATH_CONFIGURATION);
+
+			if (findDependency(project, Collections.singleton(fileClasspath), (group, name) -> {
+				return "com.github.Chocohead".equalsIgnoreCase(group) && "ForgedFlower".equalsIgnoreCase(name);
+			}) != null) {
+				return fileClasspath.plus(configurations.detachedConfiguration(project.getDependencies().localGroovy()));
+			} else {
+				return null;
+			}
+		});
 	}
 
 	public String getLoaderLaunchMethod() {
