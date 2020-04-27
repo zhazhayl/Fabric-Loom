@@ -278,7 +278,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 							}
 						} else {
 							if (nativeNames) {
-								contextJar = SnappyRemapper.makeMergedJar(project, extension, mapping.minecraftVersion).getRight();
+								contextJar = SnappyRemapper.makeMergedJar(project, extension, mapping.minecraftVersion, Optional.empty(), JarMergeOrder.INDIFFERENT).getMergedJar().toPath();
 							} else {
 								contextJar = SnappyRemapper.makeInterJar(project, extension, mapping.minecraftVersion, //See if we've actually got the old Intermediaries per chance too
 										searchForIntermediaries(versionToMappings.getOrDefault(mapping.minecraftVersion, Collections.emptyList())).map(mappingFile -> mappingFile.origin.toPath()));

@@ -25,23 +25,19 @@
 package net.fabricmc.loom.providers;
 
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
+import java.io.UncheckedIOException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.Calendar;
-import java.util.Collections;
+import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TimeZone;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
-import java.util.zip.ZipError;
-
+import java.util.function.Supplier;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Files;
 import com.google.gson.Gson;
@@ -50,34 +46,28 @@ import org.gradle.api.GradleException;
 import org.gradle.api.Project;
 import org.gradle.api.logging.Logger;
 
-import net.fabricmc.loom.AbstractPlugin;
 import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.LoomGradleExtension.JarMergeOrder;
 import net.fabricmc.loom.dependencies.LoomDependencyManager;
 import net.fabricmc.loom.dependencies.PhysicalDependencyProvider;
-import net.fabricmc.loom.providers.openfine.Openfine;
+import net.fabricmc.loom.providers.SnappyRemapper.MinecraftVersion;
 import net.fabricmc.loom.util.Checksum;
 import net.fabricmc.loom.util.Constants;
 import net.fabricmc.loom.util.DownloadUtil;
 import net.fabricmc.loom.util.ManifestVersion;
 import net.fabricmc.loom.util.MinecraftVersionInfo;
+import net.fabricmc.loom.util.MinecraftVersionInfo.AssetIndex;
+import net.fabricmc.loom.util.MinecraftVersionInfo.Library;
 import net.fabricmc.loom.util.StaticPathWatcher;
 import net.fabricmc.stitch.merge.JarMerger;
 
 public class MinecraftProvider extends PhysicalDependencyProvider {
+	private static final Map<String, MinecraftVersion> VERSION_TO_VERSION = new ConcurrentHashMap<>();
 	private static final byte DOWNLOAD_ATTEMPTS = 3;
 	static final Gson GSON = new Gson();
+
 	public String minecraftVersion;
-	public MinecraftVersionInfo versionInfo;
-
-	private File MINECRAFT_CLIENT_JAR;
-	private File MINECRAFT_SERVER_JAR;
-	private File MINECRAFT_MERGED_JAR;
-
-	private JarMergeOrder mergeOrder;
-	private ForkJoinTask<File> jarMerger;
-	private final Object mappingLock = new Object();
-	private Path mappings;
+	private MinecraftVersion version;
 
 	@Override
 	public void register(LoomDependencyManager dependencyManager) {
@@ -89,129 +79,17 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 	@Override
 	public void provide(DependencyInfo dependency, Project project, LoomGradleExtension extension, Consumer<Runnable> postPopulationScheduler) throws Exception {
 		minecraftVersion = dependency.getDependency().getVersion();
-		boolean offline = project.getGradle().getStartParameter().isOffline();
 
-		initFiles(project);
-
-		try (FileReader reader = new FileReader(downloadMcJson(project, extension, offline))) {
-			versionInfo = GSON.fromJson(reader, MinecraftVersionInfo.class);
-		}
-		SpecialCases.enhanceVersion(extension, versionInfo);
-
-		boolean needClient = extension.getJarMergeOrder() != JarMergeOrder.SERVER_ONLY;
-		boolean needServer = extension.getJarMergeOrder() != JarMergeOrder.CLIENT_ONLY;
-
-		if (offline) {
-			if ((!needClient || MINECRAFT_CLIENT_JAR.exists()) && (!needServer || MINECRAFT_SERVER_JAR.exists())) {
-				project.getLogger().debug("Found necessary game jars, presuming up-to-date");
-			} else if (MINECRAFT_MERGED_JAR.exists() && needClient == needServer) {
-				//Strictly we don't need the split jars if the merged one exists, let's try go on
-				project.getLogger().warn("Missing game jar(s) but merged jar present, things might end badly");
-			} else {
-				throw new GradleException("Missing jar(s); Client: " + MINECRAFT_CLIENT_JAR.exists() + ", Server: " + MINECRAFT_SERVER_JAR.exists());
+		version = VERSION_TO_VERSION.computeIfAbsent(minecraftVersion, version -> {
+			try {
+				return SnappyRemapper.makeMergedJar(project, extension, version, Optional.ofNullable(extension.customManifest), extension.getJarMergeOrder());
+			} catch (IOException e) {
+				throw new UncheckedIOException("Error fetching Minecraft " + version + " jar", e);
 			}
-		} else {
-			if (needClient) downloadJar(project.getLogger(), MINECRAFT_CLIENT_JAR, "client");
-			if (needServer) downloadJar(project.getLogger(), MINECRAFT_SERVER_JAR, "server");
-		}
-
-		if (needClient && extension.hasOptiFine()) {
-			MINECRAFT_CLIENT_JAR = Openfine.process(project.getLogger(), minecraftVersion, MINECRAFT_CLIENT_JAR, MINECRAFT_SERVER_JAR, extension.getOptiFine());
-			MINECRAFT_MERGED_JAR = new File(MINECRAFT_CLIENT_JAR.getParentFile(), MINECRAFT_CLIENT_JAR.getName().replace("client", "merged"));
-			addDependency("com.github.Chocohead:OptiSine:" + Openfine.VERSION, project, Constants.MINECRAFT_DEPENDENCIES);
-			AbstractPlugin.addMavenRepo(project, "Jitpack", "https://jitpack.io/"); //Needed to fetch OptiSine from
-		}
-
-		if (extension.getJarMergeOrder() == JarMergeOrder.INDIFFERENT) {
-			Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("Europe/Stockholm"));
-			calendar.set(2012, Calendar.JULY, 22); //Day before 12w30a
-			mergeOrder = calendar.getTime().before(versionInfo.releaseTime) ? JarMergeOrder.FIRST : JarMergeOrder.LAST;
-		} else {
-			mergeOrder = extension.getJarMergeOrder();
-		}
-
-		Callable<File> task;
-		switch (mergeOrder) {
-		case FIRST:
-			task = () -> {
-				if (!MINECRAFT_MERGED_JAR.exists()) {
-					try {
-						mergeJars(project.getLogger());
-					} catch (ZipError e) {
-						DownloadUtil.delete(MINECRAFT_CLIENT_JAR);
-						DownloadUtil.delete(MINECRAFT_SERVER_JAR);
-
-						project.getLogger().error("Could not merge JARs! Deleting source JARs - please re-run the command and move on.", e);
-						throw new RuntimeException(e);
-					}
-				}
-
-				return MINECRAFT_MERGED_JAR;
-			};
-			break;
-
-		case LAST:
-			task = () -> {//TODO: Account for Openfine (or any other jar interfering tasks) changing the merged jar name
-				File mergedJar = new File(extension.getUserCache(), "minecraft-" + minecraftVersion + "-intermediary-net.fabricmc.yarn.jar");
-
-				if (!mergedJar.exists()) {
-					synchronized (mappingLock) {
-						while (mappings == null) {
-							mappingLock.wait();
-						}
-					}
-
-					Path interClient = extension.getUserCache().toPath().resolve("minecraft-" + minecraftVersion + "-client-intermediary.jar");
-					//Can't use the library provider yet as the configuration might need more things adding to it
-					Set<File> libraries = SnappyRemapper.libsForVersion(project, versionInfo);
-					SnappyRemapper.remapJar(project.getLogger(), libraries, MINECRAFT_CLIENT_JAR.toPath(), "client", mappings, interClient);
-
-					Path interServer = interClient.resolveSibling("minecraft-" + minecraftVersion + "-server-intermediary.jar");
-					libraries = Collections.emptySet(); //The server contains all its own dependencies
-					SnappyRemapper.remapJar(project.getLogger(), libraries, MINECRAFT_SERVER_JAR.toPath(), "server", mappings, interServer);
-
-					mergeJars(project.getLogger(), interClient.toFile(), interServer.toFile(), mergedJar);
-				}
-
-				return mergedJar;
-			};
-
-			mappings = SnappyRemapper.getIntermediaries(extension, minecraftVersion); //TODO: Pull these straight from MappingsProvider
-			break;
-
-		case CLIENT_ONLY:
-			task = () -> MINECRAFT_CLIENT_JAR;
-			break;
-
-		case SERVER_ONLY:
-			task = () -> MINECRAFT_SERVER_JAR;
-			break;
-
-		case INDIFFERENT:
-		default:
-			throw new IllegalStateException("Unexpected jar merge order " + mergeOrder);
-		}
-
-		jarMerger = ForkJoinPool.commonPool().submit(task);
+		});
 	}
 
-	private void initFiles(Project project) {
-		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
-
-		MINECRAFT_CLIENT_JAR = new File(extension.getUserCache(), "minecraft-" + minecraftVersion + "-client.jar");
-		MINECRAFT_SERVER_JAR = new File(extension.getUserCache(), "minecraft-" + minecraftVersion + "-server.jar");
-		MINECRAFT_MERGED_JAR = new File(extension.getUserCache(), "minecraft-" + minecraftVersion + "-merged.jar");
-	}
-
-	private File downloadMcJson(Project project, LoomGradleExtension extension, boolean offline) throws IOException {
-		return downloadMcJson(project.getLogger(), extension, minecraftVersion, offline, extension.customManifest);
-	}
-
-	public static File downloadMcJson(Logger logger, LoomGradleExtension extension, String minecraftVersion, boolean offline) throws IOException {
-		return downloadMcJson(logger, extension, minecraftVersion, offline, null);
-	}
-
-	public static File downloadMcJson(Logger logger, LoomGradleExtension extension, String minecraftVersion, boolean offline, String customManifest) throws IOException {
+	public static File downloadMcJson(Logger logger, LoomGradleExtension extension, String minecraftVersion, boolean offline, Optional<String> customManifest) throws IOException {
 		File MINECRAFT_JSON = new File(extension.getUserCache(), "minecraft-" + minecraftVersion + "-info.json");
 
 		if (offline) {
@@ -224,10 +102,10 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 			}
 		} else {
 			Optional<String> versionURL;
-			if (customManifest != null) {
+			if (customManifest.isPresent()) {
 				logger.lifecycle("Using custom minecraft manifest");
 
-				versionURL = Optional.of(customManifest);
+				versionURL = customManifest;
 			} else {
 				File manifests = new File(extension.getUserCache(), "version_manifest.json");
 
@@ -290,10 +168,6 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 		return MINECRAFT_JSON;
 	}
 
-	private void downloadJar(Logger logger, File to, String name) throws IOException {
-		downloadJar(logger, minecraftVersion, versionInfo, to, name);
-	}
-
 	public static void downloadJar(Logger logger, String minecraftVersion, MinecraftVersionInfo versionInfo, File to, String name) throws IOException {
 		downloadJar(logger, minecraftVersion, new URL(versionInfo.downloads.get(name).url), to, name, versionInfo.downloads.get(name).sha1);
 	}
@@ -316,17 +190,8 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 		}
 	}
 
-	void giveIntermediaries(Path mappings) {
-		if (!jarMerger.isDone()) {
-			synchronized (mappingLock) {
-				this.mappings = mappings;
-				mappingLock.notify();
-			}
-		}
-	}
-
-	private void mergeJars(Logger logger) throws IOException {
-		mergeJars(logger, MINECRAFT_CLIENT_JAR, MINECRAFT_SERVER_JAR, MINECRAFT_MERGED_JAR);
+	void giveIntermediaries(Supplier<Path> mappings) {
+		version.giveIntermediaries(mappings);
 	}
 
 	public static void mergeJars(Logger logger, File MINECRAFT_CLIENT_JAR, File MINECRAFT_SERVER_JAR, File MINECRAFT_MERGED_JAR) throws IOException {
@@ -339,11 +204,11 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 	}
 
 	public JarMergeOrder getMergeStrategy() {
-		return mergeOrder;
+		return version.getMergeStrategy();
 	}
 
 	public Set<String> getNeededHeaders() {
-		switch (mergeOrder) {
+		switch (version.getMergeStrategy()) {
 		case FIRST:
 			return ImmutableSet.of("official", "intermediary");
 
@@ -358,16 +223,24 @@ public class MinecraftProvider extends PhysicalDependencyProvider {
 
 		case INDIFFERENT:
 		default:
-			throw new IllegalStateException("Unexpected jar merge order " + mergeOrder);
+			throw new IllegalStateException("Unexpected jar merge order " + version.getMergeStrategy());
 		}
 	}
 
 	public File getMergedJar() {
-		return jarMerger.join();
+		return version.getMergedJar();
+	}
+
+	public Collection<Library> getLibraries() {
+		return version.getLibraries();
 	}
 
 	public MinecraftLibraryProvider getLibraryProvider() {
 		return getProvider(MinecraftLibraryProvider.class);
+	}
+
+	public AssetIndex getAssetIndex() {
+		return version.getAssetIndex();
 	}
 
 	@Override

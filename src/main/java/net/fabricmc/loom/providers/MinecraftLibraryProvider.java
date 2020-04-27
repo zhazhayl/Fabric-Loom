@@ -53,12 +53,11 @@ public class MinecraftLibraryProvider extends LogicalDependencyProvider {
 	@Override
 	public void provide(Project project, LoomGradleExtension extension, Consumer<Runnable> postPopulationScheduler) throws Exception {
 		MinecraftProvider minecraftProvider = getProvider(MinecraftProvider.class);
-		MinecraftVersionInfo versionInfo = minecraftProvider.versionInfo;
 
 		initFiles(extension, minecraftProvider);
 		boolean useNatives = !GradleSupport.extractNatives(project);
 
-		for (MinecraftVersionInfo.Library library : versionInfo.libraries) {
+		for (MinecraftVersionInfo.Library library : minecraftProvider.getLibraries()) {
 			if (library.allowed() && (useNatives || !library.isNative()) && library.getFile(MINECRAFT_LIBS) != null) {
 				// TODO: Add custom library locations
 

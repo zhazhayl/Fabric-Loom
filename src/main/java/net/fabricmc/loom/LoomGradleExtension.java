@@ -53,6 +53,7 @@ import org.gradle.api.initialization.dsl.ScriptHandler;
 import org.gradle.api.plugins.BasePluginConvention;
 
 import net.fabricmc.loom.dependencies.LoomDependencyManager;
+import net.fabricmc.loom.providers.JarNameFactory;
 import net.fabricmc.loom.providers.MappingsProvider;
 import net.fabricmc.loom.providers.MinecraftMappedProvider;
 import net.fabricmc.loom.providers.MinecraftProvider;
@@ -61,15 +62,30 @@ public class LoomGradleExtension {
 	/** The order in which the Minecraft client and server jars should be merged together and remapped */
 	public enum JarMergeOrder {
 		/** Run based on whether the Minecraft version is from before 23th July 2012 */
-		INDIFFERENT,
+		INDIFFERENT(null) {
+			@Override
+			public String getJarName(String version) {
+				throw new UnsupportedOperationException("Cannot get jar name of indifferent merge order");
+			}
+		},
 		/** Always merge jars before mappings are present, regardless of version */
-		FIRST,
+		FIRST(JarNameFactory.MERGED),
 		/** Always remap jars before merging, regardless of version */
-		LAST,
+		LAST(JarNameFactory.MERGED_INTERMEDIARY),
 		/** Don't merge the jars at all, instead just use the client jar */
-		CLIENT_ONLY,
+		CLIENT_ONLY(JarNameFactory.CLIENT),
 		/** Don't merge the jars at all, instead just use the server jar */
-		SERVER_ONLY;
+		SERVER_ONLY(JarNameFactory.SERVER);
+
+		private JarMergeOrder(JarNameFactory namer) {
+			this.namer = namer;
+		}
+
+		public String getJarName(String version) {
+			return namer.getJarName(version);
+		}
+
+		private JarNameFactory namer;
 	}
 	public String runDir = "run";
 	public String refmapName;

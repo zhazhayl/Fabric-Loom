@@ -122,7 +122,7 @@ public class RunConfig {
 				}
 			}
 
-			programArgs.append(" --assetIndex \"").append(extension.getMinecraftProvider().versionInfo.assetIndex.getFabricId(extension.getMinecraftProvider().minecraftVersion)).append('"');
+			programArgs.append(" --assetIndex \"").append(extension.getMinecraftProvider().getAssetIndex().getFabricId(extension.getMinecraftProvider().minecraftVersion)).append('"');
 			programArgs.append(" --assetsDir \"").append(new File(extension.getUserCache(), "assets").getAbsolutePath()).append('"');
 			runConfig.programArgs = programArgs.toString();
 			runConfig.vmArgs = "-Dfabric.development=true";
@@ -130,7 +130,7 @@ public class RunConfig {
 		}
 		case "knot":
 			runConfig.mainClass = getMainClass(mode, extension);
-			runConfig.programArgs = "--assetIndex \"" + extension.getMinecraftProvider().versionInfo.assetIndex.getFabricId(extension.getMinecraftProvider().minecraftVersion) + '"'
+			runConfig.programArgs = "--assetIndex \"" + extension.getMinecraftProvider().getAssetIndex().getFabricId(extension.getMinecraftProvider().minecraftVersion) + '"'
 								+ " --assetsDir \"" + new File(extension.getUserCache(), "assets").getAbsolutePath() + '"';
 			runConfig.vmArgs = "-Dfabric.development=true";
 			break;
