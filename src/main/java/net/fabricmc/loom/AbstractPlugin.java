@@ -263,9 +263,9 @@ public class AbstractPlugin implements Plugin<Project> {
 		project.getTasks().getByName("jar").getExtensions().create("AT", JarSettings.class);
 		project.getTasks().whenTaskAdded(task -> {
 			if (task instanceof AbstractArchiveTask) {
-				task.getExtensions().create("AT", JarSettings.class);
+				JarSettings settings = task.getExtensions().create("AT", JarSettings.class);
 				//Only include the AT by default to the main sources task
-				if (!"sourcesJar".equals(task.getName())) task.getExtensions().getByType(JarSettings.class).setInclude(false);
+				if (!"sourcesJar".equals(task.getName())) settings.setInclude(false);
 			}
 		});
 
