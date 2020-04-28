@@ -25,7 +25,6 @@
 package net.fabricmc.loom.providers;
 
 import java.io.File;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
@@ -41,9 +40,8 @@ import net.fabricmc.loom.util.GradleSupport;
 import net.fabricmc.loom.util.MinecraftVersionInfo;
 
 public class MinecraftLibraryProvider extends LogicalDependencyProvider {
-	public File MINECRAFT_LIBS;
-
-	private Collection<File> libs = new HashSet<>();
+	private File MINECRAFT_LIBS;
+	private Set<File> libs = new HashSet<>();
 
 	@Override
 	public Set<Class<? extends DependencyProvider>> getDependencies() {
@@ -75,8 +73,8 @@ public class MinecraftLibraryProvider extends LogicalDependencyProvider {
 		postPopulationScheduler.accept(() -> libs = project.getConfigurations().getByName(Constants.MINECRAFT_DEPENDENCIES).getFiles());
 	}
 
-	public Collection<File> getLibraries() {
-		return libs;
+	public Set<File> getLibraries() {
+		return Collections.unmodifiableSet(libs);
 	}
 
 	private void initFiles(LoomGradleExtension extension, MinecraftProvider minecraftProvider) {
