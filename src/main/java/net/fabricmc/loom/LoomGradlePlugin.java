@@ -33,7 +33,6 @@ import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.plugins.ExtraPropertiesExtension;
 import org.gradle.api.specs.Spec;
-import org.gradle.api.tasks.Copy;
 import org.gradle.api.tasks.TaskContainer;
 import org.gradle.api.tasks.TaskProvider;
 
@@ -106,7 +105,7 @@ public class LoomGradlePlugin extends AbstractPlugin {
 			MinecraftMappedProvider minecraftProvider = extension.getMinecraftMappedProvider();
 
 			File mappedJar = minecraftProvider.getMappedJar();
-			File sourcesJar = getMappedByproduct(project, "-sources.jar");
+			File sourcesJar = getMappedByproduct(project, "-unmovedsources.jar");
 			File linemapFile = getMappedByproduct(project, "-sources.lmap");
 
 			task.setInput(mappedJar);
@@ -115,30 +114,15 @@ public class LoomGradlePlugin extends AbstractPlugin {
 			task.setLibraries(libraryProvider.getLibraries());
 		});
 
-		TaskProvider<RemapLineNumbersTask> remapLineNumbersTask = register("genSourcesRemapLineNumbers", RemapLineNumbersTask.class, task -> {
-			task.getOutputs().upToDateWhen(t -> false);
+		register("genSources", RemapLineNumbersTask.class, task -> {
+			task.dependsOn(decompileTask);
 		}, (project, task) -> {
 			AbstractDecompileTask decompile = decompileTask.get();
-
-			task.dependsOn(decompile);
 			task.onlyIf(t -> !decompile.getState().getSkipped());
 
 			task.setInput(decompile.getInput());
 			task.setLineMapFile(decompile.getLineMapFile());
-			task.setOutput(getMappedByproduct(project, "-linemapped.jar"));
-		});
-
-		register("genSources", Copy.class, task -> {
-			task.setGroup("fabric");
-			task.getOutputs().upToDateWhen(t -> false);
-		}, (project, task) -> {
-			RemapLineNumbersTask lineNumbers = remapLineNumbersTask.get();
-
-			task.dependsOn(lineNumbers);
-			task.onlyIf(t -> !lineNumbers.getState().getSkipped());
-
-			task.from(lineNumbers.getInput());
-			task.into(lineNumbers.getOutput());
+			task.setOutput(getMappedByproduct(project, "-sources.jar"));
 		});
 
 		tasks.register("downloadAssets", DownloadAssetsTask.class, t -> {
