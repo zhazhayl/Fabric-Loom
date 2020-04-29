@@ -26,7 +26,6 @@ package net.fabricmc.loom.providers;
 
 import java.io.File;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -41,7 +40,7 @@ import net.fabricmc.loom.util.MinecraftVersionInfo;
 
 public class MinecraftLibraryProvider extends LogicalDependencyProvider {
 	private File MINECRAFT_LIBS;
-	private Set<File> libs = new HashSet<>();
+	private Set<File> libs = Collections.emptySet();
 
 	@Override
 	public Set<Class<? extends DependencyProvider>> getDependencies() {
@@ -66,11 +65,11 @@ public class MinecraftLibraryProvider extends LogicalDependencyProvider {
 					isClientOnly = true;
 				} */
 
-				addDependency(library.getArtifactName(), project, Constants.MINECRAFT_DEPENDENCIES);
+				addDependency(library.getArtifactName(), project, Constants.MINECRAFT_LIBRARIES);
 			}
 		}
 
-		postPopulationScheduler.accept(() -> libs = project.getConfigurations().getByName(Constants.MINECRAFT_DEPENDENCIES).getFiles());
+		libs = project.getConfigurations().getByName(Constants.MINECRAFT_LIBRARIES).getFiles();
 	}
 
 	public Set<File> getLibraries() {

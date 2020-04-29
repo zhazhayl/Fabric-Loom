@@ -11,7 +11,6 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
-import java.io.UncheckedIOException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -180,28 +179,36 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 		minecraftVersion = dependency.getDependency().getVersion();
 
 		VersionKey key = extension.customManifest != null ? VersionKey.forManifest(extension.customManifest) : VersionKey.forVersion(minecraftVersion);
-		version = VERSION_TO_VERSION.computeIfAbsent(key, k -> new EnumMap<>(JarMergeOrder.class)).computeIfAbsent(getMergeStrategy(), mergeOrder -> {
-			try {
-				MinecraftVersion version = makeMergedJar(project, extension, minecraftVersion, Optional.ofNullable(extension.customManifest), mergeOrder,
-					(versionInfo, clientJar, serverJar, actualMergeOrder, jarMerger) -> {//We only want to override one method :|
-						return new MinecraftVersion(versionInfo, clientJar, serverJar, actualMergeOrder, jarMerger) {
-							@Override
-							public Set<File> getJavaLibraries(Project project) {
-								return getLibraryProvider().getLibraries();
-							}
-						};
-				});
+		Map<JarMergeOrder, MinecraftVersion> mergeToVersion = VERSION_TO_VERSION.computeIfAbsent(key, k -> new EnumMap<>(JarMergeOrder.class));
 
-				if (mergeOrder == JarMergeOrder.INDIFFERENT) {
-					//TODO: Account for the fact version.getMergeStrategy() will be different to this
+		JarMergeOrder mergeOrder = extension.getJarMergeOrder();
+		version = mergeToVersion.get(mergeOrder);
+
+		if (version == null) {
+			synchronized (mergeToVersion) {
+				MinecraftVersion version = mergeToVersion.get(mergeOrder);
+
+				if (version == null) {
+					version = makeMergedJar(project, extension, minecraftVersion, Optional.ofNullable(extension.customManifest), mergeOrder,
+						(versionInfo, clientJar, serverJar, actualMergeOrder, jarMerger) -> {//We only want to override one method :|
+							return new MinecraftVersion(versionInfo, clientJar, serverJar, actualMergeOrder, jarMerger) {
+								@Override
+								public Set<File> getJavaLibraries(Project project) {
+									return getLibraryProvider().getLibraries();
+								}
+							};
+					});
+
+					mergeToVersion.put(mergeOrder, version);
+					if (mergeOrder == JarMergeOrder.INDIFFERENT) {
+						mergeToVersion.put(version.getMergeStrategy(), version);
+					}
 				}
 
-				return version;
-			} catch (IOException e) {
-				throw new UncheckedIOException("Error fetching Minecraft " + version + " jar", e);
+				this.version = version;
 			}
-		});
-	}
+		}
+;	}
 
 
 	public static MinecraftVersion makeMergedJar(Project project, LoomGradleExtension extension, String version, Optional<String> customManifest, JarMergeOrder mergeOrder) throws IOException {
