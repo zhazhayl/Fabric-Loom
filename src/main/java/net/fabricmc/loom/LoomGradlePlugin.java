@@ -105,7 +105,7 @@ public class LoomGradlePlugin extends AbstractPlugin {
 			MinecraftMappedProvider minecraftProvider = extension.getMinecraftMappedProvider();
 
 			File mappedJar = minecraftProvider.getMappedJar();
-			File sourcesJar = getMappedByproduct(project, "-unmovedsources.jar");
+			File sourcesJar = getMappedByproduct(project, "-sources.jar");
 			File linemapFile = getMappedByproduct(project, "-sources.lmap");
 
 			task.setInput(mappedJar);
@@ -122,7 +122,6 @@ public class LoomGradlePlugin extends AbstractPlugin {
 
 			task.setInput(decompile.getInput());
 			task.setLineMapFile(decompile.getLineMapFile());
-			task.setOutput(getMappedByproduct(project, "-sources.jar"));
 		});
 
 		tasks.register("downloadAssets", DownloadAssetsTask.class, t -> {
