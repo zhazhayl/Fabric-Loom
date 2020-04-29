@@ -47,7 +47,8 @@ import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.ConfigurationContainer;
-import org.gradle.api.artifacts.Dependency;
+import org.gradle.api.artifacts.ModuleVersionIdentifier;
+import org.gradle.api.artifacts.ResolvedArtifact;
 import org.gradle.api.file.FileCollection;
 import org.gradle.api.initialization.dsl.ScriptHandler;
 import org.gradle.api.plugins.BasePluginConvention;
@@ -222,15 +223,17 @@ public class LoomGradleExtension {
 	}
 
 	@Nullable
-	private static Dependency findDependency(Project p, Collection<Configuration> configs, BiPredicate<String, String> groupNameFilter) {
+	private static ModuleVersionIdentifier findDependency(Project p, Collection<Configuration> configs, BiPredicate<String, String> groupNameFilter) {
 		for (Configuration config : configs) {
-			for (Dependency dependency : config.getDependencies()) {
-				String group = dependency.getGroup();
-				String name = dependency.getName();
+			for (ResolvedArtifact artifact : config.getResolvedConfiguration().getResolvedArtifacts()) {
+				ModuleVersionIdentifier module = artifact.getModuleVersion().getId();
+
+				String group = module.getGroup();
+				String name = module.getName();
 
 				if (groupNameFilter.test(group, name)) {
-					p.getLogger().debug("Loom findDependency found: " + group + ":" + name + ":" + dependency.getVersion());
-					return dependency;
+					p.getLogger().debug("Loom findDependency found: " + group + ':' + name + ':' + module.getVersion());
+					return module;
 				}
 			}
 		}
@@ -256,7 +259,7 @@ public class LoomGradleExtension {
 	}
 
 	@Nullable
-	private Dependency getMixinDependency() {
+	private ModuleVersionIdentifier getMixinDependency() {
 		return recurseProjects((p) -> {
 			List<Configuration> configs = new ArrayList<>();
 			// check compile classpath first
@@ -285,7 +288,7 @@ public class LoomGradleExtension {
 
 	@Nullable
 	public String getMixinJsonVersion() {
-		Dependency dependency = getMixinDependency();
+		ModuleVersionIdentifier dependency = getMixinDependency();
 
 		if (dependency != null) {
 			if (dependency.getGroup().equalsIgnoreCase("net.fabricmc")) {
