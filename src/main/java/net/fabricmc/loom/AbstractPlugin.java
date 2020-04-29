@@ -77,8 +77,23 @@ public class AbstractPlugin implements Plugin<Project> {
 		return project.getRootProject() == project;
 	}
 
-	private void extendsFrom(String a, String b) {
-		project.getConfigurations().getByName(a).extendsFrom(project.getConfigurations().getByName(b));
+	private Configuration makeConfiguration(String name) {
+		Configuration config = project.getConfigurations().maybeCreate(name);
+
+		config.setCanBeConsumed(false);
+		config.setTransitive(false);
+
+		return config;
+	}
+
+	private Configuration makeConfigurationFrame(String name) {
+		Configuration config = makeConfiguration(name);
+		config.setCanBeResolved(false); //Presumably this cancels out transitivity meaning anything
+		return config;
+	}
+
+	private void extendWith(String name, Configuration... configs) {
+		project.getConfigurations().getByName(name).extendsFrom(configs);
 	}
 
 	@Override
@@ -105,58 +120,52 @@ public class AbstractPlugin implements Plugin<Project> {
 		target.getRepositories().jcenter();
 
 		// Create default configurations
-		Configuration modCompileClasspathConfig = project.getConfigurations().maybeCreate(Constants.MOD_COMPILE_CLASSPATH);
-		modCompileClasspathConfig.setTransitive(true);
-		Configuration modCompileClasspathMappedConfig = project.getConfigurations().maybeCreate(Constants.MOD_COMPILE_CLASSPATH_MAPPED);
-		modCompileClasspathMappedConfig.setTransitive(false);
+		makeConfigurationFrame(Constants.MINECRAFT); //Used for determining the Minecraft version to use
+		makeConfigurationFrame(Constants.MAPPINGS_RAW); //Used for stacking mappings
+		makeConfigurationFrame(Constants.INCLUDE); //Used for including jars in the remapped jar, acts non-transitively
 
-		Configuration minecraftNamedConfig = project.getConfigurations().maybeCreate(Constants.MINECRAFT_NAMED);
-		minecraftNamedConfig.setTransitive(false); // The launchers do not recurse dependencies
-		Configuration minecraftIntermediaryConfig = project.getConfigurations().maybeCreate(Constants.MINECRAFT_INTERMEDIARY);
-		minecraftIntermediaryConfig.setTransitive(false);
-		Configuration minecraftLibrariesConfig = project.getConfigurations().maybeCreate(Constants.MINECRAFT_LIBRARIES);
-		minecraftLibrariesConfig.setTransitive(false);
-		Configuration minecraftDependenciesConfig = project.getConfigurations().maybeCreate(Constants.MINECRAFT_DEPENDENCIES);
-		minecraftDependenciesConfig.setTransitive(false);
-		Configuration minecraftConfig = project.getConfigurations().maybeCreate(Constants.MINECRAFT);
-		minecraftConfig.setTransitive(false);
+		/** Used to hold the final mappings being used, will be resolved when extended (probably) */
+		Configuration mappings = makeConfiguration(Constants.MAPPINGS);
+		/** All the libraries which the the chosen Minecraft version depends on in isolation */
+		Configuration minecraftLibraries = makeConfiguration(Constants.MINECRAFT_LIBRARIES);
+		/** All the libraries which the Minecraft version depends on along with those the installer JSON adds on top */
+		Configuration minecraftDependencies = project.getConfigurations().maybeCreate(Constants.MINECRAFT_DEPENDENCIES);
 
-		Configuration includeConfig = project.getConfigurations().maybeCreate(Constants.INCLUDE);
-		includeConfig.setTransitive(false); // Dont get transitive deps
+		/** The Minecraft jar remapped to the intermediary namespace */
+		Configuration minecraftIntermediary = makeConfiguration(Constants.MINECRAFT_INTERMEDIARY);
+		/** The Minecraft jar remapped to the named namespace*/
+		Configuration minecraftNamed = makeConfiguration(Constants.MINECRAFT_NAMED);
 
-		project.getConfigurations().maybeCreate(Constants.MAPPINGS);
-		project.getConfigurations().maybeCreate(Constants.MAPPINGS_RAW);
+		/** All compile dependencies coming from the mod* configurations (such as modCompile but not modRuntimeOnly) */
+		Configuration modCompileClasspath = makeConfiguration(Constants.MOD_COMPILE_CLASSPATH);
+		modCompileClasspath.setTransitive(true); //Transitive to carry of the transitivity from the individual configurations
+		/** All the dependencies on the modCompileClasspath remapped to the named namespace */
+		Configuration modCompileClasspathMapped = makeConfiguration(Constants.MOD_COMPILE_CLASSPATH_MAPPED);
 
 		for (RemappedConfigurationEntry entry : Constants.MOD_COMPILE_ENTRIES) {
-			Configuration compileModsConfig = project.getConfigurations().maybeCreate(entry.getSourceConfiguration());
-			compileModsConfig.setTransitive(true);
-			Configuration compileModsMappedConfig = project.getConfigurations().maybeCreate(entry.getRemappedConfiguration());
-			compileModsMappedConfig.setTransitive(false); // Don't get transitive deps of already remapped mods
+			/** The mods that are to be remapped to the current named mappings */
+			Configuration compileMods = makeConfiguration(entry.getSourceConfiguration());
+			compileMods.setTransitive(true); //Explicitly transitive to allow JiJ'd jars to be pulled in via maven instead
+			/** The mods that have been remapped to the current named mappings */
+			Configuration compileModsMapped = makeConfiguration(entry.getRemappedConfiguration());
 
-			extendsFrom(entry.getTargetConfiguration(project.getConfigurations()), entry.getRemappedConfiguration());
+			entry.getTargetConfiguration(project.getConfigurations()).extendsFrom(compileModsMapped);
 
 			if (entry.isOnModCompileClasspath()) {
-				extendsFrom(Constants.MOD_COMPILE_CLASSPATH, entry.getSourceConfiguration());
-				extendsFrom(Constants.MOD_COMPILE_CLASSPATH_MAPPED, entry.getRemappedConfiguration());
+				modCompileClasspath.extendsFrom(compileMods);
+				modCompileClasspathMapped.extendsFrom(compileModsMapped);
 			}
 		}
 
-		extendsFrom("compileClasspath", Constants.MINECRAFT_NAMED);
-		extendsFrom("runtimeClasspath", Constants.MINECRAFT_NAMED);
+		minecraftDependencies.extendsFrom(minecraftLibraries);
+		minecraftIntermediary.extendsFrom(minecraftDependencies);
+		minecraftNamed.extendsFrom(minecraftDependencies);
+
+		extendWith(JavaPlugin.COMPILE_CLASSPATH_CONFIGURATION_NAME, minecraftNamed, mappings);
+		extendWith(JavaPlugin.RUNTIME_CLASSPATH_CONFIGURATION_NAME, minecraftNamed, mappings);
 
 		if (!extension.ideSync()) {
-			extendsFrom(JavaPlugin.ANNOTATION_PROCESSOR_CONFIGURATION_NAME, Constants.MINECRAFT_NAMED);
-			extendsFrom(JavaPlugin.ANNOTATION_PROCESSOR_CONFIGURATION_NAME, Constants.MOD_COMPILE_CLASSPATH_MAPPED);
-		}
-
-		extendsFrom(Constants.MINECRAFT_DEPENDENCIES, Constants.MINECRAFT_LIBRARIES);
-		extendsFrom(Constants.MINECRAFT_NAMED, Constants.MINECRAFT_DEPENDENCIES);
-		extendsFrom(Constants.MINECRAFT_INTERMEDIARY, Constants.MINECRAFT_DEPENDENCIES);
-
-		extendsFrom("compile", Constants.MAPPINGS);
-
-		if (!extension.ideSync()) {
-			extendsFrom(JavaPlugin.ANNOTATION_PROCESSOR_CONFIGURATION_NAME, Constants.MAPPINGS);
+			extendWith(JavaPlugin.ANNOTATION_PROCESSOR_CONFIGURATION_NAME, minecraftNamed, modCompileClasspathMapped, mappings);
 		}
 
 		configureIDEs();
