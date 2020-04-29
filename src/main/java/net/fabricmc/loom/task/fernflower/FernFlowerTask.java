@@ -61,7 +61,6 @@ public class FernFlowerTask extends AbstractDecompileTask {
 	private boolean noFork = false;
 	private int numThreads = Runtime.getRuntime().availableProcessors();
 
-	@Internal
 	public boolean shouldRun() {
 		return !DECOMPILE_CLAIMER.computeIfAbsent(getExtension().getMinecraftProvider().minecraftVersion, k -> new AtomicBoolean()).getAndSet(true);
 	}
