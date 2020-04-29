@@ -32,6 +32,7 @@ import org.gradle.api.Action;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.plugins.ExtraPropertiesExtension;
+import org.gradle.api.specs.Spec;
 import org.gradle.api.tasks.Copy;
 import org.gradle.api.tasks.TaskContainer;
 import org.gradle.api.tasks.TaskProvider;
@@ -91,8 +92,14 @@ public class LoomGradlePlugin extends AbstractPlugin {
 
 		TaskProvider<FernFlowerTask> decompileTask = register("genSourcesDecompile", FernFlowerTask.class, task -> {
 			task.getOutputs().upToDateWhen(t -> false);
-			boolean shouldRun = task.shouldRun();
-			task.onlyIf(t -> shouldRun);
+			task.onlyIf(new Spec<Task>() {
+				private Boolean shouldRun;
+
+				@Override
+				public boolean isSatisfiedBy(Task t) {
+					return shouldRun == null ? shouldRun = task.shouldRun() : shouldRun;
+				}
+			});
 		}, (project, task) -> {
 			LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
 			MinecraftLibraryProvider libraryProvider = extension.getMinecraftProvider().getLibraryProvider();
