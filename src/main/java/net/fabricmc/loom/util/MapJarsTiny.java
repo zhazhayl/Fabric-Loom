@@ -148,7 +148,7 @@ public class MapJarsTiny {
 		if (Files.notExists(interJar)) {
 			remapJar(project.getLogger(), version.getMergedJar(), //Long method calls are long
 					intermediaryMappings.orElseGet(() -> MappingsProvider.getIntermediaries(extension, version.getName())),
-					version.bulldozeMappings(project, extension), version.getJavaLibraries(project), interJar, fromM);
+					false, version.getJavaLibraries(project), interJar, fromM);
 		}
 
 		return interJar;
