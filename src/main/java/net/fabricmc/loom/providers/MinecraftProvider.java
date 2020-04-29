@@ -52,6 +52,7 @@ import net.fabricmc.loom.util.DownloadUtil;
 import net.fabricmc.loom.util.ManifestVersion;
 import net.fabricmc.loom.util.MapJarsTiny;
 import net.fabricmc.loom.util.MinecraftVersionInfo;
+import net.fabricmc.loom.util.PentaFunction;
 import net.fabricmc.loom.util.MinecraftVersionInfo.AssetIndex;
 import net.fabricmc.loom.util.MinecraftVersionInfo.Library;
 import net.fabricmc.loom.util.StaticPathWatcher;
@@ -104,15 +105,6 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 			this.serverJar = serverJar;
 			this.mergeOrder = mergeOrder;
 			this.jarMerger = ForkJoinPool.commonPool().submit(jarMerger.apply(this));
-		}
-
-		MinecraftVersion(MinecraftVersion clone) {
-			versionInfo = clone.versionInfo;
-			clientJar = clone.clientJar;
-			serverJar = clone.serverJar;
-			mergeOrder = clone.mergeOrder;
-			jarMerger = clone.jarMerger;
-			mappings = clone.mappings;
 		}
 
 		@Override
@@ -190,12 +182,15 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 		VersionKey key = extension.customManifest != null ? VersionKey.forManifest(extension.customManifest) : VersionKey.forVersion(minecraftVersion);
 		version = VERSION_TO_VERSION.computeIfAbsent(key, k -> new EnumMap<>(JarMergeOrder.class)).computeIfAbsent(getMergeStrategy(), mergeOrder -> {
 			try {
-				MinecraftVersion version = new MinecraftVersion(makeMergedJar(project, extension, minecraftVersion, Optional.ofNullable(extension.customManifest), mergeOrder)) {
-					@Override
-					public Set<File> getJavaLibraries(Project project) {
-						return getLibraryProvider().getLibraries();
-					}
-				};
+				MinecraftVersion version = makeMergedJar(project, extension, minecraftVersion, Optional.ofNullable(extension.customManifest), mergeOrder,
+					(versionInfo, clientJar, serverJar, actualMergeOrder, jarMerger) -> {//We only want to override one method :|
+						return new MinecraftVersion(versionInfo, clientJar, serverJar, actualMergeOrder, jarMerger) {
+							@Override
+							public Set<File> getJavaLibraries(Project project) {
+								return getLibraryProvider().getLibraries();
+							}
+						};
+				});
 
 				if (mergeOrder == JarMergeOrder.INDIFFERENT) {
 					//TODO: Account for the fact version.getMergeStrategy() will be different to this
@@ -210,6 +205,11 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 
 
 	public static MinecraftVersion makeMergedJar(Project project, LoomGradleExtension extension, String version, Optional<String> customManifest, JarMergeOrder mergeOrder) throws IOException {
+		return makeMergedJar(project, extension, version, customManifest, mergeOrder, MinecraftVersion::new);
+	}
+
+	private static MinecraftVersion makeMergedJar(Project project, LoomGradleExtension extension, String version, Optional<String> customManifest, JarMergeOrder mergeOrder,
+			PentaFunction<MinecraftVersionInfo, File, File, JarMergeOrder, Function<MinecraftVersion, Callable<Path>>, MinecraftVersion> versionFactory) throws IOException {
 		boolean offline = project.getGradle().getStartParameter().isOffline();
 
 		MinecraftVersionInfo versionInfo;
@@ -307,7 +307,7 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 			throw new IllegalStateException("Unexpected jar merge order " + mergeOrder);
 		}
 
-		return new MinecraftVersion(versionInfo, clientJar, serverJar, mergeOrder, mergeTask);
+		return versionFactory.apply(versionInfo, clientJar, serverJar, mergeOrder, mergeTask);
 	}
 
 	private static File downloadMcJson(Logger logger, LoomGradleExtension extension, String minecraftVersion, boolean offline, Optional<String> customManifest) throws IOException {
