@@ -32,8 +32,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-import com.google.common.collect.ImmutableMap;
 import groovy.util.Node;
+
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
@@ -86,12 +86,6 @@ public class AbstractPlugin implements Plugin<Project> {
 		return config;
 	}
 
-	private Configuration makeConfigurationFrame(String name) {
-		Configuration config = makeConfiguration(name);
-		config.setCanBeResolved(false); //Presumably this cancels out transitivity meaning anything
-		return config;
-	}
-
 	private void extendWith(String name, Configuration... configs) {
 		project.getConfigurations().getByName(name).extendsFrom(configs);
 	}
@@ -103,9 +97,9 @@ public class AbstractPlugin implements Plugin<Project> {
 		project.getLogger().lifecycle("Fabric Loom: " + AbstractPlugin.class.getPackage().getImplementationVersion());
 
 		// Apply default plugins
-		project.apply(ImmutableMap.of("plugin", "java"));
-		project.apply(ImmutableMap.of("plugin", "eclipse"));
-		project.apply(ImmutableMap.of("plugin", "idea"));
+		project.apply(Collections.singletonMap("plugin", "java"));
+		project.apply(Collections.singletonMap("plugin", "eclipse"));
+		project.apply(Collections.singletonMap("plugin", "idea"));
 
 		LoomGradleExtension extension = project.getExtensions().create("minecraft", LoomGradleExtension.class, project);
 
@@ -120,9 +114,9 @@ public class AbstractPlugin implements Plugin<Project> {
 		target.getRepositories().jcenter();
 
 		// Create default configurations
-		makeConfigurationFrame(Constants.MINECRAFT); //Used for determining the Minecraft version to use
-		makeConfigurationFrame(Constants.MAPPINGS_RAW); //Used for stacking mappings
-		makeConfigurationFrame(Constants.INCLUDE); //Used for including jars in the remapped jar, acts non-transitively
+		makeConfiguration(Constants.MINECRAFT).setCanBeResolved(false); //Only used for determining the Minecraft version to use
+		makeConfiguration(Constants.MAPPINGS_RAW); //Used for stacking mappings
+		makeConfiguration(Constants.INCLUDE); //Used for including jars in the remapped jar, acts non-transitively
 
 		/** Used to hold the final mappings being used, will be resolved when extended (probably) */
 		Configuration mappings = makeConfiguration(Constants.MAPPINGS);
