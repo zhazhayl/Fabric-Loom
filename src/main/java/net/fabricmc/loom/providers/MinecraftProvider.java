@@ -203,6 +203,9 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 					if (mergeOrder == JarMergeOrder.INDIFFERENT) {
 						mergeToVersion.put(version.getMergeStrategy(), version);
 					}
+
+					//TODO: Pull these straight from MappingProvider as it finds them
+					if (version.getMergeStrategy() == JarMergeOrder.LAST) version.giveIntermediaries(MappingsProvider.getIntermediaries(extension, minecraftVersion));
 				}
 
 				this.version = version;
@@ -470,6 +473,9 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 
 	@Override
 	public Path getMergedJar() {
+		//Strictly this is only a problem if the main thread did this, but that's a pain to detect so we'll just be safe
+		if (needsIntermediaries()) throw new IllegalStateException("Impending deadlock blocked");
+
 		return version.getMergedJar();
 	}
 
