@@ -48,25 +48,6 @@ import org.zeroturnaround.zip.ZipUtil;
  * superclass and mixin inheritance.
  */
 class ClassInfo {
-	/**
-     * When using {@link ClassInfo#forType}, determines whether an array type
-     * should be returned as declared (eg. as <tt>Object</tt>) or whether the
-     * element type should be returned instead.
-     */
-    public static enum TypeLookup {
-        /**
-         * Return the type as declared in the descriptor. This means that array
-         * types will be treated <tt>Object</tt> for the purposes of type
-         * hierarchy lookups returning the correct member methods.
-         */
-        DECLARED_TYPE,
-
-        /**
-         * Legacy behaviour. A lookup by type will return the element type.
-         */
-        ELEMENT_TYPE
-    }
-
     private static final String JAVA_LANG_OBJECT = "java/lang/Object";
 
     /**
@@ -296,21 +277,31 @@ class ClassInfo {
      * from the cache where possible and generates the class meta if not.
      *
      * @param type Type to look up
-     * @param lookup Lookup type to use (literal/element)
-     * @return ClassInfo for the supplied type or null if the supplied type
-     *      cannot be found or is a primitive type
+     * @return ClassInfo for the supplied type or null if the supplied type is a primitive type
      */
-    public static ClassInfo forType(Type type, TypeLookup lookup) {
-        if (type.getSort() == Type.ARRAY) {
-            if (lookup == TypeLookup.ELEMENT_TYPE) {
-                return ClassInfo.forType(type.getElementType(), TypeLookup.ELEMENT_TYPE);
-            }
-            return ClassInfo.OBJECT;
-        } else if (type.getSort() < Type.ARRAY) {
-            return null;
-        }
-        return ClassInfo.forName(type.getClassName().replace('.', '/'));
-    }
+	public static ClassInfo forType(Type type) {
+		switch (type.getSort()) {
+		case Type.BOOLEAN:
+		case Type.CHAR:
+		case Type.BYTE:
+		case Type.SHORT:
+		case Type.INT:
+		case Type.FLOAT:
+		case Type.LONG:
+		case Type.DOUBLE:
+			return null; // No form of ClassInfo to represent primitives
+
+		case Type.ARRAY:
+			type = type.getElementType();
+		case Type.OBJECT:
+			return ClassInfo.forName(type.getInternalName());
+
+		case Type.VOID:
+		case Type.METHOD:
+		default:
+			throw new IllegalArgumentException("Unexpected type get ClassInfo for: " + type);
+		}
+	}
 
     /**
      * ASM logic applied via ClassInfo, returns first common superclass of
