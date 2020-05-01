@@ -25,6 +25,7 @@
 package net.fabricmc.loom.task.lvt;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -67,7 +68,9 @@ public class LocalTableRebuilder {
         try {
             analyzer.analyze(verifier.currentClass.getInternalName(), method);
         } catch (AnalyzerException ex) {
+        	System.err.println("Error analysing in " + verifier.currentClass.getInternalName() + '#' + method.name + method.desc);
             ex.printStackTrace();
+            return Collections.emptyList();
         }
 
         // Get frames from the Analyzer

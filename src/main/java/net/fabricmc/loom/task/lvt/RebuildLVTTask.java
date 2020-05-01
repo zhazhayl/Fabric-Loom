@@ -74,6 +74,9 @@ public class RebuildLVTTask extends AbstractLoomTask {
 								if (local.desc == null) local.desc = "java/lang/Object";
 							}
 
+							//If there are error analysing the rebuilt locals will be empty
+							if (entry.getValue().isEmpty()) continue;
+
 							entry.getKey().localVariables = entry.getValue();
 						}
 

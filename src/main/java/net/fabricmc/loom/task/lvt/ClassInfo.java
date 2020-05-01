@@ -227,9 +227,10 @@ class ClassInfo {
         if (info == null) {
             try {
                 ClassNode classNode = getClassNode(className);
+                if (classNode == null) throw new RuntimeException("Unable to find ClassInfo for " + className);
                 info = new ClassInfo(classNode);
-            } catch (Exception ex) {
-                throw new RuntimeException("Error getting ClassInfo for " + className, ex);
+            } catch (IOException e) {
+                throw new RuntimeException("Error getting ClassInfo for " + className, e);
             }
 
             // Put null in the cache if load failed
