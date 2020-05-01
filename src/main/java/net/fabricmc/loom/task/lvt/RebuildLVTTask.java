@@ -67,9 +67,10 @@ public class RebuildLVTTask extends AbstractLoomTask {
 
 						for (Entry<MethodNode, List<LocalVariableNode>> entry : LocalTableRebuilder.generateLocalVariableTable(node).entrySet()) {
 							for (LocalVariableNode local : entry.getValue()) {
-								assert local != null; //Should all be properly null checked in LocalTableRebuilder
+								//Should all be properly null checked in LocalTableRebuilder to not produce null locals, although the type could be
+								assert local != null: "Null local in " + className + '#' + entry.getKey().name + entry.getKey().desc;
 
-								if (local.name != null) throw new AssertionError("Tried to write a null local name?");
+								if (local.name == null) throw new AssertionError("Tried to write a null local name?");
 								if (local.desc == null) local.desc = "java/lang/Object";
 							}
 
