@@ -292,7 +292,8 @@ class ClassInfo {
 			return null; // No form of ClassInfo to represent primitives
 
 		case Type.ARRAY:
-			type = type.getElementType();
+			return forType(type.getElementType());
+
 		case Type.OBJECT:
 			return ClassInfo.forName(type.getInternalName());
 
