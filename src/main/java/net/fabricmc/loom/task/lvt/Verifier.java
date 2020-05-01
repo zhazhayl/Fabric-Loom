@@ -140,9 +140,14 @@ class Verifier extends SimpleVerifier {
 
 	        case Type.ARRAY: {
 	        	switch (type.getSort()) {
-	        	case Type.ARRAY: //Arrays of a type can be cast to arrays of a supertype if they're the same dimension
-	        		if (type.getDimensions() != other.getDimensions()) return false;
-	        		return isAssignableFrom(type.getElementType(), other.getElementType());
+	        	case Type.ARRAY:
+	        		if (Type.getType(Object.class).equals(type.getElementType())) {
+	        			//All arrays can be cast to an Object array with fewer dimensions (such as float[][] -> Object[], but not float[][] -> Object[][])
+	        			//Non-primitive arrays can themselves be cast to an Object array with the same number of dimensions as well (e.g. MyType[] -> Object[])
+	        			return type.getDimensions() < other.getDimensions() || type.getDimensions() == other.getDimensions() && other.getElementType().getSort() == Type.OBJECT;
+	        		} else {//Arrays of a type can be cast to arrays of a supertype if they're the same dimension
+	        			return type.getDimensions() == other.getDimensions() && isAssignableFrom(type.getElementType(), other.getElementType());
+	        		}
 
 	        	case Type.OBJECT: //Arrays are only assignable to Object, Serializable and Cloneable
 	        		return ImmutableSet.of(Type.getInternalName(Object.class),
