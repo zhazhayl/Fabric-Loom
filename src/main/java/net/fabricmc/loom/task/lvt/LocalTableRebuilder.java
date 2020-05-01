@@ -40,6 +40,7 @@ import org.objectweb.asm.tree.LocalVariableNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.analysis.Analyzer;
 import org.objectweb.asm.tree.analysis.AnalyzerException;
+import org.objectweb.asm.tree.analysis.BasicInterpreter;
 import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
 
@@ -124,7 +125,7 @@ public class LocalTableRebuilder {
                         localNodes[j] = null;
                     }
 
-                    String desc = local.getType() != null ? local.getType().getDescriptor() : lastKnownType[j];
+                    String desc = local.getType() != null && local.getType() != BasicInterpreter.NULL_TYPE ? local.getType().getDescriptor() : lastKnownType[j];
                     localNodes[j] = new LocalVariableNode("var" + j, desc, null, label, null, j);
                     if (desc != null) {
                         lastKnownType[j] = desc;

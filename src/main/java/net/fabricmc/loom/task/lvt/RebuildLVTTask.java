@@ -75,7 +75,7 @@ public class RebuildLVTTask extends AbstractLoomTask {
 								assert local != null: "Null local in " + className + '#' + entry.getKey().name + entry.getKey().desc;
 
 								if (local.name == null) throw new AssertionError("Tried to write a null local name?");
-								if (local.desc == null) local.desc = "java/lang/Object";
+								if (local.desc == null) local.desc = "Ljava/lang/Object;";
 							}
 
 							//If there are error analysing the rebuilt locals will be empty
