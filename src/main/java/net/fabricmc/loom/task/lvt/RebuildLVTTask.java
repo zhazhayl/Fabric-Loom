@@ -16,7 +16,9 @@ import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 
 import org.gradle.api.Project;
+import org.gradle.api.file.FileCollection;
 import org.gradle.api.tasks.InputFile;
+import org.gradle.api.tasks.InputFiles;
 import org.gradle.api.tasks.TaskAction;
 
 import org.objectweb.asm.ClassReader;
@@ -36,7 +38,7 @@ import net.fabricmc.loom.task.AbstractLoomTask;
 import net.fabricmc.loom.util.progress.ProgressLogger;
 
 public class RebuildLVTTask extends AbstractLoomTask {
-	private Object input;
+	private Object input, libraries;
 
 	@TaskAction
 	public void doTask() throws Throwable {
@@ -48,8 +50,10 @@ public class RebuildLVTTask extends AbstractLoomTask {
 		progressLogger.start("Rebuilding local variable table", "LVT Rebuild");
 
 		ClassInfo.EXTRA_LOOKUPS.add(getInput());
+		ClassInfo.EXTRA_LOOKUPS.addAll(getLibraries().getFiles());
 		ZipUtil.transformEntries(getInput(), getTransformers(progressLogger));
 		ClassInfo.EXTRA_LOOKUPS.remove(getInput());
+		ClassInfo.EXTRA_LOOKUPS.removeAll(getLibraries().getFiles());
 
 		progressLogger.completed();
 	}
@@ -104,6 +108,14 @@ public class RebuildLVTTask extends AbstractLoomTask {
 		return getProject().file(input);
 	}
 
+	@InputFiles
+	public FileCollection getLibraries() {
+		return getProject().files(libraries);
+	}
+
+	public void setLibraries(Object libraries) {
+		this.libraries = libraries;
+	}
 	public void setInput(Object input) {
 		this.input = input;
 	}

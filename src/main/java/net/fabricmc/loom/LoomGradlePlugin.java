@@ -129,9 +129,11 @@ public class LoomGradlePlugin extends AbstractPlugin {
 			task.getOutputs().upToDateWhen(t -> false);
 		}, (project, task) -> {
 			LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
+			MinecraftLibraryProvider libraryProvider = extension.getMinecraftProvider().getLibraryProvider();
 			MinecraftMappedProvider minecraftProvider = extension.getMinecraftMappedProvider();
 
 			task.setInput(minecraftProvider.getMappedJar());
+			task.setLibraries(libraryProvider.getLibraries());
 		});
 
 		tasks.register("downloadAssets", DownloadAssetsTask.class, t -> {
