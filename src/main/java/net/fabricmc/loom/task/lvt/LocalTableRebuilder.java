@@ -57,7 +57,7 @@ public class LocalTableRebuilder {
 			objectType = Type.getObjectType(classNode.superName);
 		}
 
-		Verifier verifier = new Verifier(Opcodes.ASM8, Type.getObjectType(classNode.name), objectType, interfaces, false);
+		Verifier verifier = new Verifier(Opcodes.ASM7, Type.getObjectType(classNode.name), objectType, interfaces, false);
 		return classNode.methods.stream().collect(Collectors.toMap(Function.identity(), method -> generateLocalVariableTable(verifier, method)));
 	}
 
