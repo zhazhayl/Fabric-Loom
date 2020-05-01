@@ -193,7 +193,7 @@ class ClassInfo {
     }
 
     private static InputStream findClass(String className) throws IOException {
-    	InputStream stream = ClassInfo.class.getResourceAsStream(className);
+    	InputStream stream = ClassInfo.class.getResourceAsStream('/' + className);
     	if (stream != null) return stream;
 
     	stream = findExtraClass(className);
