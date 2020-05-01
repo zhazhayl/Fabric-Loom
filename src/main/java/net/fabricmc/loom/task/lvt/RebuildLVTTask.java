@@ -97,7 +97,7 @@ public class RebuildLVTTask extends AbstractLoomTask {
 							}
 
 							if (name == null) {
-								final int index = i;
+								final int index = names.size();
 								Optional<String> existing = method.localVariables.stream().filter(l -> l.index == index).findFirst().map(l -> l.name).filter(Predicates.not(this::isBlank));
 								if (existing.isPresent()) {
 									name = existing.get();
