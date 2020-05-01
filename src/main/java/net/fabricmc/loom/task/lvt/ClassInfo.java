@@ -24,6 +24,9 @@
  */
 package net.fabricmc.loom.task.lvt;
 
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
@@ -35,6 +38,8 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
+
+import org.zeroturnaround.zip.ZipUtil;
 
 /**
  * Information about a class, used as a way of keeping track of class hierarchy
@@ -68,6 +73,7 @@ class ClassInfo {
      * information we generate
      */
     private static final Map<String, ClassInfo> cache = new HashMap<>();
+    static final Set<File> EXTRA_LOOKUPS = new HashSet<>();
 
     private static final ClassInfo OBJECT = new ClassInfo();
 
@@ -172,8 +178,32 @@ class ClassInfo {
         return null;
     }
 
+    private static InputStream findExtraClass(String className) throws IOException {
+    	for (File file : EXTRA_LOOKUPS) {
+    		if (file.isDirectory()) {
+    			file = new File(file, className);
+    			if (file.exists()) return new FileInputStream(file);
+    		} else {
+    			byte[] entry = ZipUtil.unpackEntry(file, className);
+    			if (entry != null) return new ByteArrayInputStream(entry);
+    		}
+    	}
+
+    	return null;
+    }
+
+    private static InputStream findClass(String className) throws IOException {
+    	InputStream stream = ClassInfo.class.getResourceAsStream(className);
+    	if (stream != null) return stream;
+
+    	stream = findExtraClass(className);
+    	if (stream != null) return stream;
+
+    	return null;
+    }
+
     private static ClassNode getClassNode(String className) throws IOException {
-    	try (InputStream in = ClassInfo.class.getResourceAsStream(className.replace('.', '/') + ".class")) {
+    	try (InputStream in = findClass(className.replace('.', '/') + ".class")) {
 			if (in == null) return null;
 
 			ClassNode node = new ClassNode();
@@ -228,5 +258,39 @@ class ClassInfo {
             return null;
         }
         return ClassInfo.forName(type.getClassName().replace('.', '/'));
+    }
+
+    /**
+     * ASM logic applied via ClassInfo, returns first common superclass of
+     * classes specified by <tt>type1</tt> and <tt>type2</tt>.
+     *
+     * @param type1 First type
+     * @param type2 Second type
+     * @return common superclass info
+     */
+    public static ClassInfo getCommonSuperClass(String type1, String type2) {
+        if (type1 == null || type2 == null) {
+            return ClassInfo.OBJECT;
+        }
+        return ClassInfo.getCommonSuperClass(ClassInfo.forName(type1), ClassInfo.forName(type2));
+    }
+
+    private static ClassInfo getCommonSuperClass(ClassInfo type1, ClassInfo type2) {
+        if (type1.hasSuperClass(type2)) {
+            return type2;
+        } else if (type2.hasSuperClass(type1)) {
+            return type1;
+        } else if (type1.isInterface() || type2.isInterface()) {
+            return ClassInfo.OBJECT;
+        }
+
+        do {
+            type1 = type1.getSuperClass();
+            if (type1 == null) {
+                return ClassInfo.OBJECT;
+            }
+        } while (!type2.hasSuperClass(type1));
+
+        return type1;
     }
 }

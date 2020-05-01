@@ -47,7 +47,9 @@ public class RebuildLVTTask extends AbstractLoomTask {
 		ProgressLogger progressLogger = ProgressLogger.getProgressFactory(project, RebuildLVTTask.class.getName());
 		progressLogger.start("Rebuilding local variable table", "LVT Rebuild");
 
+		ClassInfo.EXTRA_LOOKUPS.add(getInput());
 		ZipUtil.transformEntries(getInput(), getTransformers(progressLogger));
+		ClassInfo.EXTRA_LOOKUPS.remove(getInput());
 
 		progressLogger.completed();
 	}
@@ -67,7 +69,12 @@ public class RebuildLVTTask extends AbstractLoomTask {
 							entry.getKey().localVariables = entry.getValue();
 						}
 
-						ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+						ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS) {
+							@Override
+						    protected String getCommonSuperClass(String typeA, String typeB) {
+						        return ClassInfo.getCommonSuperClass(typeA, typeB).getName();
+						    }
+						};
 						node.accept(writer);
 						return writer.toByteArray();
 					}
