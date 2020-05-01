@@ -11,7 +11,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map.Entry;
-import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
@@ -44,42 +43,41 @@ public class RebuildLVTTask extends AbstractLoomTask {
 		Project project = getProject();
 
 		project.getLogger().info(":Rebuilding local variable table");
-		Stream<String> classes = findClasses();
 
 		ProgressLogger progressLogger = ProgressLogger.getProgressFactory(project, RebuildLVTTask.class.getName());
 		progressLogger.start("Rebuilding local variable table", "LVT Rebuild");
 
-		ZipUtil.transformEntries(getInput(), classes.map(className -> {
-			return new ZipEntryTransformerEntry(className, new ByteArrayZipEntryTransformer() {
-				@Override
-				protected byte[] transform(ZipEntry zipEntry, byte[] input) throws IOException {
-					progressLogger.progress("Remapping " + className.substring(0, className.length() - 6));
-
-					ClassNode node = new ClassNode();
-					new ClassReader(input).accept(node, ClassReader.EXPAND_FRAMES);
-
-					for (Entry<MethodNode, List<LocalVariableNode>> entry : LocalTableRebuilder.generateLocalVariableTable(node).entrySet()) {
-						entry.getKey().localVariables = entry.getValue();
-					}
-
-					ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-					node.accept(writer);
-					return writer.toByteArray();
-				}
-
-				@Override
-				protected boolean preserveTimestamps() {
-					return true; //Why not?
-				}
-			});
-		}).toArray(ZipEntryTransformerEntry[]::new));
+		ZipUtil.transformEntries(getInput(), getTransformers(progressLogger));
 
 		progressLogger.completed();
 	}
 
-	private Stream<String> findClasses() throws ZipException, IOException {
+	private ZipEntryTransformerEntry[] getTransformers(ProgressLogger logger) throws ZipException, IOException {
 		try (ZipFile jar = new ZipFile(getInput())) {
-			return Streams.stream(Iterators.forEnumeration(jar.entries())).map(ZipEntry::getName).filter(name -> name.endsWith(".class")).distinct();
+			return Streams.stream(Iterators.forEnumeration(jar.entries())).map(ZipEntry::getName).filter(name -> name.endsWith(".class")).distinct().map(className -> {
+				return new ZipEntryTransformerEntry(className, new ByteArrayZipEntryTransformer() {
+					@Override
+					protected byte[] transform(ZipEntry zipEntry, byte[] input) throws IOException {
+						logger.progress("Remapping " + className.substring(0, className.length() - 6));
+
+						ClassNode node = new ClassNode();
+						new ClassReader(input).accept(node, ClassReader.EXPAND_FRAMES);
+
+						for (Entry<MethodNode, List<LocalVariableNode>> entry : LocalTableRebuilder.generateLocalVariableTable(node).entrySet()) {
+							entry.getKey().localVariables = entry.getValue();
+						}
+
+						ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+						node.accept(writer);
+						return writer.toByteArray();
+					}
+
+					@Override
+					protected boolean preserveTimestamps() {
+						return true; //Why not?
+					}
+				});
+			}).toArray(ZipEntryTransformerEntry[]::new);
 		}
 	}
 
