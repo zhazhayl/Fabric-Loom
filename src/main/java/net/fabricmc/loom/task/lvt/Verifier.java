@@ -71,7 +71,7 @@ class Verifier extends SimpleVerifier {
             if (this.getSuperClass(other) == null) {
                 return false;
             }
-            if (this.isInterface) {
+            if (this.isInterface) {//Questionable short-cutting
                 return other.getSort() == Type.OBJECT || other.getSort() == Type.ARRAY;
             }
             return this.isAssignableFrom(type, this.getSuperClass(other));
@@ -90,13 +90,38 @@ class Verifier extends SimpleVerifier {
             }
             return false;
         }
-        ClassInfo typeInfo = ClassInfo.forType(type, TypeLookup.ELEMENT_TYPE);
-        if (typeInfo == null) {
-            return false;
+        switch (other.getSort()) {
+	        case Type.BOOLEAN:
+	        case Type.CHAR:
+	        case Type.BYTE:
+	        case Type.SHORT:
+	        case Type.INT:
+	        case Type.FLOAT:
+	        case Type.LONG:
+	        case Type.DOUBLE:
+	        	assert type.getSort() != other.getSort();
+	        	return false; //Primitives aren't assignable to each other
+
+	        case Type.ARRAY: {
+	        	ClassInfo typeInfo = ClassInfo.forType(type, TypeLookup.ELEMENT_TYPE); //Arrays are only assignable to Object
+	        	return typeInfo != null && typeInfo.isObject;
+	        }
+
+	        case Type.OBJECT: {
+	        	ClassInfo typeInfo = ClassInfo.forType(type, TypeLookup.ELEMENT_TYPE);
+	        	if (typeInfo == null) return false; //Might be missing this if type is a primitive/array
+	        	if (typeInfo.isObject) return true; //Can always cast objects to Object
+
+	        	ClassInfo otherInfo = ClassInfo.forType(other, TypeLookup.ELEMENT_TYPE); //Shouldn't be missing this
+	        	if (otherInfo == null) throw new NullPointerException("Unexpected null return for " + other + " type");
+
+	        	return otherInfo.hasSuperClass(typeInfo, typeInfo.isInterface() || otherInfo.isInterface());
+	        }
+
+	        case Type.VOID:
+	        case Type.METHOD:
+	        default:
+	        	throw new IllegalArgumentException("Unexpected type to try cast as " + type + ": " + other);
         }
-        if (typeInfo.isInterface()) {
-            typeInfo = ClassInfo.forName("java/lang/Object");
-        }
-        return ClassInfo.forType(other, TypeLookup.ELEMENT_TYPE).hasSuperClass(typeInfo);
     }
 }
