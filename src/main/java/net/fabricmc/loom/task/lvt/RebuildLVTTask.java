@@ -10,6 +10,7 @@ package net.fabricmc.loom.task.lvt;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Optional;
@@ -81,26 +82,36 @@ public class RebuildLVTTask extends AbstractLoomTask {
 						return true;
 					}
 
-					private int getLvIndex(int asmIndex, boolean isStatic, Type[] argTypes) {
-						int ret = isStatic ? 0 : 1;
-
-						for (int i = 0; i < asmIndex; i++) {
-							ret += argTypes[i].getSize();
-						}
-
-						return ret;
-					}
-
-					private int getAsmIndex(int lvIndex, boolean isStatic, Type[] argTypes) {
-						if (!isStatic)
-							lvIndex--;
+					private String[] getParamNames(MethodNode method, boolean isStatic, Type[] argTypes) {
+						List<String> names = new ArrayList<>((isStatic ? 0 : 1) + argTypes.length);
+						if (!isStatic) names.add("this");
 
 						for (int i = 0; i < argTypes.length; i++) {
-							if (lvIndex == 0) return i;
-							lvIndex -= argTypes[i].getSize();
+							String name = null;
+							if (method.parameters != null && i < method.parameters.size()) {
+								ParameterNode parameter = method.parameters.get(i);
+
+								if (parameter != null && !isBlank(parameter.name)) {
+									name = parameter.name;
+								}
+							}
+
+							if (name == null) {
+								final int index = i;
+								Optional<String> existing = method.localVariables.stream().filter(l -> l.index == index).findFirst().map(l -> l.name).filter(Predicates.not(this::isBlank));
+								if (existing.isPresent()) {
+									name = existing.get();
+								}
+							}
+
+							names.add(name); //Inherit the existing names where possible
+
+							if (argTypes[i].getSize() > 1) {
+								names.add("<TOP>");
+							}
 						}
 
-						return -1;
+						return names.toArray(new String[0]);
 					}
 
 					@Override
@@ -117,7 +128,7 @@ public class RebuildLVTTask extends AbstractLoomTask {
 							MethodNode method = entry.getKey();
 							boolean isStatic = Modifier.isStatic(node.access);
 							Type[] paramTypes = Type.getArgumentTypes(method.desc);
-							int parameterSize = getLvIndex(paramTypes.length, isStatic, paramTypes);
+							String[] parameterNames = getParamNames(method, isStatic, paramTypes);
 
 							for (LocalVariableNode local : entry.getValue()) {
 								//Should all be properly null checked in LocalTableRebuilder to not produce null locals, although the type could be
@@ -126,26 +137,8 @@ public class RebuildLVTTask extends AbstractLoomTask {
 								if (local.name == null) throw new AssertionError("Tried to write a null local name?");
 								if (local.desc == null) local.desc = "Ljava/lang/Object;";
 
-								if (!isStatic && local.index == 0) {
-									local.name = "this";
-								} else if (local.index < parameterSize) {
-									if (method.parameters != null) {
-										int asmIndex = getAsmIndex(local.index, isStatic, paramTypes);
-
-										if (asmIndex < method.parameters.size()) {
-											ParameterNode parameter = method.parameters.get(asmIndex);
-
-											if (parameter != null && !isBlank(parameter.name)) {
-												local.name = parameter.name;
-												continue;
-											}
-										}
-									}
-
-									Optional<String> existing = method.localVariables.stream().filter(l -> l.index == local.index).findFirst().map(l -> l.name).filter(Predicates.not(this::isBlank));
-									if (existing.isPresent()) {
-										local.name = existing.get(); //Inherit the existing names where possible
-									}
+								if (local.index < parameterNames.length && parameterNames[local.index] != null) {
+									local.name = parameterNames[local.index];
 								}
 							}
 
