@@ -24,11 +24,14 @@
  */
 package net.fabricmc.loom.task.lvt;
 
+import java.io.Serializable;
 import java.util.List;
 
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.SimpleVerifier;
+
+import com.google.common.collect.ImmutableSet;
 
 import net.fabricmc.loom.task.lvt.ClassInfo.TypeLookup;
 
@@ -138,8 +141,19 @@ class Verifier extends SimpleVerifier {
 	        	return false; //Primitives aren't assignable to each other
 
 	        case Type.ARRAY: {
-	        	ClassInfo typeInfo = ClassInfo.forType(type, TypeLookup.ELEMENT_TYPE); //Arrays are only assignable to Object
-	        	return typeInfo != null && typeInfo.isObject;
+	        	switch (type.getSort()) {
+	        	case Type.ARRAY: //Arrays of a type can be cast to arrays of a supertype if they're the same dimension
+	        		if (type.getDimensions() != other.getDimensions()) return false;
+	        		return isAssignableFrom(type.getElementType(), other.getElementType());
+
+	        	case Type.OBJECT: //Arrays are only assignable to Object, Serializable and Cloneable
+	        		return ImmutableSet.of(Type.getInternalName(Object.class),
+	        				Type.getInternalName(Serializable.class),
+	        				Type.getInternalName(Cloneable.class)).contains(type.getInternalName());
+
+	        	default:
+	        		return false;
+	        	}
 	        }
 
 	        case Type.OBJECT: {
