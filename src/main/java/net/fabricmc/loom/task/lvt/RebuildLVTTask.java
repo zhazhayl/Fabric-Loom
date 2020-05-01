@@ -116,7 +116,7 @@ public class RebuildLVTTask extends AbstractLoomTask {
 
 					@Override
 					protected byte[] transform(ZipEntry zipEntry, byte[] input) throws IOException {
-						logger.progress("Remapping " + className.substring(0, className.length() - 6));
+						logger.progress("Rebuilding " + className.substring(0, className.length() - 6));
 
 						ClassNode node = new ClassNode();
 						new ClassReader(input).accept(node, ClassReader.EXPAND_FRAMES);
