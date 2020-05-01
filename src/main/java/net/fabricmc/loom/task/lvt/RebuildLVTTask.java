@@ -9,8 +9,10 @@ package net.fabricmc.loom.task.lvt;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Modifier;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
@@ -23,14 +25,16 @@ import org.gradle.api.tasks.TaskAction;
 
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.LocalVariableNode;
 import org.objectweb.asm.tree.MethodNode;
-
+import org.objectweb.asm.tree.ParameterNode;
 import org.zeroturnaround.zip.ZipUtil;
 import org.zeroturnaround.zip.transform.ByteArrayZipEntryTransformer;
 import org.zeroturnaround.zip.transform.ZipEntryTransformerEntry;
 
+import com.google.common.base.Predicates;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Streams;
 
@@ -62,6 +66,43 @@ public class RebuildLVTTask extends AbstractLoomTask {
 		try (ZipFile jar = new ZipFile(getInput())) {
 			return Streams.stream(Iterators.forEnumeration(jar.entries())).map(ZipEntry::getName).filter(name -> name.endsWith(".class")).distinct().map(className -> {
 				return new ZipEntryTransformerEntry(className, new ByteArrayZipEntryTransformer() {
+					private boolean isBlank(CharSequence text) {
+				        int length;
+				        if (text == null || (length = text.length()) == 0) {
+				            return true;
+				        }
+
+						for (int i = 0; i < length; i++) {
+							if (!Character.isWhitespace(text.charAt(i))) {
+								return false;
+							}
+						}
+
+						return true;
+					}
+
+					private int getLvIndex(int asmIndex, boolean isStatic, Type[] argTypes) {
+						int ret = isStatic ? 0 : 1;
+
+						for (int i = 0; i < asmIndex; i++) {
+							ret += argTypes[i].getSize();
+						}
+
+						return ret;
+					}
+
+					private int getAsmIndex(int lvIndex, boolean isStatic, Type[] argTypes) {
+						if (!isStatic)
+							lvIndex--;
+
+						for (int i = 0; i < argTypes.length; i++) {
+							if (lvIndex == 0) return i;
+							lvIndex -= argTypes[i].getSize();
+						}
+
+						return -1;
+					}
+
 					@Override
 					protected byte[] transform(ZipEntry zipEntry, byte[] input) throws IOException {
 						logger.progress("Remapping " + className.substring(0, className.length() - 6));
@@ -70,18 +111,42 @@ public class RebuildLVTTask extends AbstractLoomTask {
 						new ClassReader(input).accept(node, ClassReader.EXPAND_FRAMES);
 
 						for (Entry<MethodNode, List<LocalVariableNode>> entry : LocalTableRebuilder.generateLocalVariableTable(node).entrySet()) {
+							//If there are error analysing the rebuilt locals will be empty
+							if (entry.getValue().isEmpty()) continue;
+
+							MethodNode method = entry.getKey();
+							boolean isStatic = Modifier.isStatic(node.access);
+							Type[] paramTypes = Type.getArgumentTypes(method.desc);
+							int parameterSize = getLvIndex(paramTypes.length, isStatic, paramTypes);
+
 							for (LocalVariableNode local : entry.getValue()) {
 								//Should all be properly null checked in LocalTableRebuilder to not produce null locals, although the type could be
 								assert local != null: "Null local in " + className + '#' + entry.getKey().name + entry.getKey().desc;
 
 								if (local.name == null) throw new AssertionError("Tried to write a null local name?");
 								if (local.desc == null) local.desc = "Ljava/lang/Object;";
+
+								if (!isStatic && local.index == 0) {
+									local.name = "this";
+								} else if (local.index < parameterSize) {
+									int asmIndex = getAsmIndex(local.index, isStatic, paramTypes);
+									if (asmIndex < method.parameters.size()) {
+										ParameterNode parameter = method.parameters.get(asmIndex);
+
+										if (parameter != null && !isBlank(parameter.name)) {
+											local.name = parameter.name;
+											continue;
+										}
+									}
+
+									Optional<String> existing = method.localVariables.stream().filter(l -> l.index == local.index).findFirst().map(l -> l.name).filter(Predicates.not(this::isBlank));
+									if (existing.isPresent()) {
+										local.name = existing.get(); //Inherit the existing names where possible
+									}
+								}
 							}
 
-							//If there are error analysing the rebuilt locals will be empty
-							if (entry.getValue().isEmpty()) continue;
-
-							entry.getKey().localVariables = entry.getValue();
+							method.localVariables = entry.getValue();
 						}
 
 						ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS) {
