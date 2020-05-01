@@ -129,13 +129,16 @@ public class RebuildLVTTask extends AbstractLoomTask {
 								if (!isStatic && local.index == 0) {
 									local.name = "this";
 								} else if (local.index < parameterSize) {
-									int asmIndex = getAsmIndex(local.index, isStatic, paramTypes);
-									if (asmIndex < method.parameters.size()) {
-										ParameterNode parameter = method.parameters.get(asmIndex);
+									if (method.parameters != null) {
+										int asmIndex = getAsmIndex(local.index, isStatic, paramTypes);
 
-										if (parameter != null && !isBlank(parameter.name)) {
-											local.name = parameter.name;
-											continue;
+										if (asmIndex < method.parameters.size()) {
+											ParameterNode parameter = method.parameters.get(asmIndex);
+
+											if (parameter != null && !isBlank(parameter.name)) {
+												local.name = parameter.name;
+												continue;
+											}
 										}
 									}
 
