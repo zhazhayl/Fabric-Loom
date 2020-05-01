@@ -52,6 +52,7 @@ import net.fabricmc.loom.task.RemapSourcesJarTask;
 import net.fabricmc.loom.task.RunClientTask;
 import net.fabricmc.loom.task.RunServerTask;
 import net.fabricmc.loom.task.fernflower.FernFlowerTask;
+import net.fabricmc.loom.task.lvt.RebuildLVTTask;
 
 public class LoomGradlePlugin extends AbstractPlugin {
 	private static File getMappedByproduct(Project project, String suffix) {
@@ -122,6 +123,15 @@ public class LoomGradlePlugin extends AbstractPlugin {
 
 			task.setInput(decompile.getInput());
 			task.setLineMapFile(decompile.getLineMapFile());
+		});
+
+		register("rebuildLVT", RebuildLVTTask.class, task -> {
+			task.getOutputs().upToDateWhen(t -> false);
+		}, (project, task) -> {
+			LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
+			MinecraftMappedProvider minecraftProvider = extension.getMinecraftMappedProvider();
+
+			task.setInput(minecraftProvider.getMappedJar());
 		});
 
 		tasks.register("downloadAssets", DownloadAssetsTask.class, t -> {

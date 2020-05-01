@@ -113,6 +113,7 @@ license {
 	exclude '**/loom/util/PentaFunction.java'
 	exclude '**/loom/util/ThrowingIntObjConsumer.java'
 	exclude '**/loom/task/fernflower/JavadocProvider.java'
+	exclude '**/loom/task/lvt/*.java'
 }
 
 wrapper {
