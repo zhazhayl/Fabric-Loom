@@ -59,7 +59,7 @@ class Verifier extends SimpleVerifier {
             return this.currentSuperClass;
         }
         ClassInfo c = ClassInfo.forType(type, TypeLookup.ELEMENT_TYPE).getSuperClass();
-        return c == null ? null : Type.getType("L" + c.getName() + ";");
+        return c == null ? null : Type.getObjectType(c.getName());
     }
 
     @Override
