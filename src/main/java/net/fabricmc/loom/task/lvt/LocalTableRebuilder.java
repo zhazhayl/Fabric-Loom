@@ -25,6 +25,7 @@
 package net.fabricmc.loom.task.lvt;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -85,6 +86,7 @@ public class LocalTableRebuilder {
 
         LocalVariableNode[] localNodes = new LocalVariableNode[method.maxLocals]; // LocalVariableNodes for current frame
         BasicValue[] locals = new BasicValue[method.maxLocals]; // locals in previous frame, used to work out what changes between frames
+        Arrays.fill(locals, BasicValue.UNINITIALIZED_VALUE);
         LabelNode[] labels = new LabelNode[methodSize]; // Labels to add to the method, for the markers
         String[] lastKnownType = new String[method.maxLocals];
 
@@ -98,12 +100,12 @@ public class LocalTableRebuilder {
 
             for (int j = 0; j < f.getLocals(); j++) {
                 BasicValue local = f.getLocal(j);
-                if (local == null && locals[j] == null) {
-                    continue;
+
+                if (local == null) {//It would appear from all the usages of Frame#getLocal that it is designed to always return a non-null value for a properly filled frame
+                	throw new AssertionError("Received null for local slot " + j + " from frame " + i + " in " + verifier.currentClass.getInternalName() + '#' + method.name + method.desc);
                 }
-                if (local != null && local.equals(locals[j])) {
-                    continue;
-                }
+                //No change for the local between the last frame and this one, continue on to the next local
+                if (local.equals(locals[j])) continue;
 
                 if (label == null) {
                     AbstractInsnNode existingLabel = method.instructions.get(i);
@@ -114,11 +116,11 @@ public class LocalTableRebuilder {
                     }
                 }
 
-                if (local == null && locals[j] != null) {
+                if (local == BasicValue.UNINITIALIZED_VALUE && locals[j] != BasicValue.UNINITIALIZED_VALUE) {
                     localVariables.add(localNodes[j]);
                     localNodes[j].end = label;
                     localNodes[j] = null;
-                } else if (local != null) {
+                } else if (local != BasicValue.UNINITIALIZED_VALUE) {
                     if (locals[j] != null) {
                         localVariables.add(localNodes[j]);
                         localNodes[j].end = label;
