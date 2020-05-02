@@ -121,7 +121,7 @@ public class LocalTableRebuilder {
                     localNodes[j].end = label;
                     localNodes[j] = null;
                 } else if (local != BasicValue.UNINITIALIZED_VALUE) {
-                    if (locals[j] != null) {
+                    if (locals[j] != BasicValue.UNINITIALIZED_VALUE) {
                         localVariables.add(localNodes[j]);
                         localNodes[j].end = label;
                         localNodes[j] = null;
