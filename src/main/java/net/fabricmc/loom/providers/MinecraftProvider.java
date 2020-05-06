@@ -226,7 +226,7 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 		try (FileReader reader = new FileReader(downloadMcJson(project.getLogger(), extension, version, offline, customManifest))) {
 			versionInfo = GSON.fromJson(reader, MinecraftVersionInfo.class);
 		}
-		SpecialCases.enhanceVersion(extension, versionInfo);
+		SpecialCases.enhanceVersion(versionInfo, mergeOrder);
 
 		if (mergeOrder == JarMergeOrder.INDIFFERENT) {
 			Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("Europe/Stockholm"));

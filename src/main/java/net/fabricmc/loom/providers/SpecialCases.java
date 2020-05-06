@@ -9,7 +9,6 @@ package net.fabricmc.loom.providers;
 
 import com.google.common.net.UrlEscapers;
 
-import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.LoomGradleExtension.JarMergeOrder;
 import net.fabricmc.loom.util.MinecraftVersionInfo;
 import net.fabricmc.loom.util.MinecraftVersionInfo.Downloads;
@@ -43,11 +42,11 @@ class SpecialCases {
 		}
 	}
 
-	static void enhanceVersion(LoomGradleExtension extension, MinecraftVersionInfo version) {
-		fixMissingServer(extension, version);
+	static void enhanceVersion(MinecraftVersionInfo version, JarMergeOrder mergeOrder) {
+		fixMissingServer(version, mergeOrder);
 	}
 
-	private static void fixMissingServer(LoomGradleExtension extension, MinecraftVersionInfo version) {
+	private static void fixMissingServer(MinecraftVersionInfo version, JarMergeOrder mergeOrder) {
 		if (version.downloads.containsKey("server")) return;
 
 		ServerType type;
@@ -357,7 +356,7 @@ class SpecialCases {
 		case "rd-20090515":
 		case "rd-132328":
 		case "rd-132211":
-			if (extension.getJarMergeOrder() != JarMergeOrder.CLIENT_ONLY) {
+			if (mergeOrder != JarMergeOrder.CLIENT_ONLY) {
 				throw new IllegalArgumentException("Can only use Minecraft version " + version.id + " with client merge only");
 			}
 			return;
