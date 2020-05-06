@@ -28,7 +28,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +38,8 @@ import java.util.function.Consumer;
 import org.apache.commons.io.FileUtils;
 import org.gradle.api.Project;
 
+import com.google.common.collect.ImmutableSet;
+
 import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.dependencies.DependencyProvider;
 import net.fabricmc.loom.dependencies.LogicalDependencyProvider;
@@ -48,7 +49,7 @@ import net.fabricmc.loom.util.GradleSupport;
 public class LaunchProvider extends LogicalDependencyProvider {
 	@Override
 	public Set<Class<? extends DependencyProvider>> getDependencies() {
-		return Collections.singleton(MinecraftProvider.class);
+		return ImmutableSet.of(MinecraftProvider.class, MinecraftLibraryProvider.class);
 	}
 
 	@Override
