@@ -126,13 +126,11 @@ public class RebuildLVTTask extends AbstractLoomTask {
 							if (entry.getValue().isEmpty()) continue;
 
 							MethodNode method = entry.getKey();
-							boolean isStatic = Modifier.isStatic(node.access);
-							Type[] paramTypes = Type.getArgumentTypes(method.desc);
-							String[] parameterNames = getParamNames(method, isStatic, paramTypes);
+							String[] parameterNames = getParamNames(method, Modifier.isStatic(method.access), Type.getArgumentTypes(method.desc));
 
 							for (LocalVariableNode local : entry.getValue()) {
 								//Should all be properly null checked in LocalTableRebuilder to not produce null locals, although the type could be
-								assert local != null: "Null local in " + className + '#' + entry.getKey().name + entry.getKey().desc;
+								assert local != null: "Null local in " + className + '#' + method.name + method.desc;
 
 								if (local.name == null) throw new AssertionError("Tried to write a null local name?");
 								if (local.desc == null) local.desc = "Ljava/lang/Object;";
