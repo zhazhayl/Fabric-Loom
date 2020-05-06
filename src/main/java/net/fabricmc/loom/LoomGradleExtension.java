@@ -58,6 +58,7 @@ import net.fabricmc.loom.providers.JarNameFactory;
 import net.fabricmc.loom.providers.MappingsProvider;
 import net.fabricmc.loom.providers.MinecraftMappedProvider;
 import net.fabricmc.loom.providers.MinecraftProvider;
+import net.fabricmc.loom.util.Constants;
 
 public class LoomGradleExtension {
 	/** The order in which the Minecraft client and server jars should be merged together and remapped */
@@ -301,6 +302,27 @@ public class LoomGradleExtension {
 		}
 
 		return null;
+	}
+
+	public boolean hasLWJGL2() {
+		return recurseProjects(project -> {
+			Configuration libraries = project.getConfigurations().getByName(Constants.MINECRAFT_LIBRARIES);
+			ModuleVersionIdentifier version = findDependency(project, Collections.singleton(libraries), (group, name) -> {
+				return "org.lwjgl.lwjgl".equalsIgnoreCase(group) && "lwjgl".equalsIgnoreCase(name);
+			});
+
+			if (version != null) {
+				try {
+					int split = version.getVersion().indexOf('.');
+					return split > 0 && Integer.parseInt(version.getVersion().substring(0, split)) < 3 ? Boolean.TRUE : Boolean.FALSE;
+				} catch (NumberFormatException e) {
+					project.getLogger().error("Unexpected leading part to LWJGL version: " + version.getVersion(), e);
+					return Boolean.FALSE;
+				}
+			} else {
+				return null;
+			}
+		}) == Boolean.TRUE;
 	}
 
 	public FileCollection getFernFlowerClasspath() {

@@ -38,8 +38,8 @@ import net.fabricmc.loom.util.MinecraftVersionInfo;
 
 public class MinecraftNativesProvider {
 	public static void provide(MinecraftProvider minecraftProvider, Project project) throws IOException {
-		if (!GradleSupport.extractNatives(project)) return; //No need to do this
 		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
+		if (!extension.hasLWJGL2() && !GradleSupport.extractNatives(project)) return; //No need to do this
 
 		File nativesDir = extension.getNativesDirectory();
 		File jarStore = extension.getNativesJarStore();

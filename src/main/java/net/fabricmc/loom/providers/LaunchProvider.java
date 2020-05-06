@@ -61,7 +61,7 @@ public class LaunchProvider extends LogicalDependencyProvider {
 				.argument("client", "--assetsDir")
 				.argument("client", new File(extension.getUserCache(), "assets").getAbsolutePath());
 
-		if (GradleSupport.extractNatives(project)) {
+		if (extension.hasLWJGL2() || GradleSupport.extractNatives(project)) {
 			launchConfig.property("client", "java.library.path", extension.getNativesDirectory().getAbsolutePath())
 						.property("client", "org.lwjgl.librarypath", extension.getNativesDirectory().getAbsolutePath());
 		}
