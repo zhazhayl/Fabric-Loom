@@ -180,7 +180,7 @@ public class LoomGradlePlugin extends AbstractPlugin {
 	 */
 	private <T extends Task> TaskProvider<T> register(String name, Class<T> taskClass, Action<? super T> configuration, BiConsumer<? super Project, ? super T> postConfiguration) {
 		TaskProvider<T> task = project.getTasks().register(name, taskClass, configuration);
-		project.afterEvaluate(p -> task.configure(t -> postConfiguration.accept(p, t)));
+		addAfterEvaluate(() -> task.configure(t -> postConfiguration.accept(project, t)));
 		return task;
 	}
 }

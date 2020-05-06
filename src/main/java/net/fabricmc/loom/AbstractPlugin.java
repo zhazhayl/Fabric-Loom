@@ -90,6 +90,18 @@ public class AbstractPlugin implements Plugin<Project> {
 		project.getConfigurations().getByName(name).extendsFrom(configs);
 	}
 
+	protected void addAfterEvaluate(Runnable task) {
+		project.afterEvaluate(project -> {
+			assert this.project == project;
+
+			if (project.getState().getFailure() == null) {
+				task.run();
+			} else {
+				project.getLogger().debug("Skipped " + task + " as project has error: " + project.getState().getFailure());
+			}
+		});
+	}
+
 	@Override
 	public void apply(Project target) {
 		this.project = target;
@@ -191,7 +203,7 @@ public class AbstractPlugin implements Plugin<Project> {
 	}
 
 	protected void configureScala() {
-		project.afterEvaluate(proj -> {
+		addAfterEvaluate(() -> {
 			if (project.getPluginManager().hasPlugin("scala")) {
 				ScalaCompile task = (ScalaCompile) project.getTasks().getByName("compileScala");
 				LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
@@ -281,9 +293,8 @@ public class AbstractPlugin implements Plugin<Project> {
 			project.getDependencies().add(JavaPlugin.ANNOTATION_PROCESSOR_CONFIGURATION_NAME, "net.fabricmc:fabric-mixin-compile-extensions:" + Constants.MIXIN_COMPILE_EXTENSIONS_VERSION);
 		}
 
-		project.afterEvaluate(project1 -> {
-			LoomGradleExtension extension = project1.getExtensions().getByType(LoomGradleExtension.class);
-
+		addAfterEvaluate(() -> {
+			LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
 
 
 			LoomDependencyManager dependencyManager = new LoomDependencyManager();
@@ -295,20 +306,22 @@ public class AbstractPlugin implements Plugin<Project> {
 			dependencyManager.addProvider(new MappedModsProvider());
 			dependencyManager.addProvider(new LaunchProvider());
 
-			dependencyManager.handleDependencies(project1);
+			dependencyManager.handleDependencies(project);
 
-			project1.getTasks().getByName("idea").finalizedBy(project1.getTasks().getByName("genIdeaWorkspace"));
-			project1.getTasks().getByName("eclipse").finalizedBy(project1.getTasks().getByName("genEclipseRuns"));
 
-			if (extension.autoGenIDERuns && isRootProject(project1)) {
-				SetupIntelijRunConfigs.setup(project1);
+			project.getTasks().getByName("idea").finalizedBy(project.getTasks().getByName("genIdeaWorkspace"));
+			project.getTasks().getByName("eclipse").finalizedBy(project.getTasks().getByName("genEclipseRuns"));
+
+			if (extension.autoGenIDERuns && isRootProject(project)) {
+				SetupIntelijRunConfigs.setup(project);
 			}
+
 
 			// Enables the default mod remapper
 			if (extension.remapMod) {
-				AbstractArchiveTask jarTask = (AbstractArchiveTask) project1.getTasks().getByName("jar");
+				AbstractArchiveTask jarTask = (AbstractArchiveTask) project.getTasks().getByName("jar");
 
-				RemapJarTask remapJarTask = (RemapJarTask) project1.getTasks().findByName("remapJar");
+				RemapJarTask remapJarTask = (RemapJarTask) project.getTasks().findByName("remapJar");
 
 				assert remapJarTask != null;
 
@@ -322,9 +335,9 @@ public class AbstractPlugin implements Plugin<Project> {
 				extension.addUnmappedMod(jarTask.getArchivePath().toPath());
 				remapJarTask.setAddNestedDependencies(true);
 
-				project1.getArtifacts().add("archives", remapJarTask);
+				project.getArtifacts().add("archives", remapJarTask);
 				remapJarTask.dependsOn(jarTask);
-				project1.getTasks().getByName("build").dependsOn(remapJarTask);
+				project.getTasks().getByName("build").dependsOn(remapJarTask);
 
 				Map<Project, Set<Task>> taskMap = project.getAllTasks(true);
 
@@ -334,7 +347,7 @@ public class AbstractPlugin implements Plugin<Project> {
 					for (Task task : taskSet) {
 						if (task instanceof RemapJarTask && ((RemapJarTask) task).isAddNestedDependencies()) {
 							//Run all the sub project remap jars tasks before the root projects jar, this is to allow us to include projects
-							NestedJars.getRequiredTasks(project1).forEach(task::dependsOn);
+							NestedJars.getRequiredTasks(project).forEach(task::dependsOn);
 						}
 
 						if (task instanceof AbstractArchiveTask && task.getExtensions().findByType(JarSettings.class) != null) {
@@ -346,70 +359,69 @@ public class AbstractPlugin implements Plugin<Project> {
 				}
 
 				try {
-					AbstractArchiveTask sourcesTask = (AbstractArchiveTask) project1.getTasks().getByName("sourcesJar");
-					RemapSourcesJarTask remapSourcesJarTask = (RemapSourcesJarTask) project1.getTasks().findByName("remapSourcesJar");
+					AbstractArchiveTask sourcesTask = (AbstractArchiveTask) project.getTasks().getByName("sourcesJar");
+					RemapSourcesJarTask remapSourcesJarTask = (RemapSourcesJarTask) project.getTasks().findByName("remapSourcesJar");
 					remapSourcesJarTask.setInput(sourcesTask.getArchivePath());
 					remapSourcesJarTask.setOutput(sourcesTask.getArchivePath());
-					remapSourcesJarTask.doLast(task -> project1.getArtifacts().add("archives", remapSourcesJarTask.getOutput()));
-					remapSourcesJarTask.dependsOn(project1.getTasks().getByName("sourcesJar"));
-					project1.getTasks().getByName("build").dependsOn(remapSourcesJarTask);
+					remapSourcesJarTask.doLast(task -> project.getArtifacts().add("archives", remapSourcesJarTask.getOutput()));
+					remapSourcesJarTask.dependsOn(project.getTasks().getByName("sourcesJar"));
+					project.getTasks().getByName("build").dependsOn(remapSourcesJarTask);
 				} catch (UnknownTaskException e) {
 					// pass
 				}
 			} else {
-				AbstractArchiveTask jarTask = (AbstractArchiveTask) project1.getTasks().getByName("jar");
+				AbstractArchiveTask jarTask = (AbstractArchiveTask) project.getTasks().getByName("jar");
 				extension.addUnmappedMod(jarTask.getArchivePath().toPath());
 			}
 		});
 	}
 
 	protected void configureMaven() {
-		project.afterEvaluate((p) -> {
+		addAfterEvaluate(() -> {
+			PublishingExtension mavenPublish = project.getExtensions().findByType(PublishingExtension.class);
+			if (mavenPublish == null) return; //The maven-publish plugin is not present
+
 			for (RemappedConfigurationEntry entry : Constants.MOD_COMPILE_ENTRIES) {
 				if (!entry.hasMavenScope()) {
 					continue;
 				}
 
-				Configuration compileModsConfig = p.getConfigurations().getByName(entry.getSourceConfiguration());
+				Configuration compileModsConfig = project.getConfigurations().getByName(entry.getSourceConfiguration());
 
 				// add modsCompile to maven-publish
-				PublishingExtension mavenPublish = p.getExtensions().findByType(PublishingExtension.class);
+				mavenPublish.publications((publications) -> {
+					for (Publication publication : publications) {
+						if (publication instanceof MavenPublication) {
+							((MavenPublication) publication).pom((pom) -> {
+								pom.withXml((xml) -> {
+									Node dependencies = GroovyXmlUtil.getOrCreateNode(xml.asNode(), "dependencies");
+									Set<String> foundArtifacts = new HashSet<>();
 
-				if (mavenPublish != null) {
-					mavenPublish.publications((publications) -> {
-						for (Publication publication : publications) {
-							if (publication instanceof MavenPublication) {
-								((MavenPublication) publication).pom((pom) -> {
-									pom.withXml((xml) -> {
-										Node dependencies = GroovyXmlUtil.getOrCreateNode(xml.asNode(), "dependencies");
-										Set<String> foundArtifacts = new HashSet<>();
+									GroovyXmlUtil.childrenNodesStream(dependencies).filter((n) -> "dependency".equals(n.name())).forEach((n) -> {
+										Optional<Node> groupId = GroovyXmlUtil.getNode(n, "groupId");
+										Optional<Node> artifactId = GroovyXmlUtil.getNode(n, "artifactId");
 
-										GroovyXmlUtil.childrenNodesStream(dependencies).filter((n) -> "dependency".equals(n.name())).forEach((n) -> {
-											Optional<Node> groupId = GroovyXmlUtil.getNode(n, "groupId");
-											Optional<Node> artifactId = GroovyXmlUtil.getNode(n, "artifactId");
-
-											if (groupId.isPresent() && artifactId.isPresent()) {
-												foundArtifacts.add(groupId.get().text() + ":" + artifactId.get().text());
-											}
-										});
-
-										for (Dependency dependency : compileModsConfig.getAllDependencies()) {
-											if (foundArtifacts.contains(dependency.getGroup() + ":" + dependency.getName())) {
-												continue;
-											}
-
-											Node depNode = dependencies.appendNode("dependency");
-											depNode.appendNode("groupId", dependency.getGroup());
-											depNode.appendNode("artifactId", dependency.getName());
-											depNode.appendNode("version", dependency.getVersion());
-											depNode.appendNode("scope", entry.getMavenScope());
+										if (groupId.isPresent() && artifactId.isPresent()) {
+											foundArtifacts.add(groupId.get().text() + ":" + artifactId.get().text());
 										}
 									});
+
+									for (Dependency dependency : compileModsConfig.getAllDependencies()) {
+										if (foundArtifacts.contains(dependency.getGroup() + ":" + dependency.getName())) {
+											continue;
+										}
+
+										Node depNode = dependencies.appendNode("dependency");
+										depNode.appendNode("groupId", dependency.getGroup());
+										depNode.appendNode("artifactId", dependency.getName());
+										depNode.appendNode("version", dependency.getVersion());
+										depNode.appendNode("scope", entry.getMavenScope());
+									}
 								});
-							}
+							});
 						}
-					});
-				}
+					}
+				});
 			}
 		});
 	}
