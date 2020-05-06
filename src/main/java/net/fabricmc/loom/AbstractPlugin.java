@@ -64,6 +64,7 @@ import net.fabricmc.loom.providers.MinecraftProvider;
 import net.fabricmc.loom.providers.StackedMappingsProvider;
 import net.fabricmc.loom.task.RemapJarTask;
 import net.fabricmc.loom.task.RemapSourcesJarTask;
+import net.fabricmc.loom.task.fernflower.FernFlowerTask;
 import net.fabricmc.loom.util.AccessTransformerHelper;
 import net.fabricmc.loom.util.Constants;
 import net.fabricmc.loom.util.GroovyXmlUtil;
@@ -292,6 +293,19 @@ public class AbstractPlugin implements Plugin<Project> {
 			// Add Mixin dependencies
 			project.getDependencies().add(JavaPlugin.ANNOTATION_PROCESSOR_CONFIGURATION_NAME, "net.fabricmc:fabric-mixin-compile-extensions:" + Constants.MIXIN_COMPILE_EXTENSIONS_VERSION);
 		}
+
+		project.getGradle().buildFinished(result -> {
+			LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
+
+			try {//Try avoid daemons causing caching problems
+				extension.getMinecraftProvider().clearCache();
+				for (FernFlowerTask task : project.getTasks().withType(FernFlowerTask.class)) {
+					task.resetClaims();
+				}
+			} catch (Throwable t) {
+				project.getLogger().warn("Error cleaning up after evaluation", t);
+			}
+		});
 
 		addAfterEvaluate(() -> {
 			LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);

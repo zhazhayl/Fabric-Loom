@@ -496,6 +496,10 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 		return version.getAssetIndex();
 	}
 
+	public void clearCache() {
+		VERSION_TO_VERSION.clear();
+	}
+
 	@Override
 	public String getTargetConfig() {
 		return Constants.MINECRAFT;

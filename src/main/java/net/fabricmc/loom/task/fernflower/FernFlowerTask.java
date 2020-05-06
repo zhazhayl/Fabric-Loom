@@ -65,6 +65,10 @@ public class FernFlowerTask extends AbstractDecompileTask {
 		return !DECOMPILE_CLAIMER.computeIfAbsent(getExtension().getMinecraftProvider().minecraftVersion, k -> new AtomicBoolean()).getAndSet(true);
 	}
 
+	public void resetClaims() {
+		DECOMPILE_CLAIMER.clear();
+	}
+
 	@TaskAction
 	public void doTask() throws Throwable {
 		if (!OperatingSystem.is64Bit()) {
