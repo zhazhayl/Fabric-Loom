@@ -36,7 +36,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
@@ -477,18 +479,18 @@ public class MappingsProvider extends LogicalDependencyProvider {
 						for (MethodEntry method : entry.getValue().getLeft()) {
 							EntryTriple[] methodMappings = minecraftProvider.getNeededHeaders().stream().map(method::get).toArray(EntryTriple[]::new);
 
-							if (!Arrays.stream(methodMappings).skip(1).map(EntryTriple::getName).allMatch(Predicate.isEqual(methodMappings[0].getName()))) {
+							if (!Arrays.stream(methodMappings).skip(1).filter(Objects::nonNull).map(EntryTriple::getName).allMatch(Predicate.isEqual(methodMappings[0].getName()))) {
 								Method methodMapping = mapping.method(methodMappings[0]);
-								writer.acceptMethod(className, methodMappings[0].getDesc(), Stream.concat(Arrays.stream(methodMappings).map(EntryTriple::getName), Stream.of(methodMapping.nameOr(methodMappings[0].getName()))).toArray(String[]::new));
+								writer.acceptMethod(className, methodMappings[0].getDesc(), Stream.concat(Arrays.stream(methodMappings).map(nullSafe(EntryTriple::getName)), Stream.of(methodMapping.nameOr(methodMappings[0].getName()))).toArray(String[]::new));
 							}
 						}
 
 						for (FieldEntry field : entry.getValue().getRight()) {
 							EntryTriple[] fieldMappings = minecraftProvider.getNeededHeaders().stream().map(field::get).toArray(EntryTriple[]::new);
 
-							if (!Arrays.stream(fieldMappings).skip(1).map(EntryTriple::getName).allMatch(Predicate.isEqual(fieldMappings[0].getName()))) {
+							if (!Arrays.stream(fieldMappings).skip(1).filter(Objects::nonNull).map(EntryTriple::getName).allMatch(Predicate.isEqual(fieldMappings[0].getName()))) {
 								Method fieldMapping = mapping.method(fieldMappings[0]);
-								writer.acceptField(className, fieldMappings[0].getDesc(), Stream.concat(Arrays.stream(fieldMappings).map(EntryTriple::getName), Stream.of(fieldMapping.nameOr(fieldMappings[0].getName()))).toArray(String[]::new));
+								writer.acceptField(className, fieldMappings[0].getDesc(), Stream.concat(Arrays.stream(fieldMappings).map(nullSafe(EntryTriple::getName)), Stream.of(fieldMapping.nameOr(fieldMappings[0].getName()))).toArray(String[]::new));
 							}
 						}
 					}
@@ -741,6 +743,10 @@ public class MappingsProvider extends LogicalDependencyProvider {
 				logger.warn("\t\t\t" + extra.getKey() + " => " + extra.getValue());
 			}
 		}
+	}
+
+	private static <T, R> Function<T, R> nullSafe(Function<T, R> test) {
+		return thing -> thing != null ? test.apply(thing) : null;
 	}
 
 	private String readStackHistory() {
