@@ -489,7 +489,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 							EntryTriple[] fieldMappings = minecraftProvider.getNeededHeaders().stream().map(field::get).toArray(EntryTriple[]::new);
 
 							if (!Arrays.stream(fieldMappings).skip(1).filter(Objects::nonNull).map(EntryTriple::getName).allMatch(Predicate.isEqual(fieldMappings[0].getName()))) {
-								Method fieldMapping = mapping.method(fieldMappings[0]);
+								Field fieldMapping = mapping.field(fieldMappings[0]);
 								writer.acceptField(className, fieldMappings[0].getDesc(), Stream.concat(Arrays.stream(fieldMappings).map(nullSafe(EntryTriple::getName)), Stream.of(fieldMapping.nameOr(fieldMappings[0].getName()))).toArray(String[]::new));
 							}
 						}
