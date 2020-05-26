@@ -131,7 +131,7 @@ public class TinyReader {
 
 			return mappings.getClassEntries().stream().collect(Collectors.toMap(Function.identity(), entry -> {
 				String name = entry.get(commonNamespace);
-				return Pair.of(ImmutableSet.copyOf(methods.get(name)), ImmutableSet.copyOf(fields.get(name)));
+				return Pair.of(ImmutableSet.copyOf(methods.getOrDefault(name, Collections.emptyList())), ImmutableSet.copyOf(fields.getOrDefault(name, Collections.emptyList())));
 			}));
 		}
 	}
