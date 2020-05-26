@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
@@ -30,7 +31,7 @@ import net.fabricmc.loom.providers.StackedMappingsProvider.MappingFile.MappingTy
 import net.fabricmc.loom.util.Constants;
 
 public class StackedMappingsProvider extends PhysicalDependencyProvider {
-	static final class MappingFile {
+	static final class MappingFile implements LazyMappings {
 		enum MappingType {
 			Tiny, TinyV1, TinyV2, TinyGz, Enigma;
 
@@ -95,6 +96,37 @@ public class StackedMappingsProvider extends PhysicalDependencyProvider {
 				throw new IllegalArgumentException("Tried to get namespaces from unenlightened type " + type);
 			}
 			return namespaces;
+		}
+
+		@Override
+		public ActiveMappings open() throws IOException {
+			switch (type) {
+			case Tiny:
+			case TinyV1:
+			case TinyV2:
+				return new ActiveMappings() {
+					private final FileSystem fs = FileSystems.newFileSystem(origin.toPath(), null);
+
+					@Override
+					public Path getMappings() {
+						return fs.getPath("mappings/mappings.tiny");
+					}
+
+					@Override
+					public void close() throws IOException {
+						fs.close();
+					}
+				};
+
+			case TinyGz:
+				return new DirectMappings(origin.toPath());
+
+			case Enigma:
+				throw new UnsupportedOperationException("Cannot open Enigma mappings as a single mapping path");
+
+			default:
+				throw new AssertionError("Unexpected mapping type: " + type);
+			}
 		}
 	}
 	private final MappingsProvider realProvider = new MappingsProvider();

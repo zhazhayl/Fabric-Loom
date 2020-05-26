@@ -106,6 +106,7 @@ license {
 	exclude '**/loom/providers/MappingsProvider.java'
 	exclude '**/loom/providers/MinecraftProvider.java'
 	exclude '**/loom/providers/MinecraftVersionAdaptable.java'
+	exclude '**/loom/providers/LazyMappings.java'
 	exclude '**/loom/providers/SpecialCases.java'
 	exclude '**/loom/providers/StackedMappingsProvider.java'
 	exclude '**/loom/providers/mappings/*.java'

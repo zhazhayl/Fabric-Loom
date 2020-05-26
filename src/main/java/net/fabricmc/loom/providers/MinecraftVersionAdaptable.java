@@ -9,6 +9,7 @@ package net.fabricmc.loom.providers;
 
 import java.io.File;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Set;
 
 import org.gradle.api.Project;
@@ -29,6 +30,16 @@ public interface MinecraftVersionAdaptable {
 
 	/** The way the {@link #getMergedJar() merged jar} was made */
 	JarMergeOrder getMergeStrategy();
+
+	/** The set of namespaces the native Minecraft jars will use (based on the {@link #getMergeStrategy() merge strategy}) */
+	default Set<String> getNativeHeaders() {
+		return getMergeStrategy().getNativeHeaders();
+	}
+
+	/** The set of namespaces an Intermediary mapping file should contain for the given {@link #getMergeStrategy() merge strategy} */
+	default List<String> getNeededHeaders() {
+		return getMergeStrategy().getNeededHeaders();
+	}
 
 	/** Whether {@link #giveIntermediaries(Path)} needs to be called before {@link #getMergedJar()} can be */
 	boolean needsIntermediaries();

@@ -26,6 +26,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -34,9 +35,12 @@ import java.util.ListIterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.Map.Entry;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
 
 import com.google.common.collect.ImmutableList;
@@ -48,6 +52,7 @@ import cuchaz.enigma.command.MapSpecializedMethodsCommand;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 
+import org.gradle.api.InvalidUserDataException;
 import org.gradle.api.Project;
 import org.gradle.api.logging.Logger;
 
@@ -55,19 +60,15 @@ import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.LoomGradleExtension.JarMergeOrder;
 import net.fabricmc.loom.dependencies.DependencyProvider;
 import net.fabricmc.loom.dependencies.LogicalDependencyProvider;
+import net.fabricmc.loom.providers.LazyMappings.ActiveMappings;
 import net.fabricmc.loom.providers.MinecraftProvider.MinecraftVersion;
 import net.fabricmc.loom.providers.StackedMappingsProvider.MappingFile;
 import net.fabricmc.loom.providers.StackedMappingsProvider.MappingFile.MappingType;
 import net.fabricmc.loom.providers.mappings.EnigmaReader;
 import net.fabricmc.loom.providers.mappings.MappingBlob;
-import net.fabricmc.loom.providers.mappings.MappingBlob.InvertionTarget;
 import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping;
 import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping.Field;
 import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping.Method;
-import net.fabricmc.loom.providers.mappings.MappingSplat;
-import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping;
-import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping.CombinedField;
-import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping.CombinedMethod;
 import net.fabricmc.loom.providers.mappings.TinyDuplicator;
 import net.fabricmc.loom.providers.mappings.TinyReader;
 import net.fabricmc.loom.providers.mappings.TinyV2toV1;
@@ -75,8 +76,13 @@ import net.fabricmc.loom.providers.mappings.TinyWriter;
 import net.fabricmc.loom.util.Constants;
 import net.fabricmc.loom.util.MapJarsTiny;
 import net.fabricmc.loom.util.TinyRemapperMappingsHelper;
+import net.fabricmc.mappings.ClassEntry;
+import net.fabricmc.mappings.EntryTriple;
+import net.fabricmc.mappings.FieldEntry;
 import net.fabricmc.mappings.Mappings;
+import net.fabricmc.mappings.MethodEntry;
 import net.fabricmc.stitch.commands.CommandProposeFieldNames;
+import net.fabricmc.stitch.util.Pair;
 import net.fabricmc.tinyremapper.IMappingProvider;
 
 public class MappingsProvider extends LogicalDependencyProvider {
@@ -172,7 +178,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 				//Need to see if any of the mapping files have Intermediaries for the Minecraft version they're going to be running on
 				Optional<MappingFile> interProvider = searchForIntermediaries(versionToMappings.getOrDefault(minecraftVersion, Collections.emptyList()), minecraftProvider.getNeededHeaders());
 
-				MappingBlob intermediaries;
+				LazyMappings intermediaryMaker;
 				if (interProvider.isPresent()) {
 					MappingFile mappings = interProvider.get();
 
@@ -202,36 +208,14 @@ public class MappingsProvider extends LogicalDependencyProvider {
 						}
 					}
 
-					if (minecraftProvider.getMergeStrategy() != JarMergeOrder.FIRST) {
-						throw new UnsupportedOperationException("Mapping stacking only currently supports immediately merged jars");
-					}
-
-					project.getLogger().lifecycle(":loading intermediaries " + mappings.origin.getName());
-					switch (mappings.type) {
-					case Tiny:
-						assert false: "Unexpected mappings type " + mappings.type + " from " + mappings.origin;
-					case TinyV1:
-					case TinyV2:
-						try (FileSystem fileSystem = FileSystems.newFileSystem(mappings.origin.toPath(), null)) {
-							//Would be nice to extract this out but then the file system is closed before the mappings can be read
-							TinyReader.readTiny(fileSystem.getPath("mappings/mappings.tiny"), "official", "intermediary", intermediaries = new MappingBlob());
-						}
-						break;
-
-					case TinyGz:
-						TinyReader.readTiny(mappings.origin.toPath(), "official", "intermediary", intermediaries = new MappingBlob());
-						break;
-
-					case Enigma:
-					default: //Shouldn't end up here given Enigma won't be supplying the intermediaries
-						throw new IllegalStateException("Unexpected mappings type " + mappings.type + " from " + mappings.origin);
-					}
+					project.getLogger().lifecycle(":Using intermediaries from " + mappings.origin.getName());
+					intermediaryMaker = mappings;
 				} else {
 					if (!intermediaryNames.exists()) {//Grab intermediary mappings from Github
-						project.getLogger().lifecycle(":downloading intermediaries " + intermediaryNames.getName());
+						project.getLogger().lifecycle(":Downloading intermediaries to " + intermediaryNames.getName());
 						FileUtils.copyURLToFile(new URL(SpecialCases.intermediaries(minecraftVersion)), intermediaryNames);
 					} else {
-						project.getLogger().lifecycle(":loading intermediaries " + intermediaryNames.getName());
+						project.getLogger().lifecycle(":Using intermediaries from " + intermediaryNames.getName());
 					}
 
 					if (mappingFiles.isEmpty()) {
@@ -239,16 +223,17 @@ public class MappingsProvider extends LogicalDependencyProvider {
 						break free;
 					}
 
-					if (minecraftProvider.getMergeStrategy() != JarMergeOrder.FIRST) {
-						throw new UnsupportedOperationException("Mapping stacking only currently supports immediately merged jars");
-					}
-
-					TinyReader.readTiny(intermediaryNames.toPath(), "official", "intermediary", intermediaries = new MappingBlob());
+					intermediaryMaker = () -> new DirectMappings(intermediaryNames.toPath());
 				}
 
-				MappingBlob inversion = intermediaries.invert(InvertionTarget.MEMBERS);
 				MappingBlob mappings = new MappingBlob();
+				try (ActiveMappings intermediaries = intermediaryMaker.open()) {
+					TinyReader.fillFromColumn(intermediaries.getMappings(), "intermediary", mappings);
+
+					if (minecraftProvider.needsIntermediaries()) minecraftProvider.giveIntermediaries(intermediaries.getMappings());
+				}
 				Map<String, MappingBlob> versionToIntermediaries = new HashMap<>();
+				Map<String, JarMergeOrder> versionToMerging = new HashMap<>();
 
 				for (MappingFile mapping : mappingFiles) {
 					project.getLogger().lifecycle(":loading " + mapping.origin.getName());
@@ -271,25 +256,33 @@ public class MappingsProvider extends LogicalDependencyProvider {
 								gains.streamFields().filter(field -> field.name() != null && !field.fromName.startsWith("field_")).map(field -> field.fromName).collect(Collectors.joining(", ", "Found unexpected field mappings: ", "]"));
 						}
 
+						String from;
 						Path contextJar;
 						if (minecraftVersion.equals(mapping.minecraftVersion)) {
 							if (nativeNames) {
+								if (minecraftProvider.getMergeStrategy() == JarMergeOrder.LAST) throw new InvalidUserDataException("Cannot use natively named Enigma mappings for a split named version!");
+								from = Iterables.getOnlyElement(minecraftProvider.getNativeHeaders());
 								contextJar = minecraftProvider.getMergedJar();
 							} else {
-								contextJar = MapJarsTiny.makeInterJar(project, extension, minecraftProvider, interProvider.map(mappingFile -> mappingFile.origin.toPath()));
+								from = "intermediary";
+								try (ActiveMappings intermediaries = intermediaryMaker.open()) {
+									contextJar = MapJarsTiny.makeInterJar(project, extension, minecraftProvider, Optional.of(intermediaries.getMappings()));
+								}
 							}
 						} else {
 							MinecraftVersion version = MinecraftProvider.makeMergedJar(project, extension, mapping.minecraftVersion, Optional.empty(), JarMergeOrder.INDIFFERENT);
 
 							if (nativeNames) {
+								if (version.getMergeStrategy() == JarMergeOrder.LAST) throw new InvalidUserDataException("Cannot use natively named Enigma mappings for a split named version!");
+								from = Iterables.getOnlyElement(version.getNativeHeaders());
 								contextJar = version.getMergedJar();
 							} else {
+								from = "intermediary";
 								contextJar = MapJarsTiny.makeInterJar(project, extension, version, //See if we've actually got the old Intermediaries per chance too
-										searchForIntermediaries(versionToMappings.getOrDefault(mapping.minecraftVersion, Collections.emptyList())).map(mappingFile -> mappingFile.origin.toPath()));
+										searchForIntermediaries(versionToMappings.getOrDefault(mapping.minecraftVersion, Collections.emptyList()), version.getNeededHeaders()).map(mappingFile -> mappingFile.origin.toPath()));
 							}
 						}
 
-						String from = nativeNames ? "official" : "intermediary";
 						Path specialisedMappings = MAPPINGS_DIR.toPath().resolve(FilenameUtils.removeExtension(mapping.origin.getName()) + "-specialised.jar");
 						try (FileSystem fs = FileSystems.newFileSystem(new URI("jar:" + specialisedMappings.toUri()), Collections.singletonMap("create", "true"))) {
 							Path destination = fs.getPath("mappings/mappings.tiny");
@@ -311,8 +304,11 @@ public class MappingsProvider extends LogicalDependencyProvider {
 						if (mapping.getNamespaces().contains("intermediary")) {
 							origin = "intermediary";
 						} else {
+							JarMergeOrder mergeStrategy = versionToMerging.computeIfAbsent(mapping.minecraftVersion, version -> MinecraftProvider.findMergeStrategy(project, extension, version));
+							if (mergeStrategy == JarMergeOrder.LAST) throw new InvalidUserDataException("Cannot use natively named mappings for a split named version!");
+
 							nativeNames = true;
-							origin = "official";
+							origin = Iterables.getOnlyElement(mergeStrategy.getNativeHeaders());
 						}
 						assert mapping.getNamespaces().contains("named");
 
@@ -344,8 +340,11 @@ public class MappingsProvider extends LogicalDependencyProvider {
 						if (namespaces.contains("intermediary")) {
 							origin = "intermediary";
 						} else {
+							JarMergeOrder mergeStrategy = versionToMerging.computeIfAbsent(mapping.minecraftVersion, version -> MinecraftProvider.findMergeStrategy(project, extension, version));
+							if (mergeStrategy == JarMergeOrder.LAST) throw new InvalidUserDataException("Cannot use natively named mappings for a split named version!");
+
 							nativeNames = true;
-							origin = "official";
+							origin = Iterables.getOnlyElement(mergeStrategy.getNativeHeaders());
 						}
 						assert namespaces.contains("named");
 
@@ -358,37 +357,53 @@ public class MappingsProvider extends LogicalDependencyProvider {
 					}
 
 					if (nativeNames) {
-						MappingBlob renamer;
-						if (!minecraftVersion.equals(mapping.minecraftVersion)) {
-							renamer = versionToIntermediaries.computeIfAbsent(mapping.minecraftVersion, version -> {
-								Path intermediaryNames = searchForIntermediaries(versionToMappings.getOrDefault(version, Collections.emptyList()))
+						MappingBlob renamer = versionToIntermediaries.computeIfAbsent(mapping.minecraftVersion, version -> {
+							ActiveMappings mappingsPipe = null;
+							Path intermediaryNames;
+							if (!minecraftVersion.equals(version)) {
+								intermediaryNames = searchForIntermediaries(versionToMappings.getOrDefault(version, Collections.emptyList()), null)
 										.map(mappingFile -> mappingFile.origin.toPath()).orElseGet(() -> getIntermediaries(extension, version));
-
-								MappingBlob inters = new MappingBlob();
+							} else {
 								try {
-									TinyReader.readTiny(intermediaryNames, "official", "intermediary", inters);
+									mappingsPipe = intermediaryMaker.open();
 								} catch (IOException e) {
-									throw new UncheckedIOException("Error reading Intermediary mappings for " + version, e);
+									throw new UncheckedIOException("Error opening Intermediary maker", e);
 								}
-								return inters;
-							});
-						} else {
-							renamer = intermediaries;
-						}
+								intermediaryNames = mappingsPipe.getMappings();
+							}
 
+							JarMergeOrder mergeStrategy = versionToMerging.computeIfAbsent(version, v -> MinecraftProvider.findMergeStrategy(project, extension, v));
+							if (mergeStrategy == JarMergeOrder.LAST) throw new InvalidUserDataException("Cannot use natively named mappings for a split named version!");
+
+							MappingBlob inters = new MappingBlob();
+							try {
+								TinyReader.readTiny(intermediaryNames, Iterables.getOnlyElement(mergeStrategy.getNativeHeaders()), "intermediary", inters);
+							} catch (IOException e) {
+								throw new UncheckedIOException("Error reading Intermediary mappings for " + version, e);
+							} finally {
+								if (mappingsPipe != null) {
+									try {
+										mappingsPipe.close();
+									} catch (IOException e) {
+										project.getLogger().warn("Error closing Intermediary maker", e);
+									}
+								}
+							}
+							return inters;
+						});
+
+						logErroneousMappings(project.getLogger(), gains, renamer);
 						gains = gains.rename(renamer);
 					}
 
 					for (Mapping classMapping : gains) {
 						//If the name has been lost since it was named there's no point including it
-						if (inversion.tryMapName(classMapping.from) == null) continue;
-						Mapping interMapping = inversion.get(classMapping.from);
+						if (!mappings.has(classMapping.from)) continue;
 
 						Mapping existingClass = mappings.get(classMapping.from);
 						if (existingClass.to() == null && !classMapping.from.equals(classMapping.to())) {
 							mappings.acceptClass(classMapping.from, classMapping.to());
 						}
-						assert interMapping.from.equals(existingClass.from);
 
 						if (!existingClass.comment().isPresent()) {
 							classMapping.comment().ifPresent(comment -> {
@@ -397,7 +412,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 						}
 
 						for (Method method : classMapping.methods()) {
-							if (!interMapping.hasMethod(method) && method.fromName.charAt(0) != '<') continue;
+							if (!existingClass.hasMethod(method) && method.fromName.charAt(0) != '<') continue;
 
 							Method existingMethod = existingClass.method(method);
 							if (existingMethod.name() == null && !existingMethod.fromName.equals(method.name())) {
@@ -411,7 +426,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 							}
 
 							if (method.hasArgs()) {
-								method.iterateArgs((arg, index) -> {
+								method.iterateArgs((index, arg) -> {
 									if (existingMethod.arg(index) == null) {
 										mappings.acceptMethodArg(classMapping.from, method.fromName, method.fromDesc, index, arg);
 									}
@@ -425,7 +440,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 						}
 
 						for (Field field : classMapping.fields()) {
-							if (!interMapping.hasField(field)) continue;
+							if (!existingClass.hasField(field)) continue;
 
 							Field existingField = existingClass.field(field);
 							if (existingField.name() == null && !existingField.fromName.equals(field.name())) {
@@ -442,34 +457,53 @@ public class MappingsProvider extends LogicalDependencyProvider {
 				}
 
 				project.getLogger().lifecycle(":combining mappings");
-				MappingSplat combined = new MappingSplat(mappings.rename(inversion), intermediaries);
+				Map<ClassEntry, Pair<Set<MethodEntry>, Set<FieldEntry>>> intermediaryMappings;
+				try (ActiveMappings intermediaries = intermediaryMaker.open()) {
+					intermediaryMappings = TinyReader.readTiny(intermediaries.getMappings(), "intermediary");
+				}
 
 				project.getLogger().lifecycle(":writing " + MAPPINGS_TINY_BASE.getName());
-				try (TinyWriter writer = new TinyWriter(MAPPINGS_TINY_BASE.toPath(), "official", "named", "intermediary")) {
-					for (CombinedMapping mapping : combined) {
-						String notch = mapping.from;
-						if (mapping.hasNameChange()) writer.acceptClass(notch, mapping.to, mapping.fallback);
+				try (TinyWriter writer = new TinyWriter(MAPPINGS_TINY_BASE.toPath(), Stream.concat(minecraftProvider.getNeededHeaders().stream(), Stream.of("named")).toArray(String[]::new))) {
+					for (Entry<ClassEntry, Pair<Set<MethodEntry>, Set<FieldEntry>>> entry : intermediaryMappings.entrySet()) {
+						String[] classMappings = minecraftProvider.getNeededHeaders().stream().map(entry.getKey()::get).toArray(String[]::new);
 
-						for (CombinedMethod method : mapping.methodsWithNames()) {
-							writer.acceptMethod(notch, method.fromDesc, method.from, method.to, method.fallback);
+						String className = classMappings[0];
+						Mapping mapping = mappings.getOrDummy(className);
+
+						if (!Arrays.stream(classMappings).skip(1).allMatch(Predicate.isEqual(className))) {
+							writer.acceptClass(Stream.concat(Arrays.stream(classMappings), Stream.of(mapping.toOr(className))).toArray(String[]::new));
 						}
 
-						for (CombinedField field : mapping.fieldsWithNames()) {
-							writer.acceptField(notch, field.fromDesc, field.from, field.to, field.fallback);
+						for (MethodEntry method : entry.getValue().getLeft()) {
+							EntryTriple[] methodMappings = minecraftProvider.getNeededHeaders().stream().map(method::get).toArray(EntryTriple[]::new);
+
+							if (!Arrays.stream(methodMappings).skip(1).map(EntryTriple::getName).allMatch(Predicate.isEqual(methodMappings[0].getName()))) {
+								Method methodMapping = mapping.method(methodMappings[0]);
+								writer.acceptMethod(className, methodMappings[0].getDesc(), Stream.concat(Arrays.stream(methodMappings).map(EntryTriple::getName), Stream.of(methodMapping.nameOr(methodMappings[0].getName()))).toArray(String[]::new));
+							}
+						}
+
+						for (FieldEntry field : entry.getValue().getRight()) {
+							EntryTriple[] fieldMappings = minecraftProvider.getNeededHeaders().stream().map(field::get).toArray(EntryTriple[]::new);
+
+							if (!Arrays.stream(fieldMappings).skip(1).map(EntryTriple::getName).allMatch(Predicate.isEqual(fieldMappings[0].getName()))) {
+								Method fieldMapping = mapping.method(fieldMappings[0]);
+								writer.acceptField(className, fieldMappings[0].getDesc(), Stream.concat(Arrays.stream(fieldMappings).map(EntryTriple::getName), Stream.of(fieldMapping.nameOr(fieldMappings[0].getName()))).toArray(String[]::new));
+							}
 						}
 					}
 				}
 
-				if (combined.hasArgNames()) {
+				if (mappings.hasArgNames()) {
 					project.getLogger().lifecycle(":writing " + parameterNames.getFileName());
 					try (BufferedWriter writer = Files.newBufferedWriter(parameterNames)) {
-						for (CombinedMapping mapping : combined) {
-							for (CombinedMethod method : mapping.methodsWithArgs()) {
+						for (Mapping mapping : mappings) {
+							for (Method method : mapping.methodsWithArgs()) {
 								if (!method.hasArgNames()) continue; //Just comments for the arguments
 
-								writer.write(mapping.to);
+								writer.write(mapping.toOr(mapping.from));
 								writer.write('/');
-								writer.write(method.from);
+								writer.write(method.fromName);
 								writer.write(method.fromDesc);
 								writer.newLine();
 
@@ -488,10 +522,10 @@ public class MappingsProvider extends LogicalDependencyProvider {
 					}
 				}
 
-				if (combined.hasComments()) {
+				if (mappings.hasComments()) {
 					project.getLogger().lifecycle(":writing " + decompileComments.getFileName());
 					try (BufferedWriter writer = Files.newBufferedWriter(decompileComments)) {
-						TinyV2toV1.writeComments(writer, combined);
+						TinyV2toV1.writeComments(writer, mappings);
 					}
 				}
 
@@ -504,6 +538,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 			}
 
 			assert MAPPINGS_TINY_BASE.exists();
+			if (minecraftProvider.needsIntermediaries()) minecraftProvider.giveIntermediaries(MAPPINGS_TINY_BASE.toPath());
 			assert !MAPPINGS_TINY.exists();
 
 			project.getLogger().lifecycle(":populating field names");
@@ -530,6 +565,8 @@ public class MappingsProvider extends LogicalDependencyProvider {
 				throw new IllegalStateException("Unexpected jar merge strategy " + minecraftProvider.getMergeStrategy());
 			}
 			CommandProposeFieldNames.run(minecraftProvider.getMergedJar().toFile(), MAPPINGS_TINY_BASE, MAPPINGS_TINY, namespace, "named");
+		} else {
+			if (minecraftProvider.needsIntermediaries()) minecraftProvider.giveIntermediaries(MAPPINGS_TINY.toPath());
 		}
 
 		if (Files.exists(parameterNames)) {
@@ -600,12 +637,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 		addDependency(mappingJar, project, Constants.MAPPINGS);
 	}
 
-	@Deprecated
-	private static Optional<MappingFile> searchForIntermediaries(List<MappingFile> mappings) {
-		return searchForIntermediaries(mappings, ImmutableSet.of("official", "intermediary"));
-	}
-
-	private static Optional<MappingFile> searchForIntermediaries(List<MappingFile> mappings, Set<String> interHeaders) {
+	private static Optional<MappingFile> searchForIntermediaries(List<MappingFile> mappings, Collection<String> interHeaders) {
 		return mappings.stream().filter(file -> {
 			try {
 				List<String> headers;
@@ -646,6 +678,69 @@ public class MappingsProvider extends LogicalDependencyProvider {
 		}
 
 		return intermediaryNames.toPath();
+	}
+
+	private static void logErroneousMappings(Logger logger, MappingBlob mappings, MappingBlob fallback) {
+		//Sometimes Yarn versions include their own mappings without Intermediary backing (which is bad really)
+		Map<String, Pair<String, Map<String, String>>> yarnOnlyMappings = new HashMap<>();
+
+		for (Mapping mapping : mappings) {
+			String notch = mapping.from;
+
+			if (!fallback.has(notch)) {
+				assert fallback.tryMapName(notch) == null;
+				throw new IllegalStateException("Extra class mapping missing from fallback! Unable to find " + notch + " (mapped as " + mapping.to() + ')');
+			}
+			Mapping other = fallback.getOrDummy(notch); //Won't be a dummy if combined is not null
+
+			for (Method method : mapping.methods()) {
+				if (other.hasMethod(method)) continue;
+				notch = method.fromName;
+
+				if (notch.charAt(0) != '<' && !notch.equals(method.nameOr(notch))) {
+					//Changing Notch names without intermediaries to back it up is not cross-version safe and shouldn't be done
+					//throw new IllegalStateException("Extra mappings missing from fallback! Unable to find " + mapping.from + '#' + method.fromName + method.fromDesc + " (" + mapping.to + '#' + method.name() + ')');
+
+					//Yarn sometimes does however, so we'll just the cases where it does and not use them
+					yarnOnlyMappings.computeIfAbsent(mapping.from, k -> Pair.of(mapping.to(), new HashMap<>())).getRight().put(method.fromName + method.fromDesc, method.name());
+				}
+			}
+
+			for (Field field : mapping.fields()) {
+				if (other.hasField(field)) continue;
+
+				yarnOnlyMappings.computeIfAbsent(mapping.from, k -> Pair.of(mapping.to(), new HashMap<>())).getRight().put(field.fromDesc + ' ' + field.fromName, field.name());
+				//throw new IllegalStateException("Extra mapping missing from fallback! Unable to find " + mapping.from + '#' + field.fromName + " (" + field.fromDesc + ')');
+			}
+		}
+
+		if (!yarnOnlyMappings.isEmpty() && logger.isWarnEnabled()) {//We should crash from this, but that's a nuisance as Yarn has to get fixed
+			logger.warn("Invalid Yarn mappings (ie missing Intermediaries) found:");
+
+			for (Entry<String, Pair<String, Map<String, String>>> entry : yarnOnlyMappings.entrySet()) {
+				String notch = entry.getKey();
+				String yarn = entry.getValue().getLeft();
+				logger.warn("\tIn " + notch + " (" + yarn + ')');
+
+				//Split the methods apart from the fields
+				Map<Boolean, List<Entry<String, String>>> extras = entry.getValue().getRight().entrySet().stream().collect(Collectors.partitioningBy(extra -> extra.getKey().contains("(")));
+
+				printExtras(logger, extras.get(Boolean.TRUE), "methods");
+				printExtras(logger, extras.get(Boolean.FALSE), "fields");
+
+				logger.warn(""); //Empty line to break up the classes
+			}
+		}
+	}
+
+	private static void printExtras(Logger logger, List<Entry<String, String>> extras, String type) {
+		if (!extras.isEmpty()) {
+			logger.warn("\t\tExtra mapped " + type + ':');
+
+			for (Entry<String, String> extra : extras) {
+				logger.warn("\t\t\t" + extra.getKey() + " => " + extra.getValue());
+			}
+		}
 	}
 
 	private String readStackHistory() {

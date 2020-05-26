@@ -36,9 +36,21 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 
+import com.google.common.collect.ImmutableSet;
+import com.google.common.io.MoreFiles;
+
+import net.fabricmc.mappings.ClassEntry;
+import net.fabricmc.mappings.EntryTriple;
+import net.fabricmc.mappings.FieldEntry;
+import net.fabricmc.mappings.Mappings;
+import net.fabricmc.mappings.MappingsProvider;
+import net.fabricmc.mappings.MethodEntry;
 import net.fabricmc.mappings.TinyV2Visitor;
 import net.fabricmc.mappings.visitor.ClassVisitor;
 import net.fabricmc.mappings.visitor.FieldVisitor;
@@ -46,17 +58,22 @@ import net.fabricmc.mappings.visitor.LocalVisitor;
 import net.fabricmc.mappings.visitor.MappingsVisitor;
 import net.fabricmc.mappings.visitor.MethodVisitor;
 import net.fabricmc.mappings.visitor.ParameterVisitor;
+import net.fabricmc.stitch.util.Pair;
 import net.fabricmc.tinyremapper.TinyUtils;
 
 public class TinyReader {
-	static BufferedReader getMappingReader(Path file) throws IOException {
+	private static InputStream getMappingStream(Path file) throws IOException {
 		InputStream in = Files.newInputStream(file);
 
-		if (file.getFileName().toString().endsWith(".gz")) {
+		if ("gz".equalsIgnoreCase(MoreFiles.getFileExtension(file))) {
 			in = new GZIPInputStream(in);
 		}
 
-		return new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+		return in;
+	}
+
+	static BufferedReader getMappingReader(Path file) throws IOException {
+		return new BufferedReader(new InputStreamReader(getMappingStream(file), StandardCharsets.UTF_8));
 	}
 
 	public static List<String> readHeaders(Path file) throws IOException {
@@ -101,6 +118,46 @@ public class TinyReader {
 		}
 	}
 
+	public static Map<ClassEntry, Pair<Set<MethodEntry>, Set<FieldEntry>>> readTiny(Path file, String commonNamespace) throws IOException {
+		try (InputStream in = getMappingStream(file)) {
+			Mappings mappings = MappingsProvider.readTinyMappings(in, false);
+
+			if (!mappings.getNamespaces().contains(commonNamespace)) {
+				throw new IllegalArgumentException("Namespace " + commonNamespace + " not found in " + file);
+			}
+
+			Map<String, List<MethodEntry>> methods = mappings.getMethodEntries().stream().collect(Collectors.groupingBy(method -> method.get(commonNamespace).getOwner()));
+			Map<String, List<FieldEntry>> fields = mappings.getFieldEntries().stream().collect(Collectors.groupingBy(field -> field.get(commonNamespace).getOwner()));
+
+			return mappings.getClassEntries().stream().collect(Collectors.toMap(Function.identity(), entry -> {
+				String name = entry.get(commonNamespace);
+				return Pair.of(ImmutableSet.copyOf(methods.get(name)), ImmutableSet.copyOf(fields.get(name)));
+			}));
+		}
+	}
+
+	public static void fillFromColumn(Path file, String column, MappingBlob blob) throws IOException {
+		try (InputStream in = getMappingStream(file)) {
+			Mappings mappings = MappingsProvider.readTinyMappings(in, false);
+
+			if (!mappings.getNamespaces().contains(column)) {
+				throw new IllegalArgumentException("Namespace " + column + " not found in " + file);
+			}
+
+			for (ClassEntry entry : mappings.getClassEntries()) {
+				blob.acceptClass(entry.get(column), null);
+			}
+			for (MethodEntry entry : mappings.getMethodEntries()) {
+				EntryTriple mapping = entry.get(column);
+				blob.acceptMethod(mapping.getOwner(), mapping.getName(), mapping.getDesc(), null, null, null);
+			}
+			for (FieldEntry entry : mappings.getFieldEntries()) {
+				EntryTriple mapping = entry.get(column);
+				blob.acceptField(mapping.getOwner(), mapping.getName(), mapping.getDesc(), null, null, null);
+			}
+		}
+	}
+
 	public static void readComments(Path file, String from, UnaryOperator<String> classRemapper, IMappingAcceptor mappingAcceptor) throws IOException {
 		try (Reader in = new InputStreamReader(Files.newInputStream(file), StandardCharsets.UTF_8)) {
 			TinyV2Visitor.read(in, new MappingsVisitor() {
@@ -134,7 +191,7 @@ public class TinyReader {
 						public MethodVisitor visitMethod(long offset, String[] names, String descriptor) {
 							return new MethodVisitor() {
 								private final String name = names[index];
-								private final String desc = index == 0 ? descriptor : MappingSplat.remapDesc(descriptor, classRemapper);
+								private final String desc = index == 0 ? descriptor : MappingBlob.remapDesc(descriptor, classRemapper);
 
 								@Override
 								public ParameterVisitor visitParameter(long offset, String[] names, int localVariableIndex) {
@@ -163,7 +220,7 @@ public class TinyReader {
 						public FieldVisitor visitField(long offset, String[] names, String descriptor) {
 							return new FieldVisitor() {
 								private final String name = names[index];
-								private final String desc = index == 0 ? descriptor : MappingSplat.remapDesc(descriptor, classRemapper);
+								private final String desc = index == 0 ? descriptor : MappingBlob.remapDesc(descriptor, classRemapper);
 
 								@Override
 								public void visitComment(String line) {

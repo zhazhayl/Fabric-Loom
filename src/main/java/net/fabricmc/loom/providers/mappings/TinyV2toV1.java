@@ -27,11 +27,10 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
-import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping;
-import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping.CombinedField;
-import net.fabricmc.loom.providers.mappings.MappingSplat.CombinedMapping.CombinedMethod;
+import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping;
 import net.fabricmc.mappings.EntryTriple;
 import net.fabricmc.mappings.ExtendedMappings;
 import net.fabricmc.mappings.MappingsProvider;
@@ -316,31 +315,36 @@ public class TinyV2toV1 {
 		classToComments.apply(target).add(reconstructor.apply(comment.getComments(), target));
 	}
 
-	public static void writeComments(BufferedWriter out, MappingSplat mappings) throws IOException {
+	public static void writeComments(BufferedWriter out, MappingBlob mappings) throws IOException {
 		List<FullClassComments> comments = new ArrayList<>();
 
-		for (CombinedMapping mapping : mappings) {
+		UnaryOperator<String> remapper = className -> {
+			String triedMapping = mappings.tryMapName(className);
+			return triedMapping != null ? triedMapping : className;
+		};
+
+		for (Mapping mapping : mappings) {
 			if (!mapping.hasAnyComments()) continue; //Nothing to write
 
-			FullClassComments comment = new FullClassComments(mapping.to);
+			FullClassComments comment = new FullClassComments(mapping.toOr(mapping.from));
 			if (mapping.hasComment()) comment.classComments.add(new Class(Collections.singletonList(mapping.comment), mapping.to));
 
-			for (CombinedMethod method : mapping.methods()) {
+			for (Mapping.Method method : mapping.methods()) {
 				if (!method.hasAnyComments()) continue;
 
-				EntryTriple entry = new EntryTriple(mapping.to, method.to, method.toDesc);
+				EntryTriple entry = new EntryTriple(mapping.toOr(mapping.from), method.nameOr(method.fromName), method.desc(remapper));
 				if (method.hasComment()) comment.methodComments.add(new Method(Collections.singletonList(method.comment), entry));
 
-				method.iterateArgComments((index, argComment) -> {
+				method.iterateArgComments((argComment, index) -> {
 					comment.parameterComments.computeIfAbsent(entry, k -> new ArrayList<>())
 								.add(new Parameter(Collections.singletonList(argComment), new MethodParameter(entry, method.arg(index), index)));
 				});
 			}
 
-			for (CombinedField field : mapping.fields()) {
+			for (Mapping.Field field : mapping.fields()) {
 				if (!field.hasComment()) continue;
 
-				EntryTriple entry = new EntryTriple(mapping.to, field.to, field.toDesc);
+				EntryTriple entry = new EntryTriple(mapping.toOr(mapping.from), field.nameOr(field.fromName), field.desc(remapper));
 				comment.fieldComments.add(new Field(Collections.singletonList(field.comment), entry));
 			}
 

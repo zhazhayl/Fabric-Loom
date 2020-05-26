@@ -34,15 +34,20 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
 import javax.annotation.Nullable;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.gson.JsonObject;
+
 import org.cadixdev.lorenz.MappingSet;
 import org.cadixdev.mercury.Mercury;
+
 import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.artifacts.Configuration;
@@ -87,7 +92,33 @@ public class LoomGradleExtension {
 			return namer.getJarName(version);
 		}
 
-		private JarNameFactory namer;
+		public Set<String> getNativeHeaders() {
+			switch (this) {
+			case FIRST:
+				return Collections.singleton("official");
+
+			case LAST:
+				return ImmutableSet.of("client", "server");
+
+			case CLIENT_ONLY:
+				return Collections.singleton("client");
+
+			case SERVER_ONLY:
+				return Collections.singleton("server");
+
+			case INDIFFERENT:
+				throw new UnsupportedOperationException("Indifferent merge order doesn't have headers");
+
+			default:
+				throw new IllegalStateException("Unexpected jar merge order " + this);
+			}
+		}
+
+		public List<String> getNeededHeaders() {
+			return ImmutableList.<String>builder().add("intermediary").addAll(getNativeHeaders()).build();
+		}
+
+		private final JarNameFactory namer;
 	}
 	public String runDir = "run";
 	public String refmapName;

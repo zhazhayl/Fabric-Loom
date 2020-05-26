@@ -54,7 +54,7 @@ import net.fabricmc.loom.providers.MappingsProvider;
 import net.fabricmc.loom.providers.MinecraftMappedProvider;
 import net.fabricmc.loom.providers.MinecraftProvider;
 import net.fabricmc.loom.providers.MinecraftVersionAdaptable;
-import net.fabricmc.loom.providers.mappings.MappingSplat;
+import net.fabricmc.loom.providers.mappings.MappingBlob;
 import net.fabricmc.loom.util.AccessTransformerHelper.ZipEntryAT;
 import net.fabricmc.mappings.ClassEntry;
 import net.fabricmc.mappings.EntryTriple;
@@ -252,7 +252,7 @@ public class MapJarsTiny {
 						resolvedConstructors.add(method);
 
 						transforms.computeIfAbsent(entry.getKey(), k -> new HashSet<>()).add(method);
-						interTransforms.computeIfAbsent(remapper.apply(entry.getKey()), k -> new HashSet<>()).add(MappingSplat.remapDesc(method, remapper));
+						interTransforms.computeIfAbsent(remapper.apply(entry.getKey()), k -> new HashSet<>()).add(MappingBlob.remapDesc(method, remapper));
 					}
 				}
 

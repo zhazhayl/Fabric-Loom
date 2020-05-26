@@ -11,6 +11,7 @@ import java.util.Optional;
 import java.util.function.ObjIntConsumer;
 
 import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping;
+import net.fabricmc.loom.util.ThrowingIntObjConsumer;
 
 class DummyMapping extends Mapping {
 	private static class DummyField extends Field {
@@ -99,7 +100,7 @@ class DummyMapping extends Mapping {
 		}
 
 		@Override
-		public void iterateArgs(ObjIntConsumer<String> argConsumer) {
+		public <T extends Throwable> void iterateArgs(ThrowingIntObjConsumer<String, T> argConsumer) {
 		}
 
 		@Override

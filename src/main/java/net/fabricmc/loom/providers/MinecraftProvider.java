@@ -11,6 +11,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
+import java.io.UncheckedIOException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -32,7 +33,6 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.zip.ZipError;
 
-import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.Callables;
 import com.google.gson.Gson;
 
@@ -211,8 +211,25 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 				this.version = version;
 			}
 		}
-;	}
+	}
 
+
+	public static JarMergeOrder findMergeStrategy(Project project, LoomGradleExtension extension, String version) {
+		Map<JarMergeOrder, MinecraftVersion> mergeToVersion = VERSION_TO_VERSION.get(VersionKey.forVersion(version));
+		if (mergeToVersion != null && mergeToVersion.containsKey(JarMergeOrder.INDIFFERENT)) return mergeToVersion.get(JarMergeOrder.INDIFFERENT).getMergeStrategy();
+
+		MinecraftVersionInfo versionInfo;
+		try (FileReader reader = new FileReader(downloadMcJson(project.getLogger(), extension, version, project.getGradle().getStartParameter().isOffline(), Optional.empty()))) {
+			versionInfo = GSON.fromJson(reader, MinecraftVersionInfo.class);
+		} catch (IOException e) {
+			throw new UncheckedIOException("Error processing Minecraft JSON for " + version, e);
+		}
+		SpecialCases.enhanceVersion(versionInfo, JarMergeOrder.INDIFFERENT);
+
+		Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("Europe/Stockholm"));
+		calendar.set(2012, Calendar.JULY, 22); //Day before 12w30a
+		return calendar.getTime().before(versionInfo.releaseTime) ? JarMergeOrder.FIRST : JarMergeOrder.LAST;
+	}
 
 	public static MinecraftVersion makeMergedJar(Project project, LoomGradleExtension extension, String version, Optional<String> customManifest, JarMergeOrder mergeOrder) throws IOException {
 		return makeMergedJar(project, extension, version, customManifest, mergeOrder, MinecraftVersion::new);
@@ -439,26 +456,6 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 	@Override
 	public JarMergeOrder getMergeStrategy() {
 		return version.getMergeStrategy();
-	}
-
-	public Set<String> getNeededHeaders() {
-		switch (version.getMergeStrategy()) {
-		case FIRST:
-			return ImmutableSet.of("official", "intermediary");
-
-		case LAST:
-			return ImmutableSet.of("client", "server", "intermediary");
-
-		case CLIENT_ONLY:
-			return ImmutableSet.of("client", "intermediary");
-
-		case SERVER_ONLY:
-			return ImmutableSet.of("server", "intermediary");
-
-		case INDIFFERENT:
-		default:
-			throw new IllegalStateException("Unexpected jar merge order " + version.getMergeStrategy());
-		}
 	}
 
 	@Override

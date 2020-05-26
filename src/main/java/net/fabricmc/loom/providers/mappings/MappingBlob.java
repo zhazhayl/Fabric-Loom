@@ -17,13 +17,18 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.ObjIntConsumer;
 import java.util.function.UnaryOperator;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Streams;
 
 import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping;
 import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping.Field;
 import net.fabricmc.loom.providers.mappings.MappingBlob.Mapping.Method;
+import net.fabricmc.loom.util.ThrowingIntObjConsumer;
+import net.fabricmc.mappings.EntryTriple;
 
 public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 	public static class Mapping {
@@ -58,6 +63,10 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 
 			void addArgComment(int index, String comment) {
 				extendTo(index).comment = comment;
+			}
+
+			public boolean hasAnyComments() {
+				return hasComment() || hasArgComments();
 			}
 
 			public boolean hasArgs() {
@@ -135,9 +144,9 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 				return args.length > index ? Optional.ofNullable(args[index]).map(arg -> arg.comment) : Optional.empty();
 			}
 
-			public void iterateArgs(ObjIntConsumer<String> argConsumer) {
+			public <T extends Throwable> void iterateArgs(ThrowingIntObjConsumer<String, T> argConsumer) throws T {
 				for (int i = 0; i < args.length; i++) {
-					if (args[i] != null && args[i].name != null) argConsumer.accept(args[i].name, i);
+					if (args[i] != null && args[i].name != null) argConsumer.accept(i, args[i].name);
 				}
 			}
 
@@ -174,8 +183,16 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 				return toDesc;
 			}
 
+			public String desc(UnaryOperator<String> remapper) {
+				return toDesc != null ? toDesc : remapDesc(fromDesc, remapper);
+			}
+
 			public Optional<String> comment() {
 				return Optional.ofNullable(comment);
+			}
+
+			public boolean hasComment() {
+				return comment != null;
 			}
 		}
 
@@ -205,12 +222,21 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 			return methods.values();
 		}
 
+		public Iterable<Method> methodsWithArgs() {
+			return Iterables.filter(methods(), Method::hasArgs);
+		}
+
 		public boolean hasMethod(Method other) {
 			return methods.containsKey(other.fromName + other.fromDesc);
 		}
 
 		public Method method(Method other) {
 			return method(other.fromName, other.fromDesc);
+		}
+
+		public Method method(EntryTriple method) {
+			assert from.equals(method.getOwner());
+			return method(method.getName(), method.getDesc());
 		}
 
 		Method method(String srcName, String srcDesc) {
@@ -229,12 +255,47 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 			return field(other.fromName, other.fromDesc);
 		}
 
+		public Field field(EntryTriple field) {
+			assert from.equals(field.getOwner());
+			return field(field.getName(), field.getDesc());
+		}
+
 		Field field(String srcName, String srcDesc) {
 			return fields.computeIfAbsent(srcName + ";;" + srcDesc, k -> new Field(srcName, srcDesc));
+		}
+
+		public boolean hasComment() {
+			return comment != null;
+		}
+
+		public boolean hasAnyComments() {
+			if (hasComment()) return true;
+
+			for (Method method : methods()) {
+				if (method.hasAnyComments()) {
+					return true;
+				}
+			}
+
+			for (Field field : fields()) {
+				if (field.hasComment()) {
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		Stream<Method> methodStream() {
+			return methods.values().stream();
 		}
 	}
 
 	private final Map<String, Mapping> mappings = new HashMap<>();
+
+	public boolean has(String srcName) {
+		return mappings.containsKey(srcName);
+	}
 
 	public Mapping get(String srcName) {
 		return mappings.computeIfAbsent(srcName, Mapping::new);
@@ -307,6 +368,14 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 		return stream().map(Mapping::fields).flatMap(Streams::stream);
 	}
 
+	public boolean hasComments() {
+		return mappings.values().stream().anyMatch(Mapping::hasAnyComments);
+	}
+
+	public boolean hasArgNames() {
+		return mappings.values().stream().flatMap(Mapping::methodStream).anyMatch(Method::hasArgNames);
+	}
+
 	public enum InvertionTarget {
 		FIELDS, METHODS, MEMBERS, METHOD_ARGS, ALL;
 	}
@@ -357,7 +426,7 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 					if (field.name() == null) continue;
 					//assert field.desc() != null: mapping.from + '#' + field.fromName + " (" + field.fromDesc + ") changes name without a changed descriptor";
 
-					String desc = MappingSplat.makeDesc(field, classRemapper);
+					String desc = field.desc(classRemapper);
 					invertion.acceptField(mapping.to, field.name(), desc, mapping.from, field.fromName, field.fromDesc);
 					invertion.acceptFieldComment(mapping.to, field.name(), desc, field.comment);
 				}
@@ -368,7 +437,7 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 					if (method.name() == null) continue;
 					//assert method.desc() != null: mapping.from + '#' + method.fromName + method.fromDesc + " changes name without a changed descriptor";
 
-					String desc = MappingSplat.makeDesc(method, classRemapper);
+					String desc = method.desc(classRemapper);
 					invertion.acceptMethod(mapping.to, method.name(), desc, mapping.from, method.fromName, method.fromDesc);
 					invertion.acceptMethodComment(mapping.to, method.name(), desc, method.comment);
 					if (doArgs) invertion.get(mapping.to).method(method.name(), desc).cloneArgs(method);
@@ -407,7 +476,7 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 					}
 				}
 
-				String desc = MappingSplat.remapDesc(field.fromDesc, classRemapper);
+				String desc = remapDesc(field.fromDesc, classRemapper);
 				remap.acceptField(className, field.fromName, desc, mapping.to, field.name(), field.desc());
 				remap.acceptFieldComment(className, field.fromName, desc, field.comment);
 			}
@@ -425,14 +494,26 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 					}
 				}
 
-				String desc = MappingSplat.remapDesc(method.fromDesc, classRemapper);
+				String desc = remapDesc(method.fromDesc, classRemapper);
 				remap.acceptMethod(className, method.fromName, desc, mapping.to, method.name(), method.desc());
 				remap.acceptMethodComment(className, method.fromName, desc, method.comment);
 				remap.get(className).method(method.fromName, desc).cloneArgs(method);
 			}
-
 		}
 
 		return remap;
+	}
+
+	private static final Pattern CLASS_FINDER = Pattern.compile("L([^;]+);");
+	public static String remapDesc(String desc, UnaryOperator<String> classRemapper) {
+		StringBuffer buf = new StringBuffer();
+
+		Matcher matcher = CLASS_FINDER.matcher(desc);
+		while (matcher.find()) {
+			matcher.appendReplacement(buf, Matcher.quoteReplacement('L' + classRemapper.apply(matcher.group(1)) + ';'));
+		}
+		matcher.appendTail(buf);
+
+		return buf.toString();
 	}
 }
