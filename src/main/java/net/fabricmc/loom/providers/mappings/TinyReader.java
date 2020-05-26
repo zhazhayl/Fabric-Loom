@@ -36,6 +36,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
@@ -126,13 +127,30 @@ public class TinyReader {
 				throw new IllegalArgumentException("Namespace " + commonNamespace + " not found in " + file);
 			}
 
-			Map<String, List<MethodEntry>> methods = mappings.getMethodEntries().stream().collect(Collectors.groupingBy(method -> method.get(commonNamespace).getOwner()));
-			Map<String, List<FieldEntry>> fields = mappings.getFieldEntries().stream().collect(Collectors.groupingBy(field -> field.get(commonNamespace).getOwner()));
+			Map<String, ? extends Set<MethodEntry>> methods = mappings.getMethodEntries().stream().collect(Collectors.groupingBy(method -> method.get(commonNamespace).getOwner(), ImmutableSet.toImmutableSet()));
+			Map<String, ? extends Set<FieldEntry>> fields = mappings.getFieldEntries().stream().collect(Collectors.groupingBy(field -> field.get(commonNamespace).getOwner(), ImmutableSet.toImmutableSet()));
 
-			return mappings.getClassEntries().stream().collect(Collectors.toMap(Function.identity(), entry -> {
+			Map<ClassEntry, Pair<Set<MethodEntry>, Set<FieldEntry>>> out = mappings.getClassEntries().stream().collect(Collectors.toMap(Function.identity(), entry -> {
 				String name = entry.get(commonNamespace);
-				return Pair.of(ImmutableSet.copyOf(methods.getOrDefault(name, Collections.emptyList())), ImmutableSet.copyOf(fields.getOrDefault(name, Collections.emptyList())));
+
+				Set<MethodEntry> entryMethods = methods.remove(name);
+				Set<FieldEntry> entryFields = fields.remove(name);
+				return Pair.of(entryMethods != null ? entryMethods : Collections.emptySet(), entryFields != null ? entryFields : Collections.emptySet());
 			}));
+
+			for (Entry<String, ? extends Set<MethodEntry>> entry : methods.entrySet()) {
+				String className = entry.getKey();
+
+				Set<FieldEntry> entryFields = fields.remove(className);
+				out.put(namespace -> className, Pair.of(entry.getValue(), entryFields != null ? entryFields : Collections.emptySet()));
+			}
+
+			for (Entry<String, ? extends Set<FieldEntry>> entry : fields.entrySet()) {
+				String className = entry.getKey();
+				out.put(namespace -> className, Pair.of(Collections.emptySet(), entry.getValue()));
+			}
+
+			return out;
 		}
 	}
 
