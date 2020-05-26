@@ -145,7 +145,7 @@ public class MappingBlob implements IMappingAcceptor, Iterable<Mapping> {
 			}
 
 			public <T extends Throwable> void iterateArgs(ThrowingIntObjConsumer<String, T> argConsumer) throws T {
-				for (int i = 0; i < args.length; i++) {
+				for (int i = args.length - 1; i >= 0; i--) {
 					if (args[i] != null && args[i].name != null) argConsumer.accept(i, args[i].name);
 				}
 			}
