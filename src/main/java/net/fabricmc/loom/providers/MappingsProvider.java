@@ -83,6 +83,7 @@ import net.fabricmc.mappings.EntryTriple;
 import net.fabricmc.mappings.FieldEntry;
 import net.fabricmc.mappings.Mappings;
 import net.fabricmc.mappings.MethodEntry;
+import net.fabricmc.stitch.commands.CommandCorrectMappingUnions;
 import net.fabricmc.stitch.commands.CommandProposeFieldNames;
 import net.fabricmc.stitch.util.Pair;
 import net.fabricmc.tinyremapper.IMappingProvider;
@@ -567,6 +568,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 				throw new IllegalStateException("Unexpected jar merge strategy " + minecraftProvider.getMergeStrategy());
 			}
 			CommandProposeFieldNames.run(minecraftProvider.getMergedJar().toFile(), MAPPINGS_TINY_BASE, MAPPINGS_TINY, namespace, "named");
+			CommandCorrectMappingUnions.run(MAPPINGS_TINY.toPath(), "intermediary", "named");
 		} else {
 			if (minecraftProvider.needsIntermediaries()) minecraftProvider.giveIntermediaries(MAPPINGS_TINY.toPath());
 		}
