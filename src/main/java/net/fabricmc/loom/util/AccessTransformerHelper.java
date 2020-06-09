@@ -47,6 +47,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 
+import org.apache.commons.io.IOUtils;
+
 import org.gradle.api.Task;
 import org.gradle.api.tasks.AbstractCopyTask;
 
@@ -146,9 +148,12 @@ public class AccessTransformerHelper {
 
 					switch (header[2]) {
 					case "named":
+						IOUtils.copy(in, out);
 						return; //Probably nothing to do
 
 					case "intermediary":
+						writer.write(BAD_AT_NAME + "\tv1\tnamed");
+						writer.newLine();
 						break;
 
 					default:
