@@ -25,6 +25,7 @@ package net.fabricmc.loom.util;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -35,9 +36,11 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -60,6 +63,9 @@ import org.zeroturnaround.zip.transform.ByteArrayZipEntryTransformer;
 import org.zeroturnaround.zip.transform.StreamZipEntryTransformer;
 import org.zeroturnaround.zip.transform.ZipEntryTransformerEntry;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
+
 import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.stitch.util.Pair;
 import net.fabricmc.tinyremapper.OutputConsumerPath;
@@ -73,6 +79,7 @@ public class AccessTransformerHelper {
 		void accept(String className, String method) throws IOException;
 	}
 	private static final String MAGIC_AT_NAME = "silky.at";
+	private static final String BAD_AT_NAME = "accessWidener";
 
 	public static void copyInAT(LoomGradleExtension extension, AbstractCopyTask task) {
 		if (extension.hasAT()) {
@@ -108,7 +115,10 @@ public class AccessTransformerHelper {
     }
 
 	public static boolean deobfATs(TinyRemapper tiny, File jar) {
-		return ZipUtil.transformEntry(jar, new ZipEntryTransformerEntry(MAGIC_AT_NAME, new StreamZipEntryTransformer() {
+		//This will get turned into an array to be turned back into a list by ZipUtil
+		List<ZipEntryTransformerEntry> transformers = new ArrayList<>(2);
+
+		transformers.add(new ZipEntryTransformerEntry(MAGIC_AT_NAME, new StreamZipEntryTransformer() {
 			@Override
 			protected void transform(ZipEntry zipEntry, InputStream in, OutputStream out) throws IOException {
 				BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(out, StandardCharsets.UTF_8));
@@ -116,6 +126,109 @@ public class AccessTransformerHelper {
 				writer.flush(); //Both the in and out streams are expected to not be closed, so we'll explicitly flush instead
 			}
 		}));
+
+		String aw = findAW(ZipUtil.unpackEntry(jar, "fabric.mod.json"));
+		if (aw != null) transformers.add(new ZipEntryTransformerEntry(aw, new StreamZipEntryTransformer() {
+			@Override
+			protected void transform(ZipEntry zipEntry, InputStream in, OutputStream out) throws IOException {
+				BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(out, StandardCharsets.UTF_8));
+
+				try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+					String[] header = reader.readLine().split("\\s+");
+
+					if (header.length != 3 || !BAD_AT_NAME.equals(header[0])) {
+						throw new UnsupportedOperationException("Invalid access access widener header " + header + " in " + jar);
+					}
+
+					if (!"v1".equals(header[1])) {
+						throw new RuntimeException("Unsupported access widener format " + header[1] + " in " + jar);
+					}
+
+					switch (header[2]) {
+					case "named":
+						return; //Probably nothing to do
+
+					case "intermediary":
+						break;
+
+					default:
+						throw new IllegalArgumentException("Unexpected access widener namespace: " + header[2] + " in " + jar);
+					}
+
+					Remapper remapper = tiny.getRemapper();
+					for (String line = reader.readLine(); line != null; line = reader.readLine()) {
+						int split = line.indexOf('#');
+						if (split >= 0) line = line.substring(0, split);
+
+						line = line.trim(); //Clip off whitespace
+						if (line.isEmpty()) continue;
+
+						String[] parts = line.split("\\s+");
+						switch (parts[1]) {
+						case "class":
+							if (parts.length != 3) {
+								throw new RuntimeException("Expected (<access>\tclass\t<className>) got " + line + " in " + jar);
+							}
+
+							writer.write(parts[0]);
+							writer.write("\tclass\t");
+							writer.write(remapper.map(parts[2]));
+							writer.newLine();
+							break;
+
+						case "field":
+							if (parts.length != 5) {
+								throw new RuntimeException("Expected (<access>\tfield\t<className>\t<fieldName>\t<fieldDesc>) got " + line + " in " + jar);
+							}
+
+							writer.write(parts[0]);
+							writer.write("\tfield\t");
+							writer.write(remapper.map(parts[2]));
+							writer.write('\t');
+							writer.write(remapper.mapFieldName(parts[2], parts[3], parts[4]));
+							writer.write('\t');
+							writer.write(remapper.mapDesc(parts[4]));
+							writer.newLine();
+							break;
+
+						case "method":
+							if (parts.length != 5) {
+								throw new RuntimeException("Expected (<access>\tmethod\t<className>\t<methodName>\t<methodDesc>) got " + line + " in " + jar);
+							}
+
+							writer.write(parts[0]);
+							writer.write("\tmethod\t");
+							writer.write(remapper.map(parts[2]));
+							writer.write('\t');
+							writer.write(remapper.mapMethodName(parts[2], parts[3], parts[4]));
+							writer.write('\t');
+							writer.write(remapper.mapMethodDesc(parts[4]));
+							writer.newLine();
+							break;
+
+						default:
+							throw new UnsupportedOperationException("Unsupported type " + parts[1] + " on line " + line);
+						}
+					}
+				}
+
+				writer.flush(); //Both the in and out streams are expected to not be closed, so we'll explicitly flush instead
+			}
+		}));
+
+		return ZipUtil.transformEntries(jar, transformers.toArray(new ZipEntryTransformerEntry[0]));
+	}
+
+	private static String findAW(byte[] modJSON) {
+		if (modJSON != null) {
+			JsonElement json = new JsonParser().parse(new InputStreamReader(new ByteArrayInputStream(modJSON)));
+
+			if (json.isJsonObject() && json.getAsJsonObject().has(BAD_AT_NAME)) {
+				return json.getAsJsonObject().get(BAD_AT_NAME).getAsString();
+			}
+		}
+
+		return null;
 	}
 
 	private static void readATs(Reader from, BufferedWriter to, Remapper remapper) throws IOException {
