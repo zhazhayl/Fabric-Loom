@@ -25,7 +25,6 @@
 package net.fabricmc.loom.task.fernflower;
 
 import java.io.PrintStream;
-import java.text.MessageFormat;
 import java.util.Stack;
 
 import org.jetbrains.java.decompiler.main.extern.IFernflowerLogger;
@@ -40,87 +39,95 @@ public class ThreadIDFFLogger extends IFernflowerLogger {
 	public final PrintStream stdOut;
 	public final PrintStream stdErr;
 
-	private ThreadLocal<Stack<String>> workingClass = ThreadLocal.withInitial(Stack::new);
-	private ThreadLocal<Stack<String>> line = ThreadLocal.withInitial(Stack::new);
+	private final ThreadLocal<Stack<String>> workingClass = ThreadLocal.withInitial(Stack::new);
+	private final ThreadLocal<Stack<String>> line = ThreadLocal.withInitial(Stack::new);
 
 	public ThreadIDFFLogger(PrintStream stdOut, PrintStream stdErr) {
 		this.stdOut = stdOut;
 		this.stdErr = stdErr;
 	}
 
+	private void pushMessage(Severity severity, String message) {
+    	line.get().push(severity.prefix + message);
+    	writeMessage(message, severity);
+    }
+
     @Override
     public void writeMessage(String message, Severity severity) {
-    	line.get().push(severity.prefix + message);
-    	print();
+		long threadID = Thread.currentThread().getId();
+        stdOut.println(String.format("%d :: %s%s", threadID, severity.prefix, message).trim());
     }
 
     @Override
     public void writeMessage(String message, Severity severity, Throwable t) {
-    	String currentClass = workingClass.get().peek();
+    	String currentClass = !workingClass.get().empty() ? workingClass.get().peek() : null;
     	stdErr.println("Error thrown whilst " + (currentClass == null ? "out of class" : "in " + currentClass));
         stdErr.println(message);
         t.printStackTrace(stdErr);
     }
 
-	private void print() {
-		Thread thread = Thread.currentThread();
-		long id = thread.getId();
+    private void popMessage() {
+    	Stack<String> stack = this.line.get();
+    	stack.pop();
 
-		if (line.get().isEmpty()) {
-            stdOut.println(MessageFormat.format("{0} :: waiting", id));
-			return;
-		}
+    	long threadID = Thread.currentThread().getId();
+        stdOut.println(String.format("%d :: %s", threadID, stack.empty() ? "waiting" : stack.peek()).trim());
+	}
 
-		String line = this.line.get().peek();
-        stdOut.println(MessageFormat.format("{0} :: {1}", id, line).trim());
+	@Override
+	public void startProcessingClass(String className) {
+		workingClass.get().push(className);
+		pushMessage(Severity.INFO, "Processing " + className);
 	}
 
     @Override
     public void startReadingClass(String className) {
         workingClass.get().push(className);
-        writeMessage("Reading " + className, Severity.INFO);
+        pushMessage(Severity.INFO, "Reading " + className);
     }
 
     @Override
     public void startClass(String className) {
         workingClass.get().push(className);
-        writeMessage("Decompiling " + className, Severity.INFO);
+        pushMessage(Severity.INFO, "Decompiling " + className);
     }
 
     @Override
     public void startMethod(String methodName) {
         String className = workingClass.get().peek();
-        writeMessage("Decompiling " + className + '.' + methodName.substring(0, methodName.indexOf(' ')), Severity.INFO);
+        pushMessage(Severity.INFO, "Decompiling " + className + '.' + methodName.substring(0, methodName.indexOf(' ')));
     }
 
 	@Override
 	public void endMethod() {
-		line.get().pop();
-		print();
+		popMessage();
 	}
 
 	@Override
     public void endClass() {
-        line.get().pop();
+		popMessage();
         workingClass.get().pop();
-        print();
     }
 
     @Override
     public void startWriteClass(String className) {
-    	writeMessage("Writing " + className, Severity.INFO);
+    	pushMessage(Severity.INFO, "Writing " + className);
     }
 
 	@Override
 	public void endWriteClass() {
-		line.get().pop();
-		print();
+		popMessage();
 	}
 
 	@Override
 	public void endReadingClass() {
-		line.get().pop();
+		popMessage();
 		workingClass.get().pop();
-		print();
+	}
+
+	@Override
+	public void endProcessingClass() {
+		popMessage();
+		workingClass.get().pop();
 	}
 }
