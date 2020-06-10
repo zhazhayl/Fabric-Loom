@@ -81,6 +81,7 @@ public class FernFlowerTask extends AbstractDecompileTask {
         options.put(IFernflowerPreferences.INDENT_STRING, "\t"); //Use a tab not three spaces :|
 		options.put(IFernflowerPreferences.INCLUDE_ENTIRE_CLASSPATH, "1");
         options.put(IFernflowerPreferences.LOG_LEVEL, "trace");
+		options.put(IFernflowerPreferences.THREADS, getNumThreads());
         ((LoggingManager) getLogging()).captureStandardOutput(LogLevel.LIFECYCLE);
 
 		List<String> args = new ArrayList<>();
@@ -93,7 +94,6 @@ public class FernFlowerTask extends AbstractDecompileTask {
 			args.add("-l=" + getLineMapFile().getAbsolutePath());
 		}
 
-		args.add("-t=" + getNumThreads());
 		args.add("-m=" + getExtension().getMappingsProvider().getDecompileMappings().toAbsolutePath());
 
 		//TODO, Decompiler breaks on jemalloc, J9 module-info.class?

@@ -58,7 +58,6 @@ public class ForkedFFExecutor {
 		File lineMap = null;
 		File mappings = null;
 		List<File> libraries = new ArrayList<>();
-		int numThreads = 0;
 
 		boolean isOption = true;
 		for (String arg : args) {
@@ -95,8 +94,6 @@ public class ForkedFFExecutor {
 					}
 
 					mappings = new File(arg.substring(3));
-				} else if (arg.startsWith("-t=")) {
-					numThreads = Integer.parseInt(arg.substring(3));
 				} else {
 					if (input != null) {
 						throw new RuntimeException("Unable to set more than one input.");
@@ -121,10 +118,10 @@ public class ForkedFFExecutor {
 		Fernflower ff = new Fernflower(FernFlowerUtils::getBytecode, saver, options, logger);
 
 		for (File library : libraries) {
-            ff.getStructContext().addSpace(library, false);
+			ff.addLibrary(library);
 		}
 
-        ff.getStructContext().addSpace(input, true);
+		ff.addSource(input);
 		ff.decompileContext();
 	}
 }
