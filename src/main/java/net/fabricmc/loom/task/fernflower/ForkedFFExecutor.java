@@ -58,6 +58,7 @@ public class ForkedFFExecutor {
 		File lineMap = null;
 		File mappings = null;
 		List<File> libraries = new ArrayList<>();
+		int numThreads = 0;
 
 		boolean isOption = true;
 		for (String arg : args) {
@@ -94,6 +95,8 @@ public class ForkedFFExecutor {
 					}
 
 					mappings = new File(arg.substring(3));
+				} else if (arg.startsWith("-t=")) {
+					numThreads = Integer.parseInt(arg.substring(3));
 				} else {
 					if (input != null) {
 						throw new RuntimeException("Unable to set more than one input.");
@@ -109,13 +112,13 @@ public class ForkedFFExecutor {
 		Objects.requireNonNull(mappings, "Mappings not set.");
 
 		if (mappings.exists()) options.put(IFabricJavadocProvider.PROPERTY_NAME, new JavadocProvider(mappings));
-		runFF(options, libraries, input, output, lineMap, stdOut, errOut);
+		runFF(options, libraries, input, numThreads, output, lineMap, stdOut, errOut);
 	}
 
-	public static void runFF(Map<String, Object> options, List<File> libraries, File input, File output, File lineMap, PrintStream stdOut, PrintStream stdErr) {
+	public static void runFF(Map<String, Object> options, List<File> libraries, File input, int threads, File output, File lineMap, PrintStream stdOut, PrintStream stdErr) {
 		IResultSaver saver = new ThreadSafeResultSaver(() -> output, () -> lineMap);
 		IFernflowerLogger logger = new ThreadIDFFLogger(stdOut, stdErr);
-		Fernflower ff = new Fernflower(FernFlowerUtils::getBytecode, saver, options, logger);
+		Fernflower ff = new Fernflower(FernFlowerUtils::getBytecode, saver, options, logger, threads);
 
 		for (File library : libraries) {
 			ff.addLibrary(library);
