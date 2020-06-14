@@ -131,6 +131,7 @@ public class LoomGradleExtension {
 
 	private JarMergeOrder mergeOrder = JarMergeOrder.INDIFFERENT;
 	private boolean bulldozeMappings;
+	private boolean skipFieldInference;
 	private File atFile;
 	private File optifine;
 	private List<Path> unmappedModsBuilt = new ArrayList<>();
@@ -436,6 +437,14 @@ public class LoomGradleExtension {
 
 	public boolean shouldBulldozeMappings() {
 		return bulldozeMappings;
+	}
+
+	public void setSkipFieldInference(boolean skip) {
+		skipFieldInference = skip;
+	}
+
+	public boolean shouldInferFields() {
+		return !skipFieldInference;
 	}
 
 	public void setAT(Object file) {

@@ -545,29 +545,31 @@ public class MappingsProvider extends LogicalDependencyProvider {
 			assert !MAPPINGS_TINY.exists();
 
 			project.getLogger().lifecycle(":populating field names");
-			String namespace;
-			switch (minecraftProvider.getMergeStrategy()) {
-			case FIRST:
-				namespace = "official";
-				break;
+			if (extension.shouldInferFields()) {
+				String namespace;
+				switch (minecraftProvider.getMergeStrategy()) {
+				case FIRST:
+					namespace = "official";
+					break;
 
-			case LAST:
-				namespace = "intermediary";
-				break;
+				case LAST:
+					namespace = "intermediary";
+					break;
 
-			case CLIENT_ONLY:
-				namespace = "client";
-				break;
+				case CLIENT_ONLY:
+					namespace = "client";
+					break;
 
-			case SERVER_ONLY:
-				namespace = "server";
-				break;
+				case SERVER_ONLY:
+					namespace = "server";
+					break;
 
-			case INDIFFERENT:
-			default:
-				throw new IllegalStateException("Unexpected jar merge strategy " + minecraftProvider.getMergeStrategy());
+				case INDIFFERENT:
+				default:
+					throw new IllegalStateException("Unexpected jar merge strategy " + minecraftProvider.getMergeStrategy());
+				}
+				CommandProposeFieldNames.run(minecraftProvider.getMergedJar().toFile(), MAPPINGS_TINY_BASE, MAPPINGS_TINY, namespace, "named");
 			}
-			CommandProposeFieldNames.run(minecraftProvider.getMergedJar().toFile(), MAPPINGS_TINY_BASE, MAPPINGS_TINY, namespace, "named");
 			CommandCorrectMappingUnions.run(MAPPINGS_TINY.toPath(), "intermediary", "named");
 		} else {
 			if (minecraftProvider.needsIntermediaries()) minecraftProvider.giveIntermediaries(MAPPINGS_TINY.toPath());
