@@ -452,7 +452,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 
 							if (!existingField.comment().isPresent()) {
 								field.comment().ifPresent(comment -> {
-									mappings.acceptMethodComment(classMapping.from, field.fromName, field.fromDesc, comment);
+									mappings.acceptFieldComment(classMapping.from, field.fromName, field.fromDesc, comment);
 								});
 							}
 						}
