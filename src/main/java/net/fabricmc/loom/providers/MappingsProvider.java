@@ -35,6 +35,7 @@ import java.util.ListIterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.StringJoiner;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -474,7 +475,34 @@ public class MappingsProvider extends LogicalDependencyProvider {
 						Mapping mapping = mappings.getOrDummy(className);
 
 						if (!Arrays.stream(classMappings).skip(1).allMatch(Predicate.isEqual(className))) {
-							writer.acceptClass(Stream.concat(Arrays.stream(classMappings), Stream.of(mapping.toOr(className))).toArray(String[]::new));
+							String name = mapping.to();
+
+							out: if (name == null) {
+								String[] segments = className.split("\\$");
+
+								if (segments.length > 1) {
+									for (int end = segments.length - 1; end > 0; end--) {
+										StringJoiner nameBits = new StringJoiner("$");
+										for (int i = 0; i < end; i++) {
+											nameBits.add(segments[i]);
+										}
+
+										String parent = mappings.tryMapName(nameBits.toString());
+										if (parent != null) {
+											StringBuilder fullName = new StringBuilder(parent);
+											for (int i = end; i < segments.length; i++) {
+												fullName.append('$').append(segments[i]);
+											}
+											name = fullName.toString();
+											break out;
+										}
+									}
+								}
+
+								name = className;
+							}
+
+							writer.acceptClass(Stream.concat(Arrays.stream(classMappings), Stream.of(name)).toArray(String[]::new));
 						}
 
 						for (MethodEntry method : entry.getValue().getLeft()) {
