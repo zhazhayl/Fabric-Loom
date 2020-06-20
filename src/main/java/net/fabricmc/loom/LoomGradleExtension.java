@@ -64,7 +64,7 @@ import net.fabricmc.loom.providers.MappingsProvider;
 import net.fabricmc.loom.providers.MinecraftMappedProvider;
 import net.fabricmc.loom.providers.MinecraftProvider;
 import net.fabricmc.loom.util.Constants;
-import net.fabricmc.mappings.EntryTriple;
+import net.fabricmc.stitch.commands.CommandProposeFieldNames.NameAcceptor;
 
 public class LoomGradleExtension {
 	/** The order in which the Minecraft client and server jars should be merged together and remapped */
@@ -132,7 +132,7 @@ public class LoomGradleExtension {
 
 	private JarMergeOrder mergeOrder = JarMergeOrder.INDIFFERENT;
 	private boolean bulldozeMappings;
-	private BiPredicate<EntryTriple, String> fieldInferenceFilter = (existingName, replacement) -> existingName.getName().startsWith("field_");
+	private NameAcceptor fieldInferenceFilter = (inputMapping, originalName, replacementName) -> originalName.startsWith("field_");
 	private File atFile;
 	private File optifine;
 	private List<Path> unmappedModsBuilt = new ArrayList<>();
@@ -440,11 +440,11 @@ public class LoomGradleExtension {
 		return bulldozeMappings;
 	}
 
-	public void setFieldInferenceFilter(BiPredicate<EntryTriple, String> filter) {
+	public void setFieldInferenceFilter(NameAcceptor filter) {
 		fieldInferenceFilter = filter;
 	}
 
-	public BiPredicate<EntryTriple, String> getFieldInferenceFilter() {
+	public NameAcceptor getFieldInferenceFilter() {
 		return fieldInferenceFilter;
 	}
 
