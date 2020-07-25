@@ -70,7 +70,7 @@ public class Openfine {
 
 	public static File process(Logger logger, String mcVersion, File client, File server, File optifineJar) throws IOException {
 		OptiFineVersion optifine = new OptiFineVersion(optifineJar);
-		logger.info("Loaded OptiFine " + optifine.version);
+		logger.lifecycle("Loaded OptiFine " + optifine.version);
 
 		if (!optifine.supports(mcVersion)) {
 			throw new InvalidUserDataException("Incompatible OptiFine version, requires " + optifine.minecraftVersion + " rather than " + mcVersion);
@@ -364,7 +364,7 @@ public class Openfine {
 
 					@Override
 					protected byte[] transform(ZipEntry zipEntry, byte[] input) throws IOException {
-						logger.trace("Rebuilding " + className.substring(0, className.length() - 6));
+						logger.quiet("Rebuilding " + className.substring(0, className.length() - 6));
 
 						ClassWriter classWriter = new ClassWriter(0);
 						new ClassReader(input).accept(makeVisitor(classWriter), 0);

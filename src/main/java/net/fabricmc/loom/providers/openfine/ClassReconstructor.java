@@ -76,7 +76,7 @@ public class ClassReconstructor {
 				logger.debug("\tDespite finding " + lambdaFixes);
 			}
 
-			if (!lambdaFixes.isEmpty()) fixLambdas(lambdaFixes, originalClass.methods, patchedClass.methods, methodChanges);
+			if (!lambdaFixes.isEmpty()) fixLambdas(logger, lambdaFixes, originalClass.methods, patchedClass.methods, methodChanges);
 		}
 		methodChanges.annotate(annotator);
 
@@ -85,7 +85,7 @@ public class ClassReconstructor {
 
 		annotator.apply(patchedClass);
 		stitchAnnotationFix(logger, patchedClass);
-		rebuildOrder(patchedClass, server);
+		rebuildOrder(logger, patchedClass, server);
 		return write(patchedClass);
 	}
 
@@ -95,7 +95,7 @@ public class ClassReconstructor {
 		return node;
 	}
 
-	private static void fixLambdas(Map<String, String> fixes, List<MethodNode> originalMethods, List<MethodNode> patchedMethods, MethodChanges changes) {
+	private static void fixLambdas(Logger logger, Map<String, String> fixes, List<MethodNode> originalMethods, List<MethodNode> patchedMethods, MethodChanges changes) {
 		changes.sortModifiedMethods(patchedMethods);
 		patchedMethods.forEach(method -> MethodComparison.findLambdas(method.instructions, 0, idin -> {
 			Handle handle = (Handle) idin.bsmArgs[1];
@@ -112,8 +112,8 @@ public class ClassReconstructor {
 
 				idin.bsmArgs[1] = new Handle(handle.getTag(), owner, name, desc, handle.isInterface());
 
-				if (!desc.equals(handle.getDesc())) {//Shouldn't ever do this, the methods aren't really equal if the descriptions are different
-					throw new IllegalStateException("Description changed remapping lambda handle: " + handle + " => " + idin.bsmArgs[1]);
+				if (!desc.equals(handle.getDesc())) {//Whilst the methods aren't really equal if the descriptions are different, it's better than losing them completely
+					logger.warn("Description changed remapping lambda handle: " + handle + " => " + idin.bsmArgs[1]);
 				}
 			}
 		}));
@@ -150,14 +150,14 @@ public class ClassReconstructor {
 		}
 	}
 
-	private static void rebuildOrder(ClassNode node, byte[] basis) {
+	private static void rebuildOrder(Logger logger, ClassNode node, byte[] basis) {
 		if (basis == null) return; //Nothing to rebuild from
 
 		ClassNode basisNode = new ClassNode();
 		new ClassReader(basis).accept(basisNode, ClassReader.SKIP_CODE | ClassReader.SKIP_FRAMES | ClassReader.SKIP_DEBUG);
 
-		fix(node.name, "inner class", node.innerClasses, basisNode.innerClasses, innerClass -> innerClass.name);
-		fix(node.name, "method", node.methods, basisNode.methods, method -> method.name + method.desc);
+		fix(logger, node.name, "inner class", node.innerClasses, basisNode.innerClasses, innerClass -> innerClass.name);
+		fix(logger, node.name, "method", node.methods, basisNode.methods, method -> method.name + method.desc);
 	}
 
 	private static class Swap {
@@ -174,17 +174,17 @@ public class ClassReconstructor {
 		}
 	}
 
-	private static <T> void fix(String name, String type, List<T> client, List<T> server, Function<T, String> mapper) {
-		List<Swap> swaps = fix(name, type, client.stream().map(mapper).collect(Collectors.toList()), server.stream().map(mapper).collect(Collectors.toList()));
+	private static <T> void fix(Logger logger, String name, String type, List<T> client, List<T> server, Function<T, String> mapper) {
+		List<Swap> swaps = fix(logger, name, type, client.stream().map(mapper).collect(Collectors.toList()), server.stream().map(mapper).collect(Collectors.toList()));
 
 		for (Swap swap : swaps) {
 			Collections.swap(client, swap.a, swap.b);
 		}
 
-		if (!swaps.isEmpty()) System.out.println("Resolved " + type + " ordering issues in " + name);
+		if (!swaps.isEmpty()) logger.info("Resolved " + type + " ordering issues in " + name);
 	}
 
-	private static List<Swap> fix(String name, String type, List<String> client, List<String> server) {
+	private static List<Swap> fix(Logger logger, String name, String type, List<String> client, List<String> server) {
 		List<Swap> swaps = new ArrayList<>();
 
 		boolean attemptedFix = false;
@@ -211,7 +211,7 @@ public class ClassReconstructor {
             	if (attemptedFix) {
             		throw new IllegalStateException("Unable to fix " + type + " inconsistencies in " + name);
             	} else {
-            		System.out.println(Character.toUpperCase(type.charAt(0)) + type.substring(1) + " deadlock found in " + name + " at " + c + ", " + s);
+            		logger.info(Character.toUpperCase(type.charAt(0)) + type.substring(1) + " deadlock found in " + name + " at " + c + ", " + s);
             		Collections.swap(client, c, c + 1);
             		swaps.add(new Swap(c, c + 1));
             		attemptedFix = true;
