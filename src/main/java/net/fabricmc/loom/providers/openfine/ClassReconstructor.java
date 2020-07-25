@@ -8,6 +8,7 @@
 package net.fabricmc.loom.providers.openfine;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -23,6 +24,7 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InnerClassNode;
 import org.objectweb.asm.tree.MethodNode;
@@ -136,11 +138,13 @@ public class ClassReconstructor {
 		}
 
 		if (syntheticOffset != 0) {
-			logger.debug("Fixing " + node.name + " to have an offset of " + syntheticOffset);
+			logger.info("Fixing " + node.name + " to be offset of " + syntheticOffset);
+			List<AnnotationNode> offset = Arrays.asList(new AnnotationNode[syntheticOffset]);
 
 			for (MethodNode method : node.methods) {
 				if ("<init>".equals(method.name) && method.desc.startsWith(syntheticArgs)) {
 					method.visibleAnnotableParameterCount += syntheticOffset;
+					method.visibleAnnotations.addAll(0, offset);
 				}
 			}
 		}
