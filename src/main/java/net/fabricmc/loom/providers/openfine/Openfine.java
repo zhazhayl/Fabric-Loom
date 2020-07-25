@@ -253,7 +253,7 @@ public class Openfine {
 			transforms = Streams.stream(Iterators.forEnumeration(jar.entries())).map(ZipEntry::getName).filter(name -> name.endsWith(".class")).distinct().map(className -> {
 				return new ZipEntryTransformerEntry(className, new ByteArrayZipEntryTransformer() {
 					private ClassVisitor makeVisitor(ClassVisitor parent) {
-						return new ClassVisitor(Opcodes.ASM7) {
+						return new ClassVisitor(Opcodes.ASM7, parent) {
 							private final String removedDescriptor = Type.getDescriptor(OptiFineRemoved.class);
 							private String className;
 
