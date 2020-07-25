@@ -29,6 +29,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.gradle.api.Project;
+import org.gradle.api.artifacts.repositories.ArtifactRepository;
 import org.gradle.api.file.ProjectLayout;
 import org.gradle.api.file.RegularFileProperty;
 
@@ -83,6 +84,14 @@ public class GradleSupport {
 			return (RegularFileProperty) method.invoke(project.getLayout());
 		} catch (ReflectiveOperationException | ClassCastException e) {
 			throw new IllegalStateException("Can't find new or old fileProperty?", e);
+		}
+	}
+
+	public static void onlyForGroupMatching(Project project, ArtifactRepository repo, String regex) {
+		if (majorGradleVersion(project) >= 6 || majorGradleVersion(project) == 5 && minorGradleVersion(project) >= 1) {
+			repo.content(filter -> {
+				filter.includeGroupByRegex(regex);
+			});
 		}
 	}
 }

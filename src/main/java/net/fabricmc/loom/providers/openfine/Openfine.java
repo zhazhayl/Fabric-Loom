@@ -72,14 +72,11 @@ public class Openfine {
 
 	private static void extract(Logger logger, File minecraft, File installer, File to) throws IOException {
 		logger.info("Extracting OptiFine into " + to);
-		try {
-			URLClassLoader classLoader = new URLClassLoader(new URL[] {installer.toURI().toURL()}, Openfine.class.getClassLoader());
 
+		try (URLClassLoader classLoader = new URLClassLoader(new URL[] {installer.toURI().toURL()}, Openfine.class.getClassLoader())) {
 			Class<?> clazz = classLoader.loadClass("optifine.Patcher");
 			Method method = clazz.getDeclaredMethod("process", File.class, File.class, File.class);
 			method.invoke(null, minecraft, installer, to);
-
-			classLoader.close();
 		} catch (MalformedURLException e) {
 			throw new RuntimeException("Unable to use OptiFine jar at " + installer.getAbsolutePath(), e);
 		} catch (ReflectiveOperationException e) {
@@ -94,7 +91,7 @@ public class Openfine {
 		try (JarFile mcJar = new JarFile(client); JarFile optifineJar = new JarFile(optifine)) {
 			//Comparison on ZipEntries is poorly defined so we'll use the entry names for equality
 			mcEntries = ImmutableSet.copyOf(Iterators.transform(Iterators.forEnumeration(mcJar.entries()), JarEntry::getName));
-			optifineEntries = ImmutableSet.copyOf(Iterators.transform(Iterators.forEnumeration(optifineJar.entries()), JarEntry::getName));
+			optifineEntries = ImmutableSet.copyOf(Iterators.filter(Iterators.transform(Iterators.forEnumeration(optifineJar.entries()), JarEntry::getName), name -> !name.startsWith("srg/")));
 
 			if (mcEntries.size() > optifineEntries.size()) {
 				intersection = Sets.intersection(optifineEntries, mcEntries);
@@ -105,7 +102,7 @@ public class Openfine {
 
 		try (FileSystemDelegate mcFS = StitchUtil.getJarFileSystem(client, false);
 				FileSystemDelegate ofFS = StitchUtil.getJarFileSystem(optifine, false);
-				FileSystemDelegate serverFS = StitchUtil.getJarFileSystem(server, false);
+				FileSystemDelegate serverFS = server.exists() ? StitchUtil.getJarFileSystem(server, false) : null;
 				FileSystemDelegate outputFS = StitchUtil.getJarFileSystem(to, true)) {
 			for (String entry : Sets.difference(mcEntries, optifineEntries)) {
 				copy(mcFS.get(), outputFS.get(), entry);
@@ -125,8 +122,13 @@ public class Openfine {
 			            Files.createDirectories(pathOut.getParent());
 			        }
 
-			        Path pathStichFix = serverFS.get().getPath(entry);
-			        byte[] stitchFix = Files.isReadable(pathStichFix) ? Files.readAllBytes(pathStichFix) : null;
+			        byte[] stitchFix;
+			        if (serverFS != null) {
+			        	Path pathStichFix = serverFS.get().getPath(entry);
+				        stitchFix = Files.isReadable(pathStichFix) ? Files.readAllBytes(pathStichFix) : null;
+			        } else {
+			        	stitchFix = null;
+			        }
 
 			        logger.info("Reconstructing " + entry);
 			        byte[] data = ClassReconstructor.reconstruct(Files.readAllBytes(pathRawIn), Files.readAllBytes(pathPatchedIn), stitchFix);

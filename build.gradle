@@ -111,7 +111,7 @@ license {
 	exclude '**/loom/providers/StackedMappingsProvider.java'
 	exclude '**/loom/providers/mappings/*.java'
 	exclude '**/loom/providers/openfine/*.java'
-	exclude '**/loom/util/PentaFunction.java'
+	exclude '**/loom/util/HexaFunction.java'
 	exclude '**/loom/util/ThrowingIntObjConsumer.java'
 	exclude '**/loom/task/fernflower/JavadocProvider.java'
 	exclude '**/loom/task/lvt/*.java'

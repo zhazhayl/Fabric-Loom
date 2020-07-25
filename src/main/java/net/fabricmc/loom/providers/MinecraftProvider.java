@@ -30,7 +30,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.zip.ZipError;
 
 import com.google.common.util.concurrent.Callables;
@@ -41,17 +40,20 @@ import org.gradle.api.Project;
 import org.gradle.api.artifacts.Dependency;
 import org.gradle.api.logging.Logger;
 
+import net.fabricmc.loom.AbstractPlugin;
 import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.LoomGradleExtension.JarMergeOrder;
 import net.fabricmc.loom.dependencies.LoomDependencyManager;
 import net.fabricmc.loom.dependencies.PhysicalDependencyProvider;
+import net.fabricmc.loom.providers.openfine.Openfine;
 import net.fabricmc.loom.util.Checksum;
 import net.fabricmc.loom.util.Constants;
 import net.fabricmc.loom.util.DownloadUtil;
+import net.fabricmc.loom.util.GradleSupport;
 import net.fabricmc.loom.util.ManifestVersion;
 import net.fabricmc.loom.util.MapJarsTiny;
 import net.fabricmc.loom.util.MinecraftVersionInfo;
-import net.fabricmc.loom.util.PentaFunction;
+import net.fabricmc.loom.util.HexaFunction;
 import net.fabricmc.loom.util.MinecraftVersionInfo.AssetIndex;
 import net.fabricmc.loom.util.MinecraftVersionInfo.Library;
 import net.fabricmc.loom.util.StaticPathWatcher;
@@ -59,19 +61,24 @@ import net.fabricmc.stitch.merge.JarMerger;
 
 public class MinecraftProvider extends PhysicalDependencyProvider implements MinecraftVersionAdaptable {
 	private static final class VersionKey {
-		private final boolean customManifest;
+		private final boolean customManifest, optifine;
 		private final String value;
 
 		public static VersionKey forVersion(String minecraftVersion) {
-			return new VersionKey(false, minecraftVersion);
+			return forVersion(minecraftVersion, false);
+		}
+
+		public static VersionKey forVersion(String minecraftVersion, boolean withOptifine) {
+			return new VersionKey(false, minecraftVersion, withOptifine);
 		}
 
 		public static VersionKey forManifest(String manifestURL) {
-			return new VersionKey(true, manifestURL);
+			return new VersionKey(true, manifestURL, false);
 		}
 
-		private VersionKey(boolean customManifest, String value) {
+		private VersionKey(boolean customManifest, String value, boolean withOptifine) {
 			this.customManifest = customManifest;
+			optifine = withOptifine;
 			this.value = value;
 		}
 
@@ -81,12 +88,12 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 			if (!(obj instanceof VersionKey)) return false;
 
 			VersionKey that = (VersionKey) obj;
-			return customManifest == that.customManifest && Objects.equals(value, that.value);
+			return customManifest == that.customManifest && optifine == that.optifine && Objects.equals(value, that.value);
 		}
 
 		@Override
 		public int hashCode() {
-			return Boolean.hashCode(customManifest) * value.hashCode();
+			return Boolean.hashCode(customManifest) * value.hashCode() * Boolean.hashCode(optifine);
 		}
 	}
 	public static class MinecraftVersion implements MinecraftVersionAdaptable {
@@ -98,12 +105,71 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 		private final ForkJoinTask<Path> jarMerger;
 		volatile Path mappings;
 
-		MinecraftVersion(MinecraftVersionInfo versionInfo, File clientJar, File serverJar, JarMergeOrder mergeOrder, Function<MinecraftVersion, Callable<Path>> jarMerger) {
+		MinecraftVersion(Project project, MinecraftVersionInfo versionInfo, File clientJar, File serverJar, JarMergeOrder mergeOrder, File mergedJar) {
 			this.versionInfo = versionInfo;
 			this.clientJar = clientJar;
 			this.serverJar = serverJar;
 			this.mergeOrder = mergeOrder;
-			this.jarMerger = ForkJoinPool.commonPool().submit(jarMerger.apply(this));
+			this.jarMerger = ForkJoinPool.commonPool().submit(makeMergeTask(project, project.getLogger(), mergedJar));
+		}
+
+		private Callable<Path> makeMergeTask(Project project, Logger logger, File mergedJar) {
+			switch (mergeOrder) {
+			case FIRST:
+				return () -> {
+					if (!mergedJar.exists()) {
+						try {
+							mergeJars(logger, clientJar, serverJar, mergedJar);
+						} catch (ZipError e) {
+							DownloadUtil.delete(clientJar);
+							DownloadUtil.delete(serverJar);
+
+							logger.error("Could not merge JARs! Deleting source JARs - please re-run the command and move on.", e);
+							throw new RuntimeException("Error merging " + clientJar + " and " + serverJar, e);
+						}
+					}
+
+					return mergedJar.toPath();
+				};
+
+			case LAST:
+				return () -> {//TODO: Account for Openfine (or any other jar interfering tasks) changing the merged jar name
+					if (!mergedJar.exists()) {
+						synchronized (this) {
+							while (mappings == null) {
+								wait();
+							}
+						}
+
+						Path interClient = mergedJar.toPath().resolve(JarNameFactory.CLIENT_INTERMEDIARY.getJarName(getName()));
+						if (Files.notExists(interClient)) {
+							//Can't use the library provider yet as the configuration might need more things adding to it
+							Set<File> libraries = getJavaLibraries(project);
+							MapJarsTiny.remapJar(logger, clientJar.toPath(), mappings, false, libraries, interClient, "client");
+						}
+
+						Path interServer = interClient.resolveSibling(JarNameFactory.SERVER_INTERMEDIARY.getJarName(getName()));
+						if (Files.notExists(interServer)) {
+							Set<File> libraries = Collections.emptySet(); //The server contains all its own dependencies
+							MapJarsTiny.remapJar(logger, serverJar.toPath(), mappings, false, libraries, interServer, "server");
+						}
+
+						MinecraftProvider.mergeJars(logger, interClient.toFile(), interServer.toFile(), mergedJar);
+					}
+
+					return mergedJar.toPath();
+				};
+
+			case CLIENT_ONLY:
+				return Callables.returning(clientJar.toPath());
+
+			case SERVER_ONLY:
+				return Callables.returning(serverJar.toPath());
+
+			case INDIFFERENT:
+			default:
+				throw new IllegalStateException("Unexpected jar merge order " + mergeOrder);
+			}
 		}
 
 		@Override
@@ -117,7 +183,7 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 
 		@Override
 		public Set<File> getJavaLibraries(Project project) {
-			return project.getConfigurations().detachedConfiguration(versionInfo.libraries.stream().filter(library -> library.allowed() && !library.isNative())
+			return project.getConfigurations().detachedConfiguration(getLibraries().stream().filter(library -> library.allowed() && !library.isNative())
 					.map(library -> project.getDependencies().module(library.getArtifactName())).toArray(Dependency[]::new)).getFiles();
 		}
 
@@ -178,7 +244,7 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 	public void provide(DependencyInfo dependency, Project project, LoomGradleExtension extension, Consumer<Runnable> postPopulationScheduler) throws Exception {
 		minecraftVersion = dependency.getDependency().getVersion();
 
-		VersionKey key = extension.customManifest != null ? VersionKey.forManifest(extension.customManifest) : VersionKey.forVersion(minecraftVersion);
+		VersionKey key = extension.customManifest != null ? VersionKey.forManifest(extension.customManifest) : VersionKey.forVersion(minecraftVersion, extension.hasOptiFine());
 		Map<JarMergeOrder, MinecraftVersion> mergeToVersion = VERSION_TO_VERSION.computeIfAbsent(key, k -> new EnumMap<>(JarMergeOrder.class));
 
 		JarMergeOrder mergeOrder = extension.getJarMergeOrder();
@@ -190,8 +256,19 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 
 				if (version == null) {
 					version = makeMergedJar(project, extension, minecraftVersion, Optional.ofNullable(extension.customManifest), mergeOrder,
-						(versionInfo, clientJar, serverJar, actualMergeOrder, jarMerger) -> {//We only want to override one method :|
-							return new MinecraftVersion(versionInfo, clientJar, serverJar, actualMergeOrder, jarMerger) {
+						(projectAgain, versionInfo, clientJar, serverJar, actualMergeOrder, mergedJar) -> {
+							if (extension.hasOptiFine() && actualMergeOrder != JarMergeOrder.SERVER_ONLY) {
+								try {
+									clientJar = Openfine.process(projectAgain.getLogger(), versionInfo.id, clientJar, serverJar, extension.getOptiFine());
+									mergedJar = new File(clientJar, clientJar.getName().replace("client", "merged"));
+									addDependency("com.github.Chocohead:OptiSine:" + Openfine.VERSION, project, Constants.MINECRAFT_DEPENDENCIES);
+									GradleSupport.onlyForGroupMatching(project, AbstractPlugin.addMavenRepo(project, "Jitpack", "https://jitpack.io/"), "^([Cc][Oo][Mm]|[Ii][Oo])\\.[Gg][Ii][Tt][Hh][Uu][Bb]\\."); //Needed to fetch OptiSine from
+								} catch (IOException e) {
+									throw new UncheckedIOException("Error processing Optifine jar from " + extension.getOptiFine(), e);
+								}
+							}
+
+							return new MinecraftVersion(projectAgain, versionInfo, clientJar, serverJar, actualMergeOrder, mergedJar) {
 								@Override
 								public Set<File> getJavaLibraries(Project project) {
 									return getLibraryProvider().getLibraries();
@@ -236,7 +313,7 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 	}
 
 	private static MinecraftVersion makeMergedJar(Project project, LoomGradleExtension extension, String version, Optional<String> customManifest, JarMergeOrder mergeOrder,
-			PentaFunction<MinecraftVersionInfo, File, File, JarMergeOrder, Function<MinecraftVersion, Callable<Path>>, MinecraftVersion> versionFactory) throws IOException {
+			HexaFunction<Project, MinecraftVersionInfo, File, File, JarMergeOrder, File, MinecraftVersion> versionFactory) throws IOException {
 		boolean offline = project.getGradle().getStartParameter().isOffline();
 
 		MinecraftVersionInfo versionInfo;
@@ -272,69 +349,7 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 			if (needServer) downloadJar(project.getLogger(), version, versionInfo, serverJar, "server");
 		}
 
-		Function<MinecraftVersion, Callable<Path>> mergeTask;
-		switch (mergeOrder) {
-		case FIRST:
-			mergeTask = lock -> () -> {
-				if (!mergedJar.exists()) {
-					try {
-						mergeJars(project.getLogger(), clientJar, serverJar, mergedJar);
-					} catch (ZipError e) {
-						DownloadUtil.delete(clientJar);
-						DownloadUtil.delete(serverJar);
-
-						project.getLogger().error("Could not merge JARs! Deleting source JARs - please re-run the command and move on.", e);
-						throw new RuntimeException("Error merging " + clientJar + " and " + serverJar, e);
-					}
-				}
-
-				return mergedJar.toPath();
-			};
-			break;
-
-		case LAST:
-			mergeTask = lock -> () -> {//TODO: Account for Openfine (or any other jar interfering tasks) changing the merged jar name
-				if (!mergedJar.exists()) {
-					synchronized (lock) {
-						while (lock.mappings == null) {
-							lock.wait();
-						}
-					}
-
-					Path interClient = extension.getUserCache().toPath().resolve(JarNameFactory.CLIENT_INTERMEDIARY.getJarName(version));
-					if (Files.notExists(interClient)) {
-						//Can't use the library provider yet as the configuration might need more things adding to it
-						Set<File> libraries = lock.getJavaLibraries(project);
-						MapJarsTiny.remapJar(project.getLogger(), clientJar.toPath(), lock.mappings, false, libraries, interClient, "client");
-					}
-
-					Path interServer = interClient.resolveSibling(JarNameFactory.SERVER_INTERMEDIARY.getJarName(version));
-					if (Files.notExists(interServer)) {
-						Set<File> libraries = Collections.emptySet(); //The server contains all its own dependencies
-						MapJarsTiny.remapJar(project.getLogger(), serverJar.toPath(), lock.mappings, false, libraries, interServer, "server");
-					}
-
-					MinecraftProvider.mergeJars(project.getLogger(), interClient.toFile(), interServer.toFile(), mergedJar);
-				}
-
-				return mergedJar.toPath();
-			};
-			break;
-
-		case CLIENT_ONLY:
-			mergeTask = lock -> Callables.returning(clientJar.toPath());
-			break;
-
-		case SERVER_ONLY:
-			mergeTask = lock -> Callables.returning(serverJar.toPath());
-			break;
-
-		case INDIFFERENT:
-		default:
-			throw new IllegalStateException("Unexpected jar merge order " + mergeOrder);
-		}
-
-		return versionFactory.apply(versionInfo, clientJar, serverJar, mergeOrder, mergeTask);
+		return versionFactory.apply(project, versionInfo, clientJar, serverJar, mergeOrder, mergedJar);
 	}
 
 	private static File downloadMcJson(Logger logger, LoomGradleExtension extension, String minecraftVersion, boolean offline, Optional<String> customManifest) throws IOException {

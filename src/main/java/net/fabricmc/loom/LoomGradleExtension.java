@@ -460,17 +460,14 @@ public class LoomGradleExtension {
 		return atFile;
 	}
 
-	@Deprecated
 	public void setOptiFine(Object file) {
-		project.getLogger().warn("OptiFine support is currently removed");
-		//optifine = project.file(file);
+		optifine = project.file(file);
 	}
 
 	public boolean hasOptiFine() {
 		return optifine != null;
 	}
 
-	@Deprecated
 	public File getOptiFine() {
 		return optifine;
 	}
