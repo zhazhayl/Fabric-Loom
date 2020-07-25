@@ -253,7 +253,7 @@ public class Openfine {
 			transforms = Streams.stream(Iterators.forEnumeration(jar.entries())).map(ZipEntry::getName).filter(name -> name.endsWith(".class")).distinct().map(className -> {
 				return new ZipEntryTransformerEntry(className, new ByteArrayZipEntryTransformer() {
 					private ClassVisitor makeVisitor(ClassVisitor parent) {
-						return new ClassVisitor(Opcodes.ASM8) {
+						return new ClassVisitor(Opcodes.ASM7) {
 							private final String removedDescriptor = Type.getDescriptor(OptiFineRemoved.class);
 							private String className;
 
@@ -264,7 +264,7 @@ public class Openfine {
 
 							private AnnotationVisitor makeVisitor(String descriptor, AnnotationVisitor parent) {
 								if (removedDescriptor.equals(descriptor)) {
-									return new AnnotationVisitor(Opcodes.ASM8, parent) {
+									return new AnnotationVisitor(Opcodes.ASM7, parent) {
 										private OptiFineRemoved.Type removalType;
 
 										@Override
@@ -341,7 +341,7 @@ public class Openfine {
 										}
 									};
 								} else {
-									return new AnnotationVisitor(Opcodes.ASM8, parent) {
+									return new AnnotationVisitor(Opcodes.ASM7, parent) {
 										@Override
 										public AnnotationVisitor visitAnnotation(String name, String descriptor) {
 											return makeVisitor(descriptor, super.visitAnnotation(name, descriptor));
