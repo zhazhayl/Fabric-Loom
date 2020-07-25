@@ -165,7 +165,7 @@ public class MethodComparison {
 					throw new IllegalStateException("Unexpected impl tag: " + implA.getTag());
 				}
 			} else {
-				throw new IllegalStateException(String.format("Unknown invokedynamic bsm: %s/%s%s (tag=%d iif=%b)", a.bsm.getOwner(), a.bsm.getName(), a.bsm.getDesc(), a.bsm.getTag(), a.bsm.isInterface()));
+				throw new IllegalStateException(String.format("Unknown invokedynamic bsm: %s#%s%s (tag=%d iif=%b)", a.bsm.getOwner(), a.bsm.getName(), a.bsm.getDesc(), a.bsm.getTag(), a.bsm.isInterface()));
 			}
 		}
 
@@ -245,11 +245,11 @@ public class MethodComparison {
 
 	private static boolean isJavaLambdaMetafactory(Handle bsm) {
 		return bsm.getTag() == Opcodes.H_INVOKESTATIC
-				&& bsm.getOwner().equals("java/lang/invoke/LambdaMetafactory")
-				&& (bsm.getName().equals("metafactory")
-						&& bsm.getDesc().equals("(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;")
-						|| bsm.getName().equals("altMetafactory")
-						&& bsm.getDesc().equals("(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;[Ljava/lang/Object;)Ljava/lang/invoke/CallSite;")
+				&& "java/lang/invoke/LambdaMetafactory".equals(bsm.getOwner())
+				&& ("metafactory".equals(bsm.getName())
+						&& "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;".equals(bsm.getDesc())
+						|| "altMetafactory".equals(bsm.getName())
+						&& "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;[Ljava/lang/Object;)Ljava/lang/invoke/CallSite;".equals(bsm.getDesc())
 				) && !bsm.isInterface();
 	}
 
@@ -288,7 +288,7 @@ public class MethodComparison {
 				if (isJavaLambdaMetafactory(idin.bsm)) {
 					instructionEater.accept(idin);
 				} else {
-					throw new IllegalStateException(String.format("Unknown invokedynamic bsm: %s/%s%s (tag=%d iif=%b)", idin.bsm.getOwner(), idin.bsm.getName(), idin.bsm.getDesc(), idin.bsm.getTag(), idin.bsm.isInterface()));
+					throw new IllegalStateException(String.format("Unknown invokedynamic bsm: %s#%s%s (tag=%d iif=%b)", idin.bsm.getOwner(), idin.bsm.getName(), idin.bsm.getDesc(), idin.bsm.getTag(), idin.bsm.isInterface()));
 				}
 			}
 		}

@@ -7,12 +7,8 @@
  */
 package net.fabricmc.loom.providers.openfine;
 
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -25,6 +21,7 @@ import java.nio.file.attribute.BasicFileAttributeView;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
@@ -38,11 +35,14 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Sets;
 
+import net.fabricmc.loom.providers.MappingsProvider;
+import net.fabricmc.loom.providers.MappingsProvider.MappingFactory;
+import net.fabricmc.loom.util.TinyRemapperMappingsHelper;
 import net.fabricmc.mappings.EntryTriple;
 import net.fabricmc.mappings.FieldEntry;
-import net.fabricmc.mappings.MappingsProvider;
 import net.fabricmc.stitch.util.StitchUtil;
 import net.fabricmc.stitch.util.StitchUtil.FileSystemDelegate;
+import net.fabricmc.tinyremapper.IMappingProvider;
 
 public class Openfine {
 	public static final String VERSION = "cc6da75";
@@ -131,7 +131,7 @@ public class Openfine {
 			        }
 
 			        logger.info("Reconstructing " + entry);
-			        byte[] data = ClassReconstructor.reconstruct(Files.readAllBytes(pathRawIn), Files.readAllBytes(pathPatchedIn), stitchFix);
+			        byte[] data = ClassReconstructor.reconstruct(logger, Files.readAllBytes(pathRawIn), Files.readAllBytes(pathPatchedIn), stitchFix);
 
 			        //BasicFileAttributes touchTime = Files.readAttributes(pathIn, BasicFileAttributes.class);
 			        Files.write(pathOut, data, StandardOpenOption.CREATE_NEW);
@@ -162,38 +162,61 @@ public class Openfine {
         Files.getFileAttributeView(pathIn, BasicFileAttributeView.class).setTimes(touchTime.lastModifiedTime(), touchTime.lastAccessTime(), touchTime.creationTime());
 	}
 
-	public static void applyBonusMappings(File to) throws IOException {
+	public static void applyBonusMappings(MappingsProvider mappingsProvider) throws IOException {
 		List<FieldEntry> extra = new ArrayList<>();
 
-		try (InputStream in = new FileInputStream(to)) {
-			for (FieldEntry field : MappingsProvider.readTinyMappings(in, false).getFieldEntries()) {
-				String interName = field.get("intermediary").getName();
+		for (FieldEntry field : mappingsProvider.getMappings().getFieldEntries()) {
+			String interName = field.get("intermediary").getName();
 
-				//Option#CLOUDS
-				if ("field_1937".equals(interName)) {
-					extra.add(namespace -> {
-						EntryTriple real = field.get(namespace);
-						return new EntryTriple(real.getOwner(), "official".equals(namespace) ? "CLOUDS" : "CLOUDS_OF", real.getDesc());
-					});
-				}
+			switch (interName) {
+			case "field_1937": //Option#CLOUDS
+				extra.add(namespace -> {
+					EntryTriple real = field.get(namespace);
+					return new EntryTriple(real.getOwner(), "official".equals(namespace) ? "CLOUDS" : "CLOUDS_OF", real.getDesc());
+				});
+				break;
 
-				//WorldRenderer#renderDistance
-				if ("field_4062".equals(interName)) {
-					extra.add(namespace -> {
-						EntryTriple real = field.get(namespace);
-						return new EntryTriple(real.getOwner(), "official".equals(namespace) ? "renderDistance" : "renderDistance_OF", real.getDesc());
-					});
-				}
-
-				if (interName.endsWith("_OF")) return; //Already applied the bonus mappings to this file
+			case "field_4062": //WorldRenderer#renderDistance
+				extra.add(namespace -> {
+					EntryTriple real = field.get(namespace);
+					return new EntryTriple(real.getOwner(), "official".equals(namespace) ? "renderDistance" : "renderDistance_OF", real.getDesc());
+				});
+				break;
 			}
 		}
 
-		try (BufferedWriter writer = new BufferedWriter(new FileWriter(to, true))) {
-			for (FieldEntry field : extra) {
-				EntryTriple obf = field.get("official");
-				writer.write(String.format("FIELD\t%s\t%s\t%s\t%s\t%s\n", obf.getOwner(), obf.getDesc(), obf.getName(), field.get("named").getName(), field.get("intermediary").getName()));
+		mappingsProvider.mcRemappingFactory = new MappingFactory() {
+			private final MappingFactory factory = mappingsProvider.mcRemappingFactory;
+
+			@Override
+			public IMappingProvider create(String fromMapping, String toMapping) throws IOException {
+				return new IMappingProvider() {
+					private final IMappingProvider wrapped = factory.create(fromMapping, toMapping);
+
+					private void addExtras(Map<String, String> fields) {
+						for (FieldEntry field : extra) {
+							TinyRemapperMappingsHelper.add(field, fromMapping, toMapping, fields);
+						}
+					}
+
+					@Override
+					public void load(Map<String, String> classMap, Map<String, String> fieldMap, Map<String, String> methodMap, Map<String, String[]> localMap) {
+						wrapped.load(classMap, fieldMap, methodMap, localMap);
+						addExtras(fieldMap);
+					}
+
+					@Override
+					public void load(Map<String, String> classMap, Map<String, String> fieldMap, Map<String, String> methodMap) {
+						wrapped.load(classMap, fieldMap, methodMap);
+						addExtras(fieldMap);
+					}
+
+					@Override
+					public String suggestLocalName(String type, boolean plural) {
+						return wrapped.suggestLocalName(type, plural);
+					}
+				};
 			}
-		}
+		};
 	}
 }

@@ -9,7 +9,6 @@ package net.fabricmc.loom.providers.openfine;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,7 +28,6 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.MethodNode;
 
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Streams;
 
@@ -74,9 +72,9 @@ public class MethodChanges {
 		return modifiedMethods.stream().anyMatch(method -> !method.equal && method.hasLambdas()) && !lostMethods.isEmpty() && !gainedMethods.isEmpty();
 	}
 
-	public void tryFixLambdas(Map<String, String> fixes) {//How do you fix lambdas? With dozens of other lambdas of course
+	public boolean tryFixLambdas(Map<String, String> fixes) {//How do you fix lambdas? With dozens of other lambdas of course
 		List<MethodNode> gainedLambdas = gainedMethods.stream().filter(method -> (method.access & Opcodes.ACC_SYNTHETIC) != 0 && method.name.startsWith("lambda$")).collect(Collectors.toList());
-		if (gainedLambdas.isEmpty()) return; //Nothing looks like a lambda
+		if (gainedLambdas.isEmpty()) return true; //Nothing looks like a lambda
 
 		Set<String> possibleLambdas = gainedLambdas.stream().map(method -> className + '#' + method.name + method.desc).collect(Collectors.toSet()); //The collection of lambdas we're looking to fix, any others are irrelevant from the point of view that they're probably fine
 
@@ -89,7 +87,7 @@ public class MethodChanges {
 				Streams.forEachPair(lostMethods.stream(), gainedLambdas.stream(), (lost, gained) -> addFix(fixes, gained, lost));
 				gainedMethods.removeAll(gainedLambdas);
 				lostMethods.clear();
-				return; //Nothing more to do
+				return true; //Nothing more to do
 			}
 		}
 
@@ -109,106 +107,11 @@ public class MethodChanges {
 			lostMethods.removeAll(lostToGained.keySet());
 			gainedMethods.removeAll(lostToGained.values());
 
-			if (complete) return; //Caught all the lambdas
+			if (complete) return true; //Caught all the lambdas
 			gainedLambdas.retainAll(gainedMethods);
 		}
 
-		switch (className) {//Special case classes which can't be easily automatically resolved or have misses that cannot be avoided
-			case "cvi": {//ItemRenderer
-				expect("lost methods", lostMethods, "a(Lcxm;CI)V", "a(Lcxm;II)V", "a(I[ZLcxl;III)V", "a(Ljm;)V", "b(Ljm;)V");
-				expect("gained lambdas", gainedLambdas, "lambda$onCharEvent$6(CILcxm;)V", "lambda$onCharEvent$5(IILcxm;)V", "lambda$onKeyEvent$4(I[ZIIILcxl;)V", "lambda$onKeyEvent$3(Ljm;)V", "lambda$null$2(Ljm;)V");
-
-				expect("new matched lambdas", fixes.keySet(), "cvi#lambda$getClipboardString$7(IJ)V", "cvi#lambda$copyHoveredObject$1(Lqs;Lcrx;Lib;)V", "cvi#lambda$copyHoveredObject$0(Lbvk;Lev;Lib;)V");
-				expect("old matched lambdas", fixes.values(), "cvi#a(IJ)V", "cvi#b(Lqs;Lcrx;Lib;)V", "cvi#b(Lbvk;Lev;Lib;)V");
-
-				List<MethodNode> reversedLostMethods = Lists.reverse(lostMethods); //Not strictly necessary, just makes grabbing the final elements a little nicer looking
-				List<MethodNode> reversedGainedLambdas = Lists.reverse(gainedLambdas);
-
-				applyFix(fixes, reversedGainedLambdas.remove(0), reversedLostMethods.remove(0)); //Match lambda$null$2(Ljm;)V => b(Ljm;)V
-				applyFix(fixes, reversedGainedLambdas.remove(0), reversedLostMethods.remove(0)); //Match lambda$onKeyEvent$3(Ljm;)V => a(Ljm;)V
-				//The remaining 3 lambdas are technically still in the class, but have completely different signatures due to the way they've changed to account for Forge event support
-
-				return; //Manually checked and corrected everything
-			}
-
-			case "cwd": {//InGameHud
-				expect("lost methods", lostMethods, "a(FIILduj;)V");
-				expect("gained lambdas", gainedLambdas, "lambda$renderPotionEffects$1(FIILduj;)V", "lambda$renderPotionEffects$0(FIILduj;)V");
-
-				expect("new matched lambdas", fixes.keySet(), "cwd#lambda$renderScoreboard$2(Lcsw;)Z");
-				expect("old matched lambdas", fixes.values(), "cwd#a(Lcsw;)Z");
-
-				//The single lost lambda is effectively duplicated by the two gained ones, owing to Forge event support using a duplicated (but different) code path
-				applyFix(fixes, gainedLambdas.remove(0), lostMethods.remove(0)); //Match lambda$renderPotionEffects$1(FIILduj;)V => a(FIILduj;)V as it is the vanilla code path version
-
-				return;
-			}
-
-			case "czv": {//SkinOptionsScreen
-				expect("lost methods", lostMethods, "a(Lcwq;)V", "b(Lcwq;)V");
-				expect("gained lambdas", gainedLambdas, "lambda$init$3(Lcwq;)V", "lambda$init$2(Lcwq;)V", "lambda$init$1(Lcwq;)V");
-
-				expect("new matched lambdas", fixes.keySet(), "czv#lambda$init$0(Lavz;Lcwq;)V");
-				expect("old matched lambdas", fixes.values(), "czv#a(Lavz;Lcwq;)V");
-
-				applyFix(fixes, gainedLambdas.remove(0), lostMethods.get(0)); //Match lambda$init$3(Lcwq;)V => a(Lcwq;)V
-				applyFix(fixes, gainedLambdas.remove(1), lostMethods.get(0)); //Match lambda$init$1(Lcwq;)V => b(Lcwq;)V
-
-				return; //The init$2 lambda is an OptiFine added button callback
-			}
-
-			case "dix": {//ParticleManager
-				expect("lost methods", lostMethods, "a(Lagh;Ljava/util/Map;Ldui$a;)V");
-				expect("gained lambdas", gainedLambdas, "lambda$reload$5(Lagh;Ljava/util/Map;Ljava/lang/Object;)V");
-
-				expect("new matched lambdas", fixes.keySet(), "dix#lambda$reload$1(Lxe;Ljava/util/Map;Ljava/util/concurrent/Executor;Lqs;)Ljava/util/concurrent/CompletableFuture;", "dix#lambda$reload$3(Lagh;Ljava/util/Map;Lxe;Ljava/lang/Void;)Ldui$a;", "dix#lambda$addBlockDestroyEffects$8(Lev;Lbvk;DDDDDD)V",
-						"dix#lambda$tick$7(Ldiz;)Ljava/util/Queue;", "dix#lambda$null$0(Lxe;Lqs;Ljava/util/Map;)V", "dix#lambda$null$4(Lduj;Lqs;Ljava/util/List;)V", "dix#lambda$reload$2(I)[Ljava/util/concurrent/CompletableFuture;", "dix#lambda$tick$6(Ldiz;Ljava/util/Queue;)V");
-				expect("old matched lambdas", fixes.values(), "dix#a(Lxe;Ljava/util/Map;Ljava/util/concurrent/Executor;Lqs;)Ljava/util/concurrent/CompletableFuture;", "dix#a(Lagh;Ljava/util/Map;Lxe;Ljava/lang/Void;)Ldui$a;", "dix#a(Lev;Lbvk;DDDDDD)V", "dix#a(Ldiz;)Ljava/util/Queue;",
-						"dix#b(Lxe;Lqs;Ljava/util/Map;)V", "dix#a(Lduj;Lqs;Ljava/util/List;)V", "dix#a(I)[Ljava/util/concurrent/CompletableFuture;", "dix#a(Ldiz;Ljava/util/Queue;)V");
-
-				return; //The reload$5 lambda does match the single lost method, but has a signature change (apparently for no reason)
-			}
-
-			case "dwa": {//ModelLoader
-				expect("lost methods", lostMethods, "a(Lxd;)Lcom/mojang/datafixers/util/Pair;", "a(Ldlm;)V", "b(Ldlm;)V");
-				expect("gained lambdas", gainedLambdas, "lambda$loadBlockstate$11(Lqs;Lxd;)Lcom/mojang/datafixers/util/Pair;", "lambda$static$1(Ldlm;)V", "lambda$static$0(Ldlm;)V");
-
-				expect("new matched lambdas", fixes.keySet(), "dwa#lambda$null$13(Ldwg;Ljava/util/Map$Entry;)Z", "dwa#lambda$null$14(Ljava/util/Map;Ldlv;Ldwg;Ldln;Lbvk;)V", "dwa#lambda$loadBlockstate$10(Ljava/util/Map;Lqs;Lbvk;)V", "dwa#lambda$null$2(Lqs;Lbvk;)V",
-						"dwa#lambda$loadBlockstate$15(Lcom/google/common/collect/ImmutableList;Lbvl;Ljava/util/Map;Ldwg;Ldln;Lqs;Lcom/mojang/datafixers/util/Pair;Ljava/lang/String;Ldlv;)V", "dwa#lambda$parseVariantKey$8(Lbmm;Ljava/util/Map;Lbvk;)Z", "dwa#lambda$func_217844_a$7(Lqs;)V",
-						"dwa#lambda$new$4(Lbvk;)V", "dwa#lambda$new$5(Ljava/util/Set;Ldwg;)Ljava/util/stream/Stream;", "dwa#lambda$new$3(Lqs;Lbvl;)V", "dwa#lambda$new$6(Ljava/lang/String;)V", "dwa#lambda$loadBlockstate$12(Ljava/util/Map;Ldwg;Lbvk;)V", "dwa#lambda$loadBlockstate$9(Lqs;)Lbvl;");
-				expect("old matched lambdas", fixes.values(), "dwa#a(Ldwg;Ljava/util/Map$Entry;)Z", "dwa#a(Ljava/util/Map;Ldlv;Ldwg;Ldln;Lbvk;)V", "dwa#a(Ljava/util/Map;Lqs;Lbvk;)V", "dwa#a(Lqs;Lbvk;)V",
-						"dwa#a(Lcom/google/common/collect/ImmutableList;Lbvl;Ljava/util/Map;Ldwg;Ldln;Lqs;Lcom/mojang/datafixers/util/Pair;Ljava/lang/String;Ldlv;)V", "dwa#a(Lbmm;Ljava/util/Map;Lbvk;)Z", "dwa#e(Lqs;)V", "dwa#a(Lbvk;)V", "dwa#a(Ljava/util/Set;Ldwg;)Ljava/util/stream/Stream;",
-						"dwa#a(Lqs;Lbvl;)V", "dwa#a(Ljava/lang/String;)V", "dwa#a(Ljava/util/Map;Ldwg;Lbvk;)V", "dwa#d(Lqs;)Lbvl;");
-
-				applyFix(fixes, gainedLambdas.remove(1), lostMethods.get(1)); //Match lambda$static$1(Ldlm;)V => a(Ldlm;)V
-				applyFix(fixes, gainedLambdas.remove(1), lostMethods.get(1)); //Match lambda$static$0(Ldlm;)V => b(Ldlm;)V
-				//The loadBlockstate$11 lambda matches the remaining lost method, but gains a parameter for Forge blockstate support
-
-				return;
-			}
-		}
-
-		//If we can't directly match up the lost and gained lambda like methods, nor match by description more creative solutions will be needed
-		throw new IllegalStateException("Unable to resolve " + gainedLambdas.size() + " lambda(s) in " + className + ": " + gainedLambdas.stream().map(method -> method.name + method.desc).collect(Collectors.joining(", ", "[", "]")) + " from " + lostMethods.stream().map(method -> method.name + method.desc).collect(Collectors.joining(", ", "[", "]")) + " having found " + fixes);
-	}
-
-	private static void expect(String type, List<MethodNode> methods, String... names) {
-		if (!Arrays.equals(methods.stream().map(method -> method.name + method.desc).toArray(String[]::new), names)) {
-			throw new IllegalStateException("Mismatch with " + type + ", expected " + Arrays.toString(names) + " but had " + methods.stream().map(method -> method.name + method.desc).collect(Collectors.joining(", ", "[", "]")));
-		}
-	}
-
-	private static void expect(String type, Collection<String> methods, String... names) {
-		if (methods.size() != names.length || !methods.containsAll(Arrays.asList(names))) {
-			throw new IllegalStateException("Mismatch with " + type + ", expected " + Arrays.toString(names) + " but had " + methods);
-		}
-	}
-
-	private void applyFix(Map<String, String> fixes, MethodNode from, MethodNode to) {
-		if (addFix(fixes, from, to)) {
-			gainedMethods.remove(from);
-			lostMethods.remove(to);
-		}
+		return false; //Still some lambda-like methods which couldn't be matched up
 	}
 
 	private boolean addFix(Map<String, String> fixes, MethodNode from, MethodNode to) {
@@ -224,8 +127,12 @@ public class MethodChanges {
 		return true;
 	}
 
-	public Stream<MethodNode> modifiedMethods() {
-		return modifiedMethods.stream().map(method -> method.node);
+	Stream<String> lostMethods() {
+		return lostMethods.stream().map(method -> method.name + method.desc);
+	}
+
+	Stream<String> gainedLambdas() {
+		return gainedMethods.stream().filter(method -> (method.access & Opcodes.ACC_SYNTHETIC) != 0 && method.name.startsWith("lambda$")).map(method -> method.name + method.desc);
 	}
 
 	public void refreshChanges(List<MethodNode> original) {

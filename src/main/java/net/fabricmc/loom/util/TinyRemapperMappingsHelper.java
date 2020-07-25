@@ -24,6 +24,8 @@
 
 package net.fabricmc.loom.util;
 
+import java.util.Map;
+
 import net.fabricmc.mappings.ClassEntry;
 import net.fabricmc.mappings.EntryTriple;
 import net.fabricmc.mappings.FieldEntry;
@@ -44,8 +46,7 @@ public class TinyRemapperMappingsHelper {
 			}
 
 			for (FieldEntry entry : mappings.getFieldEntries()) {
-				EntryTriple fromTriple = entry.get(from);
-				fieldMap.put(fromTriple.getOwner() + '/' + MemberInstance.getFieldId(fromTriple.getName(), fromTriple.getDesc(), false), entry.get(to).getName());
+				add(entry, from, to, fieldMap);
 			}
 
 			for (MethodEntry entry : mappings.getMethodEntries()) {
@@ -53,5 +54,10 @@ public class TinyRemapperMappingsHelper {
 				methodMap.put(fromTriple.getOwner() + '/' + MemberInstance.getMethodId(fromTriple.getName(), fromTriple.getDesc()), entry.get(to).getName());
 			}
 		};
+	}
+
+	public static void add(FieldEntry field, String from, String to, Map<String, String> fields) {
+		EntryTriple fromTriple = field.get(from);
+		fields.put(fromTriple.getOwner() + '/' + MemberInstance.getFieldId(fromTriple.getName(), fromTriple.getDesc(), false), field.get(to).getName());
 	}
 }

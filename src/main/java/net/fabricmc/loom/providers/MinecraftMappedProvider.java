@@ -108,7 +108,7 @@ public class MinecraftMappedProvider extends LogicalDependencyProvider {
             if (getIntermediaryJar().exists() && !minecraftProvider.getMergedJar().equals(getIntermediaryJar().toPath())) {
                 getIntermediaryJar().delete();
             }
-            if (extension.hasOptiFine()) Openfine.applyBonusMappings(mappingsProvider.MAPPINGS_TINY);
+            if (extension.hasOptiFine()) Openfine.applyBonusMappings(mappingsProvider);
             new MapJarsTiny().mapJars(minecraftProvider, this, project);
             if (!targets.isEmpty()) MapJarsTiny.transform(project, targets, this, mappingsProvider);
         }

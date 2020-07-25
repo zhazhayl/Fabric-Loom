@@ -17,6 +17,8 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.gradle.api.logging.Logger;
+
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Handle;
@@ -27,7 +29,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 
 public class ClassReconstructor {
-	public static byte[] reconstruct(byte[] original, byte[] modified, byte[] server) {
+	public static byte[] reconstruct(Logger logger, byte[] original, byte[] modified, byte[] server) {
 		ClassNode originalClass = read(original);
 		ClassNode patchedClass = read(modified);
 
@@ -40,8 +42,11 @@ public class ClassReconstructor {
 
 		Set<String> gainedInterfaces, lostInterfaces;
 		if (!Objects.equals(originalClass.interfaces, patchedClass.interfaces)) {
-			gainedInterfaces = Sets.difference(ImmutableSet.copyOf(patchedClass.interfaces), ImmutableSet.copyOf(originalClass.interfaces));
-			lostInterfaces = Sets.difference(ImmutableSet.copyOf(originalClass.interfaces), ImmutableSet.copyOf(patchedClass.interfaces));
+			Set<String> originalInterfaces = ImmutableSet.copyOf(originalClass.interfaces);
+			Set<String> patchedInterfaces = ImmutableSet.copyOf(patchedClass.interfaces);
+
+			gainedInterfaces = Sets.difference(patchedInterfaces, originalInterfaces);
+			lostInterfaces = Sets.difference(originalInterfaces, patchedInterfaces);
 		} else {
 			gainedInterfaces = lostInterfaces = Collections.emptySet();
 		}
@@ -58,7 +63,14 @@ public class ClassReconstructor {
 		MethodChanges methodChanges = new MethodChanges(originalClass.name, originalClass.methods, patchedClass.methods);
 		if (methodChanges.couldNeedLambdasFixing()) {
 			Map<String, String> lambdaFixes = new HashMap<>();
-			methodChanges.tryFixLambdas(lambdaFixes);
+
+			if (!methodChanges.tryFixLambdas(lambdaFixes)) {
+				//If we persistently can't directly match up the lost and gained lambda like methods, nor match by description, more creative solutions may be needed
+				logger.debug("Unable to resolve " + methodChanges.gainedLambdas().count() + " lambda(s) in " + originalClass.name + ':');
+				logger.debug(methodChanges.lostMethods().collect(Collectors.joining(", ", "\tLost:   [", "]")));
+				logger.debug(methodChanges.gainedLambdas().collect(Collectors.joining(", ", "\tGained: [", "]")));
+				logger.debug("\tDespite finding " + lambdaFixes);
+			}
 
 			if (!lambdaFixes.isEmpty()) fixLambdas(lambdaFixes, originalClass.methods, patchedClass.methods, methodChanges);
 		}
@@ -134,7 +146,7 @@ public class ClassReconstructor {
 			Collections.swap(client, swap.a, swap.b);
 		}
 
-		if (!swaps.isEmpty()) System.out.println("Resolved " + type + " issues in " + name);
+		if (!swaps.isEmpty()) System.out.println("Resolved " + type + " ordering issues in " + name);
 	}
 
 	private static List<Swap> fix(String name, String type, List<String> client, List<String> server) {

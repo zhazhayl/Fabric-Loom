@@ -9,6 +9,7 @@ package net.fabricmc.loom.providers.openfine;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Enumeration;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
@@ -18,31 +19,37 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 
-import org.zeroturnaround.zip.ZipBreakException;
-import org.zeroturnaround.zip.ZipUtil;
-
 public class OptiFineVersion {
 	public final String version, minecraftVersion;
 	public final boolean isInstaller;
 
 	public OptiFineVersion(File file) throws IOException {
 		ClassNode classNode = new ClassNode();
+		boolean isInstaller = false;
 		try (JarFile jarFile = new JarFile(file)) {
-			JarEntry entry = jarFile.getJarEntry("Config.class");
+			JarEntry entry = jarFile.getJarEntry("net/optifine/Config.class");
+			if (entry == null) entry = jarFile.getJarEntry("Config.class"); //Could be an old Optifine version
+
 			if (entry == null) {
 				throw new InvalidUserDataException("Invalid OptiFine jar, could not find Config");
 			}
 
 			ClassReader classReader = new ClassReader(jarFile.getInputStream(entry));
 			classReader.accept(classNode, ClassReader.SKIP_CODE | ClassReader.SKIP_FRAMES | ClassReader.SKIP_DEBUG);
+
+			for (Enumeration<JarEntry> it = jarFile.entries(); it.hasMoreElements();) {
+				if (it.nextElement().getName().startsWith("patch/")) {
+					isInstaller = true;
+					break;
+				}
+			}
 		}
 
 		String version = null, minecraftVersion = null;
 		for (FieldNode fieldNode : classNode.fields) {
-			if (fieldNode.name.equals("VERSION")) {
+			if ("VERSION".equals(fieldNode.name)) {
 				version = (String) fieldNode.value;
-			}
-			if (fieldNode.name.equals("MC_VERSION")) {
+			} else if ("MC_VERSION".equals(fieldNode.name)) {
 				minecraftVersion = (String) fieldNode.value;
 			}
 		}
@@ -53,15 +60,7 @@ public class OptiFineVersion {
 
 		this.version = version;
 		this.minecraftVersion = minecraftVersion;
-
-		boolean[] wrap = new boolean[] {false};
-		ZipUtil.iterate(file, (in, entry) -> {
-			if (entry.getName().startsWith("patch/")) {
-				wrap[0] = true;
-				throw new ZipBreakException();
-			}
-		});
-		isInstaller = wrap[0];
+		this.isInstaller = isInstaller;
 	}
 
 	public boolean supports(String minecraftVersion) {
