@@ -260,7 +260,7 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 							if (extension.hasOptiFine() && actualMergeOrder != JarMergeOrder.SERVER_ONLY) {
 								try {
 									clientJar = Openfine.process(projectAgain.getLogger(), versionInfo.id, clientJar, serverJar, extension.getOptiFine());
-									mergedJar = new File(clientJar, clientJar.getName().replace("client", "merged"));
+									mergedJar = new File(clientJar.getParentFile(), clientJar.getName().replace("client", "merged"));
 									addDependency("com.github.Chocohead:OptiSine:" + Openfine.VERSION, project, Constants.MINECRAFT_DEPENDENCIES);
 									GradleSupport.onlyForGroupMatching(project, AbstractPlugin.addMavenRepo(project, "Jitpack", "https://jitpack.io/"), "^([Cc][Oo][Mm]|[Ii][Oo])\\.[Gg][Ii][Tt][Hh][Uu][Bb]\\."); //Needed to fetch OptiSine from
 								} catch (IOException e) {
