@@ -58,7 +58,7 @@ import net.fabricmc.loom.util.OperatingSystem;
  */
 public class FernFlowerTask extends AbstractDecompileTask {
 	private static final Map<String, AtomicBoolean> DECOMPILE_CLAIMER = new ConcurrentHashMap<>();
-	private boolean noFork = false;
+	private boolean noFork = false, logMethods;
 	private int numThreads = Runtime.getRuntime().availableProcessors();
 
 	public boolean shouldRun() {
@@ -95,6 +95,7 @@ public class FernFlowerTask extends AbstractDecompileTask {
 
 		args.add("-t=" + getNumThreads());
 		args.add("-m=" + getExtension().getMappingsProvider().getDecompileMappings().toAbsolutePath());
+		if (shouldLogMethods()) args.add("--log-methods");
 
 		//TODO, Decompiler breaks on jemalloc, J9 module-info.class?
 		getLibraries().forEach(f -> args.add("-e=" + f.getAbsolutePath()));
@@ -192,11 +193,20 @@ public class FernFlowerTask extends AbstractDecompileTask {
 		return noFork;
 	}
 
+	@Internal
+	public boolean shouldLogMethods() {
+		return logMethods;
+	}
+
 	public void setNoFork(boolean noFork) {
 		this.noFork = noFork;
 	}
 
 	public void setNumThreads(int numThreads) {
 		this.numThreads = numThreads;
+	}
+
+	public void setLogMethods(boolean log) {
+		logMethods = log;
 	}
 }

@@ -38,13 +38,15 @@ import org.jetbrains.java.decompiler.main.extern.IFernflowerLogger;
 public class ThreadIDFFLogger extends IFernflowerLogger {
 	public final PrintStream stdOut;
 	public final PrintStream stdErr;
+	private final boolean watchMethods;
 
 	private final ThreadLocal<Stack<String>> workingClass = ThreadLocal.withInitial(Stack::new);
 	private final ThreadLocal<Stack<String>> line = ThreadLocal.withInitial(Stack::new);
 
-	public ThreadIDFFLogger(PrintStream stdOut, PrintStream stdErr) {
+	public ThreadIDFFLogger(PrintStream stdOut, PrintStream stdErr, boolean watchMethods) {
 		this.stdOut = stdOut;
 		this.stdErr = stdErr;
+		this.watchMethods = watchMethods;
 	}
 
 	private void pushMessage(Severity severity, String message) {
@@ -94,13 +96,15 @@ public class ThreadIDFFLogger extends IFernflowerLogger {
 
     @Override
     public void startMethod(String methodName) {
-        String className = workingClass.get().peek();
-        pushMessage(Severity.INFO, "Decompiling " + className + '.' + methodName.substring(0, methodName.indexOf(' ')));
+    	if (watchMethods) {
+	        String className = workingClass.get().peek();
+	        pushMessage(Severity.INFO, "Decompiling " + className + '.' + methodName.substring(0, methodName.indexOf(' ')));
+    	}
     }
 
 	@Override
 	public void endMethod() {
-		popMessage();
+		if (watchMethods) popMessage();
 	}
 
 	@Override
