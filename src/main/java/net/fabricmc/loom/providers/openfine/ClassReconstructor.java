@@ -22,7 +22,9 @@ import org.gradle.api.logging.Logger;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Handle;
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.InnerClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
 import com.google.common.collect.ImmutableSet;
@@ -80,6 +82,7 @@ public class ClassReconstructor {
 		fieldChanges.annotate(annotator);
 
 		annotator.apply(patchedClass);
+		stitchAnnotationFix(logger, patchedClass);
 		rebuildOrder(patchedClass, server);
 		return write(patchedClass);
 	}
@@ -113,6 +116,34 @@ public class ClassReconstructor {
 			}
 		}));
 		changes.refreshChanges(originalMethods);
+	}
+
+	private static void stitchAnnotationFix(Logger logger, ClassNode node) {
+		int syntheticOffset = 0;
+		String syntheticArgs = null;
+
+		if ((node.access & Opcodes.ACC_ENUM) != 0) {
+			syntheticOffset = 2;
+            syntheticArgs = "(Ljava/lang/String;I";
+		} else {//SyntheticParameterClassVisitor is expecting classes that have been through ProGuard, the patched class won't have been
+			for (InnerClassNode innerClass : node.innerClasses) {
+				if (innerClass.name.equals(node.name) && innerClass.innerName != null && innerClass.outerName != null && (innerClass.access & Opcodes.ACC_STATIC) == 0) {
+					syntheticOffset = 1;
+		            syntheticArgs = "(L" + innerClass.outerName + ';';
+		            break;
+		        }
+			}
+		}
+
+		if (syntheticOffset != 0) {
+			logger.debug("Fixing " + node.name + " to have an offset of " + syntheticOffset);
+
+			for (MethodNode method : node.methods) {
+				if ("<init>".equals(method.name) && method.desc.startsWith(syntheticArgs)) {
+					method.visibleAnnotableParameterCount += syntheticOffset;
+				}
+			}
+		}
 	}
 
 	private static void rebuildOrder(ClassNode node, byte[] basis) {
