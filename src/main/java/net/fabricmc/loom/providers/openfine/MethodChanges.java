@@ -16,7 +16,6 @@ import java.util.ListIterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.StringJoiner;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -24,7 +23,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.MethodNode;
 
 import com.google.common.collect.Iterables;
@@ -149,12 +147,7 @@ public class MethodChanges {
 	}
 
 	public void annotate(Annotator annotator) {
-		lostMethods.stream().map(method -> {
-			Type methodType = Type.getType(method.desc);
-			StringJoiner joiner = new StringJoiner(", ", "(", ")");
-			Arrays.stream(methodType.getArgumentTypes()).map(Type::getClassName).forEach(joiner::add);
-			return method.name + joiner.toString() + methodType.getReturnType();
-		}).forEach(annotator::dropMethod);
+		lostMethods.stream().map(method -> method.name.concat(method.desc)).forEach(annotator::dropMethod);
 		gainedMethods.stream().map(method -> method.name + method.desc).forEach(annotator::addMethod);
 		modifiedMethods.stream().filter(MethodComparison::hasChanged).collect(Collectors.toMap(comparison -> comparison.node.name + comparison.node.desc, MethodComparison::toChangeSet)).forEach(annotator::addChangedMethod);
 	}

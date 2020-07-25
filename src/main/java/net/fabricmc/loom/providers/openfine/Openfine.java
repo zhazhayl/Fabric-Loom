@@ -20,20 +20,38 @@ import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributeView;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 import org.apache.commons.io.FilenameUtils;
 
 import org.gradle.api.InvalidUserDataException;
 import org.gradle.api.logging.Logger;
 
+import org.objectweb.asm.AnnotationVisitor;
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
+
+import org.zeroturnaround.zip.ZipUtil;
+import org.zeroturnaround.zip.transform.ByteArrayZipEntryTransformer;
+import org.zeroturnaround.zip.transform.ZipEntryTransformerEntry;
+
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Sets;
+import com.google.common.collect.Streams;
 
 import net.fabricmc.loom.providers.MappingsProvider;
 import net.fabricmc.loom.providers.MappingsProvider.MappingFactory;
@@ -43,6 +61,9 @@ import net.fabricmc.mappings.FieldEntry;
 import net.fabricmc.stitch.util.StitchUtil;
 import net.fabricmc.stitch.util.StitchUtil.FileSystemDelegate;
 import net.fabricmc.tinyremapper.IMappingProvider;
+import net.fabricmc.tinyremapper.MemberInstance;
+
+import com.chocohead.optisine.OptiFineRemoved;
 
 public class Openfine {
 	public static final String VERSION = "cc6da75";
@@ -218,5 +239,146 @@ public class Openfine {
 				};
 			}
 		};
+	}
+
+	public static void transformRemovals(Logger logger, MappingsProvider mappingsProvider, File namedJar) throws IOException {
+		Map<String, String> notchToNamed = new HashMap<>();
+		mappingsProvider.mcRemappingFactory.create("official", "named").load(notchToNamed, notchToNamed, notchToNamed);
+
+		Map<String, String> namedToNotch = new HashMap<>();
+		mappingsProvider.mcRemappingFactory.create("named", "official").load(namedToNotch, new EmptyMap<>(), new EmptyMap<>());
+
+		ZipEntryTransformerEntry[] transforms;
+		try (ZipFile jar = new ZipFile(namedJar)) {
+			transforms = Streams.stream(Iterators.forEnumeration(jar.entries())).map(ZipEntry::getName).filter(name -> name.endsWith(".class")).distinct().map(className -> {
+				return new ZipEntryTransformerEntry(className, new ByteArrayZipEntryTransformer() {
+					private ClassVisitor makeVisitor(ClassVisitor parent) {
+						return new ClassVisitor(Opcodes.ASM8) {
+							private final String removedDescriptor = Type.getDescriptor(OptiFineRemoved.class);
+							private String className;
+
+							@Override
+							public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
+								super.visit(version, access, className = name, signature, superName, interfaces);
+							}
+
+							private AnnotationVisitor makeVisitor(String descriptor, AnnotationVisitor parent) {
+								if (removedDescriptor.equals(descriptor)) {
+									return new AnnotationVisitor(Opcodes.ASM8, parent) {
+										private OptiFineRemoved.Type removalType;
+
+										@Override
+										public void visitEnum(String name, String descriptor, String value) {
+											if ("type".equals(name)) {
+												assert Type.getDescriptor(OptiFineRemoved.Type.class).equals(descriptor);
+												removalType = OptiFineRemoved.Type.valueOf(value);
+												logger.debug("Passing removal of " + removalType + " in " + className);
+											}
+
+											super.visitEnum(name, descriptor, value);
+										}
+
+										private Type remapType(Type type) {
+											switch (type.getSort()) {
+											case Type.ARRAY:
+												return Type.getObjectType(Strings.repeat("[", type.getDimensions()).concat(remapType(type.getElementType()).getDescriptor()));
+
+											case Type.OBJECT:
+												return Type.getObjectType(notchToNamed.getOrDefault(type.getInternalName(), type.getInternalName()));
+
+											default:
+												return type;
+											}
+										}
+
+										private String memberReplace(String member, boolean method) {
+											int split = member.lastIndexOf(method ? '(' : '#');
+											String name = member.substring(0, split);
+											String desc = member.substring(method ? split : split + 1);
+
+											String clazz = namedToNotch.get(className);
+											if (clazz != null) {
+												String remap = clazz + '/' + (method ? MemberInstance.getMethodId(name, desc) : MemberInstance.getFieldId(name, desc, false));
+												name = notchToNamed.getOrDefault(remap, remap);
+											} else {
+												logger.warn("Unable to find backwards mapping for ".concat(className));
+											}
+
+											Type descType = Type.getType(desc);
+											if (method) {
+												desc = Arrays.stream(descType.getArgumentTypes()).map(this::remapType).map(Type::getClassName).collect(Collectors.joining(", "));
+												return remapType(descType.getReturnType()).getClassName() + ' ' + name + '(' + desc + ')';
+											} else {
+												desc = remapType(descType).getClassName();
+												return desc + ' ' + name;
+											}
+										}
+
+										@Override
+										public void visit(String name, Object value) {
+											if ("name".equals(name)) {
+												if (removalType == null) {
+													throw new IllegalStateException("Found annotation methods in unexpected order in ".concat(className));
+												}
+
+												switch (removalType) {
+												case INTERFACE:
+													value = notchToNamed.getOrDefault(value, (String) value);
+													break;
+
+												case METHOD: {
+													value = memberReplace((String) value, true);
+													break;
+												}
+
+												case FIELD:
+													value = memberReplace((String) value, false);
+													break;
+												}
+											}
+
+											super.visit(name, value);
+										}
+									};
+								} else {
+									return new AnnotationVisitor(Opcodes.ASM8, parent) {
+										@Override
+										public AnnotationVisitor visitAnnotation(String name, String descriptor) {
+											return makeVisitor(descriptor, super.visitAnnotation(name, descriptor));
+										}
+
+										@Override
+										public AnnotationVisitor visitArray(String name) {
+											return makeVisitor(null, super.visitArray(name));
+										}
+									};
+								}
+							}
+
+							@Override
+							public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+								return makeVisitor(descriptor, super.visitAnnotation(descriptor, visible));
+							}
+						};
+					}
+
+					@Override
+					protected byte[] transform(ZipEntry zipEntry, byte[] input) throws IOException {
+						logger.trace("Rebuilding " + className.substring(0, className.length() - 6));
+
+						ClassWriter classWriter = new ClassWriter(0);
+						new ClassReader(input).accept(makeVisitor(classWriter), 0);
+						return classWriter.toByteArray();
+					}
+
+					@Override
+					protected boolean preserveTimestamps() {
+						return true; //Why not?
+					}
+				});
+			}).toArray(ZipEntryTransformerEntry[]::new);
+		}
+
+		ZipUtil.transformEntries(namedJar, transforms);
 	}
 }

@@ -96,6 +96,8 @@ public class MinecraftMappedProvider extends LogicalDependencyProvider {
         	targets = Collections.emptySet();
         }
 
+        if (extension.hasOptiFine()) atOffset = "-optifined".concat(atOffset);
+
         String intermediaryJar = minecraftProvider.minecraftVersion + "-intermediary" + atOffset + '-' + mappingsProvider.mappingsName;
         MINECRAFT_INTERMEDIARY_JAR = new File(cache, "minecraft-" + intermediaryJar + ".jar");
         String mappedJar = minecraftProvider.minecraftVersion + "-mapped" + atOffset + '-' + mappingsProvider.mappingsName + '-' + mappingsProvider.mappingsVersion;
@@ -111,6 +113,7 @@ public class MinecraftMappedProvider extends LogicalDependencyProvider {
             if (extension.hasOptiFine()) Openfine.applyBonusMappings(mappingsProvider);
             new MapJarsTiny().mapJars(minecraftProvider, this, project);
             if (!targets.isEmpty()) MapJarsTiny.transform(project, targets, this, mappingsProvider);
+            if (extension.hasOptiFine()) Openfine.transformRemovals(project.getLogger(), mappingsProvider, getMappedJar());
         }
 
         if (!MINECRAFT_MAPPED_JAR.exists()) {
