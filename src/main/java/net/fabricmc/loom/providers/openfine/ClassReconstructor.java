@@ -139,12 +139,25 @@ public class ClassReconstructor {
 
 		if (syntheticOffset != 0) {
 			logger.info("Fixing " + node.name + " to be offset of " + syntheticOffset);
-			List<AnnotationNode> offset = Arrays.asList(new AnnotationNode[syntheticOffset]);
 
 			for (MethodNode method : node.methods) {
 				if ("<init>".equals(method.name) && method.desc.startsWith(syntheticArgs)) {
 					method.visibleAnnotableParameterCount += syntheticOffset;
-					if (method.visibleAnnotations != null) method.visibleAnnotations.addAll(0, offset);
+
+					if (method.visibleParameterAnnotations != null) {
+						for (int end = method.visibleParameterAnnotations.length, i = end - syntheticOffset; i < end; i++) {
+							if (method.visibleParameterAnnotations[i] != null) {
+								logger.warn("In " + node.name + '#' + method.name + method.desc);
+
+								for (AnnotationNode annotation : method.visibleParameterAnnotations[i]) {
+									logger.warn("\tLost annotation of type ".concat(annotation.desc));
+								}
+							}
+						}
+
+						System.arraycopy(method.visibleParameterAnnotations, 0, method.visibleParameterAnnotations, syntheticOffset, method.visibleParameterAnnotations.length - syntheticOffset);
+						Arrays.fill(method.visibleParameterAnnotations, 0, syntheticOffset, null);
+					}
 				}
 			}
 		}
