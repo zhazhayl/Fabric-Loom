@@ -364,7 +364,7 @@ public class Openfine {
 
 					@Override
 					protected byte[] transform(ZipEntry zipEntry, byte[] input) throws IOException {
-						logger.quiet("Rebuilding " + className.substring(0, className.length() - 6));
+						logger.debug("Rebuilding " + className.substring(0, className.length() - 6));
 
 						ClassWriter classWriter = new ClassWriter(0);
 						new ClassReader(input).accept(makeVisitor(classWriter), 0);
