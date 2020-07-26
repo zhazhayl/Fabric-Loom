@@ -144,7 +144,7 @@ public class ClassReconstructor {
 			for (MethodNode method : node.methods) {
 				if ("<init>".equals(method.name) && method.desc.startsWith(syntheticArgs)) {
 					method.visibleAnnotableParameterCount += syntheticOffset;
-					method.visibleAnnotations.addAll(0, offset);
+					if (method.visibleAnnotations != null) method.visibleAnnotations.addAll(0, offset);
 				}
 			}
 		}
