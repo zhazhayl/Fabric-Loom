@@ -7,12 +7,14 @@ Usage: `gradlew genSources eclipse/idea/vscode`
 
 ## What's new?
 * [FernFlower](https://github.com/FabricMC/intellij-fernflower) switched to [ForgeFlower](https://github.com/MinecraftForge/ForgeFlower) for `genSources`
+* Control over the order in which the jars are merged, including single sided use
 * Support for using mappings on the wrong version
 * Support for Enigma mappings
 * Support for gz compressed Tiny mappings
 * Support to pull Enigma mappings straight from Github
 * Support for dynamically defined mappings directly in `build.gradle`
 * Support to stack mappings on top of each other
+* Applying OptiFine directly to the Minecraft jar
 * Access Transformers
 * Easier additional remapped jar tasks
 * Optional non-forking decompiling for `genSources`
@@ -25,7 +27,39 @@ Whilst not a whole lot needs to change compared to a normal Loom setup, there is
 ### Declaring the plugin
 The Jitpack maven is needed to grab [ForgeFlower](https://github.com/Chocohead/ForgedFlower), a [Tiny Remapper fork](https://github.com/Chocohead/tiny-remapper), and a [Tiny Mappings Parser fork](https://github.com/Chocohead/Tiny-Mappings-Parser) in order for Sin² to work. Fabric's maven will cover all other libraries that both Loom and Sin² need to work aside from [Darcula](https://github.com/bulenkov/Darcula) which is on JCenter. The Gradle plugin also needs to change in order to pull the right version of Loom. Sin² versions are marked by the short Git commit revision.
 
-Together, the following will need to be switched in `build.gradle`:
+In practice, this means when using a Gradle setup similar to the [Fabric Example Mod](https://github.com/FabricMC/fabric-example-mod), the following needs to be added to the `settings.gradle`:
+```diff
+pluginManagement {
+	repositories {
+		jcenter()
+		maven {
+			name = 'Fabric'
+			url = 'https://maven.fabricmc.net/'
+		}
+		gradlePluginPortal()
++		maven {
++			name = 'Jitpack'
++			url = 'https://jitpack.io'
++		}
+	}
++	resolutionStrategy {
++		eachPlugin {
++			if (requested.id.id == "fabric-loom" && requested.version?.endsWith("-SNAPSHOT") != true) {
++				useModule("com.github.Chocohead.Fabric-Loom:fabric-loom:${requested.version}")
++			}
++		}
++	}
+}
+```
+As well as the following in `build.gradle`:
+```diff
+plugins {
+-	id 'fabric-loom' version '0.4-SNAPSHOT'
++	id 'fabric-loom' version '9f357ae'
+}
+```
+
+If using a more stockish Gradle setup, just the following will need to be applied to the `build.gradle`:
 ```groovy
 buildscript {
 	repositories {
@@ -41,13 +75,8 @@ buildscript {
 	}
 	dependencies {
 		//Sin² Edition Loom
-		classpath 'com.github.Chocohead:fabric-loom:e131f8f'
+		classpath 'com.github.Chocohead:fabric-loom:9f357ae'
 	}
-}
-plugins {
-	//Old/normal Loom plugin (comment this out or remove the line entirely)
-	//id 'fabric-loom' version '0.2.6-SNAPSHOT'
-	...
 }
 apply plugin: "fabric-loom"
 ```
@@ -65,13 +94,29 @@ Stock Version | Sin² Branch | Example Sin² Version
 0.2.3 | [*\<Floating\>*](https://github.com/Chocohead/fabric-loom/compare/f2fc524...32e0cc5) | **c4551b3** and **32e0cc5**
 0.2.4 | [openfine](https://github.com/Chocohead/fabric-loom/tree/openfine) | **7eb4201**
 0.2.5 | [dust](https://github.com/Chocohead/fabric-loom/tree/dust) | **5784f06**
-0.2.6 | [leaf](https://github.com/Chocohead/fabric-loom/tree/leaf) | **1fc286d**
+0.2.6 | [leaf](https://github.com/Chocohead/fabric-loom/tree/leaf) | **b2af97e**
+0.2.6½ | [jekan't](https://github.com/Chocohead/fabric-loom/tree/jekan't) | **9f357ae**
 0.2.7 | *\<None\>* | -
 0.4.x | *\<None\>* | -
+
+Note that whilst `jekan't` does not fully reflect 0.2.7's changes it does support [Access Wideners](https://fabricmc.net/wiki/tutorial:accesswideners) in dependencies (such as Fabric API) unlike 0.2.6 as well as some other cherry-picked things from 0.4
 
 
 ## How do I use the new things?
 Once you've switched over to using Sin², ForgeFlower decompiling will be used for `genSources`. For the other additional features however, more changes are needed:
+
+### Jar merge control
+The traditional method to develop Fabric mods involves the client and server jars being merged together, then the resulting jar remapped. For the vast majority of cases this is completely fine. For any version before 12w30a however, this is no longer sufficient as the jars are not obfuscated the same way. Thus supporting any version before that (such as [1.2.5](https://github.com/minecraft-cursed-legacy/Example-Mod/tree/1.2.5) or [Beta 1.7.3](https://github.com/minecraft-cursed-legacy/Example-Mod/tree/b1.7.3)) is not possible using normal Loom. Sin² handles this case by allowing the remapping of the client and server jars to happen before they are merged together. If the release date in the `version.json` manifest file is before the day preceding 12w30a's release this setting is changed automatically to ensure merging works.
+
+This is all well and good but say (for whatever reason) you wanted to merge a newer version after remapping each jar. Or even just use only the client or server jar without merging the other at all. This is also possible by explicitly specifying the jar merge order:
+```groovy
+minecraft {
+	jarMergeOrder = "first" //Merge the jars before remapping (default for 12w30a+)
+	//jarMergeOrder = "client_only" //Only use the client jar
+	//jarMergeOrder = "server_only" //Only use the server jar	
+	//jarMergeOrder = "last" //Merge the jars after remapping (default for pre-12w30a)
+}
+```
 
 ### Running mappings on different versions
 Normally it is up to the mappings to declare the Minecraft version they are designed for, and Loom will just trust that they supply everything that is needed remapping wise. This can cause a problem when trying to use them on another Minecraft version as they could be missing mappings for new or changed parts of the code. Sin² instead only trusts the mappings if they were designed for the Minecraft version being used, otherwise it will grab the correct Intermediary mappings for the Minecraft version actually being used and apply the mappings on top, allowing for the mappings to be missing parts without issue.
@@ -203,11 +248,32 @@ As seen, stacking mappings can result in conflicts which prevent remapping. Usin
 All conflicts are given as a single list and the build will stop there until they are manually corrected. This can be bypassed for method and field naming conflicts by adding the appropriate flag in the `minecraft` block:
 ```groovy
 minecraft {
-	//Not especially recommended if there are wide spread conflicts, but works for a quick fix
+	//Not especially recommended if there are widespread conflicts, but works for a quick fix
 	bulldozeMappings = true
 }
 ```
 Conflicting class names cannot be bulldozed however as there would be no way of loading two identically named classes. Any (strange) issues that arise from bulldozing mappings should be taken as a warning that this has resulted in uncorrectable problems with the remapped jars. Hence this is not a recommended fix for long term projects.
+
+
+### Using OptiFine
+A long-standing feature of Sin² is to be able to apply OptiFine directly to the Minecraft jar to allow the changes which are made to be debugged (and generally seen at all). This process comes as part of [OpenFine](https://github.com/Chocohead/OptiSine) which was a precursor to [OptiFabric](https://github.com/modmuss50/OptiFabric) in allowing OptiFine to be developed against and played with Fabric mods.
+
+* Any class or method which OptiFine has different bytecode for is annotated with an `OptiFineChanged` annotation
+* Any removed interface, method (including lambdas) or field will be noted with an `OptiFineRemoved` annotation on the relevant class
+* Any interface which OptiFine adds to a class is noted with an `InterfaceGain` annotation on the class
+* Any method or field which OptiFine adds is noted with an `OptiFineAdded` annotation on the respective member
+* Any access change, be it widening or narrowing, is noted with an `AccessChange` annotation on the class/method/field it applies to
+* Any change to whether a class, method or field is final is noted with a `FinalityChange` annotation
+
+These annotations allow easily searching for places where OptiFine has changed vanilla code, as well as making it clearer in a given class what has happened to make it different. It should be noted that not all lambda changes can be recovered due to the indeterministic nature they can be defined so a larger sequence of removed methods is likely due to that.
+
+All versions of OptiFine from 1.14 should work, to use them just the following addition to the `build.gradle` is needed:
+```groovy
+minecraft {
+	optiFine = file("path/to/OptiFine.jar")
+}
+```
+Either the OptiFine installer or extracted mod can be used. Upon reloading Gradle it will apply, re-merge and remap the Minecraft jar to include the provided OptiFine version. To remove it simply remove (or comment out) the `optiFine` line and reloading Gradle will return back to the vanilla jar.
 
 
 ### Access Transformers
@@ -226,6 +292,4 @@ The example source set will now produce a separate jar which doesn't include the
 
 
 ## What's broken?
-With the newer 1.16 snapshots there are a couple of methods which ForgeFlower is unable to decompile. The various `register` methods in `net/minecraft/data/client/model/BlockStateVariantMap` and one in `BlockStateModelGenerator` all fail with a `StackOverflowError` (which can fill the console out depending on the logging history). `net/minecraft/entity/ai/brain/Brain#getOptionalMemory` also fails to decompile with a `NullPointerException`.
-
-Other than those issues (which manifest themselves as warnings whilst running `genSources`), there is nothing else Sin² knowingly breaks. Feel free to [report](https://github.com/Chocohead/Fabric-Loom/issues) anything if you do find something.
+Ideally nothing, right now there is nothing Sin² knowingly breaks. Feel free to [report](https://github.com/Chocohead/Fabric-Loom/issues) anything if you do find something.
