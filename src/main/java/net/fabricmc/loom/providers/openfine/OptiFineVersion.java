@@ -58,7 +58,12 @@ public class OptiFineVersion {
 			throw new IllegalStateException("Unable to find OptiFine version information for " + file + " (only found '" + version + "' for '" + minecraftVersion + "')");
 		}
 
-		this.version = version;
+		int split = version.indexOf(minecraftVersion);
+		if (split < 0 || (split += minecraftVersion.length() + 1) >= version.length()) {
+			throw new IllegalStateException("Unable to mould the OptiFine version " + version + " (for " + minecraftVersion + ") into shape");
+		}
+
+		this.version = version.substring(split);
 		this.minecraftVersion = minecraftVersion;
 		this.isInstaller = isInstaller;
 	}

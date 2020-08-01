@@ -70,7 +70,7 @@ public class Openfine {
 
 	public static File process(Logger logger, String mcVersion, File client, File server, File optifineJar) throws IOException {
 		OptiFineVersion optifine = new OptiFineVersion(optifineJar);
-		logger.lifecycle("Loaded OptiFine " + optifine.version);
+		logger.lifecycle("Loaded OptiFine " + optifine.version + " for " + optifine.minecraftVersion);
 
 		if (!optifine.supports(mcVersion)) {
 			throw new InvalidUserDataException("Incompatible OptiFine version, requires " + optifine.minecraftVersion + " rather than " + mcVersion);
@@ -85,7 +85,7 @@ public class Openfine {
 			if (!optifineJar.exists()) extract(logger, client, installer, optifineJar);
 		}
 
-		File merged = new File(optiCache, FilenameUtils.removeExtension(client.getName()) + "-optifined.jar");
+		File merged = new File(optiCache, FilenameUtils.removeExtension(client.getName()) + '-' + optifine.version + ".jar");
 		if (!merged.exists()) merge(logger, client, optifineJar, server, merged);
 
 		return merged;
