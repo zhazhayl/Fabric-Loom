@@ -135,7 +135,11 @@ public class MapJarsTiny {
 
 		case LAST:
 			if (version.needsIntermediaries()) {
-				version.giveIntermediaries(intermediaryMappings.orElseGet(() -> MappingsProvider.getIntermediaries(extension, version.getName())));
+				if (intermediaryMappings.isPresent()) {
+					intermediaryMappings.ifPresent(version::giveIntermediaries);
+				} else {//Would've been nice if ifPresent returned a boolean for if it is
+					version.getOrFindIntermediaries(extension);
+				}
 			}
 
 			return version.getMergedJar();
@@ -145,11 +149,11 @@ public class MapJarsTiny {
 			throw new IllegalStateException("Unexpected jar merge strategy " + version.getMergeStrategy());
 		}
 
-		Path interJar = extension.getUserCache().toPath().resolve(nameFactory.getJarName(version.getName()));
+		Path interJar = extension.getUserCache().toPath().resolve(nameFactory.getJarName(version.makeNamingStrategy()));
 
 		if (Files.notExists(interJar)) {
 			remapJar(project.getLogger(), version.getMergedJar(), //Long method calls are long
-					intermediaryMappings.orElseGet(() -> MappingsProvider.getIntermediaries(extension, version.getName())),
+					intermediaryMappings.orElseGet(() -> version.getOrFindIntermediaries(extension)),
 					false, version.getJavaLibraries(project), interJar, fromM);
 		}
 

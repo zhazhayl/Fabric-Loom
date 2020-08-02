@@ -60,6 +60,7 @@ import org.gradle.api.plugins.BasePluginConvention;
 
 import net.fabricmc.loom.dependencies.LoomDependencyManager;
 import net.fabricmc.loom.providers.JarNameFactory;
+import net.fabricmc.loom.providers.JarNamingStrategy;
 import net.fabricmc.loom.providers.MappingsProvider;
 import net.fabricmc.loom.providers.MinecraftMappedProvider;
 import net.fabricmc.loom.providers.MinecraftProvider;
@@ -72,7 +73,7 @@ public class LoomGradleExtension {
 		/** Run based on whether the Minecraft version is from before 23th July 2012 */
 		INDIFFERENT(null) {
 			@Override
-			public String getJarName(String version) {
+			public String getJarName(JarNamingStrategy strategy) {
 				throw new UnsupportedOperationException("Cannot get jar name of indifferent merge order");
 			}
 		},
@@ -89,8 +90,8 @@ public class LoomGradleExtension {
 			this.namer = namer;
 		}
 
-		public String getJarName(String version) {
-			return namer.getJarName(version);
+		public String getJarName(JarNamingStrategy strategy) {
+			return namer.getJarName(strategy);
 		}
 
 		public Set<String> getNativeHeaders() {

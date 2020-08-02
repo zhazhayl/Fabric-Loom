@@ -22,6 +22,11 @@ public interface MinecraftVersionAdaptable {
 	/** The name of the Minecraft version */
 	String getName();
 
+	/** The {@link JarNamingStrategy naming strategy} for the Minecraft jars */
+	default JarNamingStrategy makeNamingStrategy() {
+		return JarNamingStrategy.forVersion(getName());
+	}
+
 	/** The collection of libraries needed to run the jar */
 	Set<File> getJavaLibraries(Project project);
 
@@ -46,6 +51,11 @@ public interface MinecraftVersionAdaptable {
 
 	/** Provide Intermediaries for making the {@link #getMergedJar() merged jar} ({@link #needsIntermediaries() if needed}) */
 	void giveIntermediaries(Path mappings);
+
+	/** Gets the Intermediary mappings as given by {@link #giveIntermediaries(Path)} or finds them elsewhere */
+	default Path getOrFindIntermediaries(LoomGradleExtension extension) {
+		return MappingsProvider.getIntermediaries(extension, getName());
+	}
 
 	/** Whether to use {@link Builder#ignoreConflicts(boolean)} when remapping the jar */
 	default boolean bulldozeMappings(Project project, LoomGradleExtension extension) {

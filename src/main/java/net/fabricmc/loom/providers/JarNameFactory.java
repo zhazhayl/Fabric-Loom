@@ -11,40 +11,50 @@ package net.fabricmc.loom.providers;
 public enum JarNameFactory {
 	CLIENT {
 		@Override
-		public String getJarName(String version) {
-			return "minecraft-" + version + "-client.jar";
+		public String getDependencyName(JarNamingStrategy strategy) {
+			return strategy.getVersion().concat("-client");
 		}
 	},
 	CLIENT_INTERMEDIARY {
 		@Override
-		public String getJarName(String version) {
-			return "minecraft-" + version + "-client-intermediary.jar";
+		public String getDependencyName(JarNamingStrategy strategy) {
+			return strategy.getVersion().concat("-client-intermediary");
 		}
 	},
 	SERVER {
 		@Override
-		public String getJarName(String version) {
-			return "minecraft-" + version + "-server.jar";
+		public String getDependencyName(JarNamingStrategy strategy) {
+			return strategy.getVersion().concat("-server");
 		}
 	},
 	SERVER_INTERMEDIARY {
 		@Override
-		public String getJarName(String version) {
-			return "minecraft-" + version + "-server-intermediary.jar";
+		public String getDependencyName(JarNamingStrategy strategy) {
+			return strategy.getVersion().concat("-server-intermediary");
 		}
 	},
 	MERGED {
 		@Override
-		public String getJarName(String version) {
-			return "minecraft-" + version + "-merged.jar";
+		public String getDependencyName(JarNamingStrategy strategy) {
+			return strategy.getVersion().concat("-merged");
 		}
 	},
 	MERGED_INTERMEDIARY {
 		@Override
-		public String getJarName(String version) {
-			return "minecraft-" + version + "-intermediary.jar"; //FIXME: Attach the mapping name to the end?
+		public String getDependencyName(JarNamingStrategy strategy) {
+			return strategy.getVersion() + "-intermediary" + strategy.getExtra(); //FIXME: Attach the mapping name to the end?
+		}
+	},
+	NAMED {
+		@Override
+		public String getDependencyName(JarNamingStrategy strategy) {
+			return strategy.getVersion() + "-mapped" + strategy.getExtra() + '-' + strategy.getVersion();
 		}
 	};
 
-	public abstract String getJarName(String version);
+	public abstract String getDependencyName(JarNamingStrategy strategy);
+
+	public String getJarName(JarNamingStrategy strategy) {
+		return "minecraft-" + getDependencyName(strategy) + ".jar";
+	}
 }

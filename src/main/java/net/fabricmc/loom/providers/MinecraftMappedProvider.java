@@ -66,12 +66,12 @@ public class MinecraftMappedProvider extends LogicalDependencyProvider {
             throw new RuntimeException("input merged jar not found");
         }
 
-        String atOffset; //Explicitly flag AT'd jars differently to vanilla/stock ones
+        JarNamingStrategy jarName = minecraftProvider.makeNamingStrategy(); //Explicitly flag AT'd jars differently to vanilla/stock ones
         File cache; //Save to the project cache when ATing to simplify flagging AT changes
         Set<Pair<String, String>> targets;
         boolean atChange = false;
         if (extension.hasAT()) {
-        	atOffset = "-transformed";
+        	jarName = jarName.withExtra("-transformed");
         	cache = new File(extension.getRootProjectPersistentCache(), "access_transformed_jars");
         	cache.mkdir();
 
@@ -91,17 +91,12 @@ public class MinecraftMappedProvider extends LogicalDependencyProvider {
     			atChange = true;
     		}
         } else {
-        	atOffset = "";
         	cache = extension.getUserCache();
         	targets = Collections.emptySet();
         }
 
-        if (extension.hasOptiFine()) atOffset = "-optifined".concat(atOffset);
-
-        String intermediaryJar = minecraftProvider.minecraftVersion + "-intermediary" + atOffset + '-' + mappingsProvider.mappingsName;
-        MINECRAFT_INTERMEDIARY_JAR = new File(cache, "minecraft-" + intermediaryJar + ".jar");
-        String mappedJar = minecraftProvider.minecraftVersion + "-mapped" + atOffset + '-' + mappingsProvider.mappingsName + '-' + mappingsProvider.mappingsVersion;
-        MINECRAFT_MAPPED_JAR = new File(cache, "minecraft-" + mappedJar + ".jar");
+        MINECRAFT_INTERMEDIARY_JAR = new File(cache, JarNameFactory.MERGED_INTERMEDIARY.getJarName(jarName));
+        MINECRAFT_MAPPED_JAR = new File(cache, JarNameFactory.NAMED.getJarName(jarName));
 
         if (!getMappedJar().exists() || !getIntermediaryJar().exists() || atChange) {
             if (getMappedJar().exists()) {
@@ -120,8 +115,8 @@ public class MinecraftMappedProvider extends LogicalDependencyProvider {
             throw new RuntimeException("mapped jar not found");
         }
 
-        addDependency("net.minecraft:minecraft:" + mappedJar, project, Constants.MINECRAFT_NAMED);
-        addDependency("net.minecraft:minecraft:" + intermediaryJar, project, Constants.MINECRAFT_INTERMEDIARY);
+        addDependency("net.minecraft:minecraft:".concat(JarNameFactory.MERGED_INTERMEDIARY.getDependencyName(jarName)), project, Constants.MINECRAFT_NAMED);
+        addDependency("net.minecraft:minecraft:".concat(JarNameFactory.NAMED.getDependencyName(jarName)), project, Constants.MINECRAFT_INTERMEDIARY);
     }
 
     public Collection<File> getMapperPaths() {

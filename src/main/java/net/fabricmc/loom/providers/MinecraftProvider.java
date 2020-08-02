@@ -140,15 +140,16 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 								wait();
 							}
 						}
+						JarNamingStrategy nameStrategy = makeNamingStrategy();
 
-						Path interClient = mergedJar.toPath().resolve(JarNameFactory.CLIENT_INTERMEDIARY.getJarName(getName()));
+						Path interClient = mergedJar.toPath().resolve(JarNameFactory.CLIENT_INTERMEDIARY.getJarName(nameStrategy));
 						if (Files.notExists(interClient)) {
 							//Can't use the library provider yet as the configuration might need more things adding to it
 							Set<File> libraries = getJavaLibraries(project);
 							MapJarsTiny.remapJar(logger, clientJar.toPath(), mappings, false, libraries, interClient, "client");
 						}
 
-						Path interServer = interClient.resolveSibling(JarNameFactory.SERVER_INTERMEDIARY.getJarName(getName()));
+						Path interServer = interClient.resolveSibling(JarNameFactory.SERVER_INTERMEDIARY.getJarName(nameStrategy));
 						if (Files.notExists(interServer)) {
 							Set<File> libraries = Collections.emptySet(); //The server contains all its own dependencies
 							MapJarsTiny.remapJar(logger, serverJar.toPath(), mappings, false, libraries, interServer, "server");
@@ -225,6 +226,13 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 				}
 			}
 		}
+
+		@Override
+		public Path getOrFindIntermediaries(LoomGradleExtension extension) {
+			if (mappings != null) return mappings;
+
+			return MinecraftVersionAdaptable.super.getOrFindIntermediaries(extension);
+		}
 	}
 	private static final Map<VersionKey, Map<JarMergeOrder, MinecraftVersion>> VERSION_TO_VERSION = new ConcurrentHashMap<>();
 	private static final byte DOWNLOAD_ATTEMPTS = 3;
@@ -257,18 +265,30 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 				if (version == null) {
 					version = makeMergedJar(project, extension, minecraftVersion, Optional.ofNullable(extension.customManifest), mergeOrder,
 						(projectAgain, versionInfo, clientJar, serverJar, actualMergeOrder, mergedJar) -> {
+							JarNamingStrategy nameStrategy;
 							if (extension.hasOptiFine() && actualMergeOrder != JarMergeOrder.SERVER_ONLY) {
 								try {
-									clientJar = Openfine.process(projectAgain.getLogger(), versionInfo.id, clientJar, serverJar, extension.getOptiFine());
-									mergedJar = new File(clientJar.getParentFile(), clientJar.getName().replace("client", "merged"));
-									addDependency("com.github.Chocohead:OptiSine:" + Openfine.VERSION, project, Constants.MINECRAFT_DEPENDENCIES);
-									GradleSupport.onlyForGroupMatching(project, AbstractPlugin.addMavenRepo(project, "Jitpack", "https://jitpack.io/"), "^([Cc][Oo][Mm]|[Ii][Oo])\\.[Gg][Ii][Tt][Hh][Uu][Bb]\\."); //Needed to fetch OptiSine from
+									nameStrategy = Openfine.process(projectAgain.getLogger(), versionInfo.id, clientJar, serverJar, extension.getOptiFine());
+
+									File optiCache = new File(clientJar.getParentFile(), "optifine");
+									clientJar = new File(optiCache, JarNameFactory.CLIENT.getJarName(nameStrategy));
+									mergedJar = new File(optiCache, JarNameFactory.MERGED.getJarName(nameStrategy));
+
+									addDependency("com.github.Chocohead:OptiSine:" + Openfine.VERSION, projectAgain, Constants.MINECRAFT_DEPENDENCIES);
+									GradleSupport.onlyForGroupMatching(projectAgain, AbstractPlugin.addMavenRepo(projectAgain, "Jitpack", "https://jitpack.io/"), "^([Cc][Oo][Mm]|[Ii][Oo])\\.[Gg][Ii][Tt][Hh][Uu][Bb]\\."); //Needed to fetch OptiSine from
 								} catch (IOException e) {
 									throw new UncheckedIOException("Error processing Optifine jar from " + extension.getOptiFine(), e);
 								}
+							} else {
+								nameStrategy = JarNamingStrategy.forVersion(versionInfo.id);
 							}
 
 							return new MinecraftVersion(projectAgain, versionInfo, clientJar, serverJar, actualMergeOrder, mergedJar) {
+								@Override
+								public JarNamingStrategy makeNamingStrategy() {
+									return nameStrategy;
+								}
+
 								@Override
 								public Set<File> getJavaLibraries(Project project) {
 									return getLibraryProvider().getLibraries();
@@ -331,9 +351,10 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 		boolean needClient = extension.getJarMergeOrder() != JarMergeOrder.SERVER_ONLY;
 		boolean needServer = extension.getJarMergeOrder() != JarMergeOrder.CLIENT_ONLY;
 
-		File clientJar = new File(extension.getUserCache(), JarNameFactory.CLIENT.getJarName(version));
-		File serverJar = new File(extension.getUserCache(), JarNameFactory.SERVER.getJarName(version));
-		File mergedJar = new File(extension.getUserCache(), mergeOrder.getJarName(version));
+		JarNamingStrategy nameStrategy = JarNamingStrategy.forVersion(version);
+		File clientJar = new File(extension.getUserCache(), JarNameFactory.CLIENT.getJarName(nameStrategy));
+		File serverJar = new File(extension.getUserCache(), JarNameFactory.SERVER.getJarName(nameStrategy));
+		File mergedJar = new File(extension.getUserCache(), mergeOrder.getJarName(nameStrategy));
 
 		if (offline) {
 			if ((!needClient || clientJar.exists()) && (!needServer || serverJar.exists())) {
@@ -469,6 +490,16 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 	}
 
 	@Override
+	public JarNamingStrategy makeNamingStrategy() {
+		JarNamingStrategy out = version.makeNamingStrategy();
+
+		MappingsProvider mappings = getProvider(MappingsProvider.class);
+		if (mappings.mappingsName != null) out = out.withMappings(mappings.mappingsName + '-' + mappings.mappingsVersion);
+
+		return out;
+	}
+
+	@Override
 	public JarMergeOrder getMergeStrategy() {
 		return version.getMergeStrategy();
 	}
@@ -481,6 +512,11 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 	@Override
 	public void giveIntermediaries(Path mappings) {
 		version.giveIntermediaries(mappings);
+	}
+
+	@Override
+	public Path getOrFindIntermediaries(LoomGradleExtension extension) {
+		return version.getOrFindIntermediaries(extension);
 	}
 
 	@Override

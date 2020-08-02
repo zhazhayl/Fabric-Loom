@@ -53,6 +53,8 @@ import com.google.common.collect.Iterators;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Streams;
 
+import net.fabricmc.loom.providers.JarNameFactory;
+import net.fabricmc.loom.providers.JarNamingStrategy;
 import net.fabricmc.loom.providers.MappingsProvider;
 import net.fabricmc.loom.providers.MappingsProvider.MappingFactory;
 import net.fabricmc.loom.util.TinyRemapperMappingsHelper;
@@ -68,7 +70,7 @@ import com.chocohead.optisine.OptiFineRemoved;
 public class Openfine {
 	public static final String VERSION = "cc6da75";
 
-	public static File process(Logger logger, String mcVersion, File client, File server, File optifineJar) throws IOException {
+	public static JarNamingStrategy process(Logger logger, String mcVersion, File client, File server, File optifineJar) throws IOException {
 		OptiFineVersion optifine = new OptiFineVersion(optifineJar);
 		logger.lifecycle("Loaded OptiFine " + optifine.version + " for " + optifine.minecraftVersion);
 
@@ -85,10 +87,12 @@ public class Openfine {
 			if (!optifineJar.exists()) extract(logger, client, installer, optifineJar);
 		}
 
-		File merged = new File(optiCache, FilenameUtils.removeExtension(client.getName()) + '-' + optifine.version + ".jar");
+		JarNamingStrategy out = JarNamingStrategy.forVersion(mcVersion + '-' + optifine.version);
+
+		File merged = new File(optiCache, JarNameFactory.CLIENT.getJarName(out));
 		if (!merged.exists()) merge(logger, client, optifineJar, server, merged);
 
-		return merged;
+		return out;
 	}
 
 	private static void extract(Logger logger, File minecraft, File installer, File to) throws IOException {

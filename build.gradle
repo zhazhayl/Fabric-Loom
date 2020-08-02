@@ -103,6 +103,7 @@ license {
 	exclude '**/loom/dependencies/LogicalDependencyProvider.java'
 	exclude '**/loom/dependencies/PhysicalDependencyProvider.java'
 	exclude '**/loom/providers/JarNameFactory.java'
+	exclude '**/loom/providers/JarNamingStrategy.java'
 	exclude '**/loom/providers/MappingsProvider.java'
 	exclude '**/loom/providers/MinecraftProvider.java'
 	exclude '**/loom/providers/MinecraftVersionAdaptable.java'
