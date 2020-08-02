@@ -300,9 +300,6 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 					if (mergeOrder == JarMergeOrder.INDIFFERENT) {
 						mergeToVersion.put(version.getMergeStrategy(), version);
 					}
-
-					//TODO: Pull these straight from MappingProvider as it finds them
-					if (version.getMergeStrategy() == JarMergeOrder.LAST) version.giveIntermediaries(MappingsProvider.getIntermediaries(extension, minecraftVersion));
 				}
 
 				this.version = version;
