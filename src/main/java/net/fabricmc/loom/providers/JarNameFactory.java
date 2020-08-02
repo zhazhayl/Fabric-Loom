@@ -48,7 +48,7 @@ public enum JarNameFactory {
 	NAMED {
 		@Override
 		public String getDependencyName(JarNamingStrategy strategy) {
-			return strategy.getVersion() + "-mapped" + strategy.getExtra() + '-' + strategy.getVersion();
+			return strategy.getVersion() + "-mapped" + strategy.getExtra() + '-' + strategy.getMappings();
 		}
 	};
 
