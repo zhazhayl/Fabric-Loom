@@ -136,6 +136,7 @@ public class AccessTransformerHelper {
 				BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(out, StandardCharsets.UTF_8));
 
 				try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+					reader.mark(2048); //It should only need to read the expected header
 					String[] header = reader.readLine().split("\\s+");
 
 					if (header.length != 3 || !BAD_AT_NAME.equals(header[0])) {
@@ -148,7 +149,8 @@ public class AccessTransformerHelper {
 
 					switch (header[2]) {
 					case "named":
-						IOUtils.copy(in, out);
+						reader.reset();
+						IOUtils.copy(reader, out, StandardCharsets.UTF_8);
 						return; //Probably nothing to do
 
 					case "intermediary":
@@ -215,9 +217,9 @@ public class AccessTransformerHelper {
 							throw new UnsupportedOperationException("Unsupported type " + parts[1] + " on line " + line);
 						}
 					}
+				} finally {
+					writer.flush(); //Both the in and out streams are expected to not be closed, so we'll explicitly flush instead
 				}
-
-				writer.flush(); //Both the in and out streams are expected to not be closed, so we'll explicitly flush instead
 			}
 		}));
 
