@@ -427,6 +427,13 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 						url = "https://gist.github.com/Chocohead/b62b1e94d8d4b32ef3326df63cf407f2/raw/bdc1f968b3529ebca9b197a5b2612f57b6354624/1.15_combat-6.json";
 						break;
 
+					case "1.16_combat-0":
+						logger.warn("Using Mojang name for sixth Combat Test, Intermediaries are published as 1_16_combat-0 instead");
+					case "1_16_combat-0": //Combat Test 6
+						//Extracted from https://launcher.mojang.com/experiments/combat/5a8ceec8681ed96ab6ecb9607fb5d19c8a755559/1_16_combat-0.zip
+						url = "https://gist.github.com/Chocohead/b62b1e94d8d4b32ef3326df63cf407f2/raw/139228e3b641866284e111b148d028236f51ddc9/1_16_combat-0.json";
+						break;
+
 					default:
 						break out;
 					}
