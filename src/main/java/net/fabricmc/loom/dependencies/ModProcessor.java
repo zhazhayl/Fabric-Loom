@@ -190,7 +190,7 @@ public class ModProcessor {
 			remapper.readInputs(inputPath);
 			remapper.apply(outputConsumer);
 
-			if (AccessTransformerHelper.deobfATs(remapper, output)) {
+			if (AccessTransformerHelper.deobfATs(input, remapper, outputConsumer)) {
 				project.getLogger().info("Found and remapped access transformer in " + input.getName());
 			}
 		} finally {

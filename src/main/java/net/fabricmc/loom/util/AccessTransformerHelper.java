@@ -25,27 +25,26 @@ package net.fabricmc.loom.util;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 import org.apache.commons.io.IOUtils;
 
@@ -60,9 +59,7 @@ import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InnerClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
-import org.zeroturnaround.zip.ZipUtil;
 import org.zeroturnaround.zip.transform.ByteArrayZipEntryTransformer;
-import org.zeroturnaround.zip.transform.StreamZipEntryTransformer;
 import org.zeroturnaround.zip.transform.ZipEntryTransformerEntry;
 
 import com.google.gson.JsonElement;
@@ -116,26 +113,42 @@ public class AccessTransformerHelper {
         }
     }
 
-	public static boolean deobfATs(TinyRemapper tiny, File jar) {
-		//This will get turned into an array to be turned back into a list by ZipUtil
-		List<ZipEntryTransformerEntry> transformers = new ArrayList<>(2);
+	public static boolean deobfATs(File jar, TinyRemapper tiny, OutputConsumerPath output) throws IOException {
+		Path temp = Files.createTempDirectory("fabric-loom");
 
-		transformers.add(new ZipEntryTransformerEntry(MAGIC_AT_NAME, new StreamZipEntryTransformer() {
-			@Override
-			protected void transform(ZipEntry zipEntry, InputStream in, OutputStream out) throws IOException {
-				BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(out, StandardCharsets.UTF_8));
-				readATs(new InputStreamReader(in, StandardCharsets.UTF_8), writer, tiny.getRemapper());
-				writer.flush(); //Both the in and out streams are expected to not be closed, so we'll explicitly flush instead
+		try (ZipFile zip = new ZipFile(jar)) {
+			boolean hasWritten = false;
+			ZipEntry entry = zip.getEntry(MAGIC_AT_NAME);
+
+			if (entry != null) {
+				Path at = temp.resolve(MAGIC_AT_NAME);
+
+				try (Reader in = new InputStreamReader(zip.getInputStream(entry), StandardCharsets.UTF_8);
+						BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(at), StandardCharsets.UTF_8))) {
+					readATs(in, writer, tiny.getRemapper());
+				}
+
+				output.addNonClassFile(at, MAGIC_AT_NAME);
+				hasWritten = true;
 			}
-		}));
 
-		String aw = findAW(ZipUtil.unpackEntry(jar, "fabric.mod.json"));
-		if (aw != null) transformers.add(new ZipEntryTransformerEntry(aw, new StreamZipEntryTransformer() {
-			@Override
-			protected void transform(ZipEntry zipEntry, InputStream in, OutputStream out) throws IOException {
-				BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(out, StandardCharsets.UTF_8));
+			entry = zip.getEntry("fabric.mod.json");
 
-				try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+			off: if (entry != null) {
+				try (Reader in = new InputStreamReader(zip.getInputStream(entry), StandardCharsets.UTF_8)) {
+					JsonElement json = new JsonParser().parse(in);
+
+					if (!json.isJsonObject() || !json.getAsJsonObject().has(BAD_AT_NAME) || (entry = zip.getEntry(json.getAsJsonObject().get(BAD_AT_NAME).getAsString())) == null) {
+						break off;
+					}
+				}
+
+				Path aw = temp.resolve(entry.getName());
+				Files.createDirectories(aw.getParent());
+
+				out: try (BufferedReader reader = new BufferedReader(new InputStreamReader(zip.getInputStream(entry), StandardCharsets.UTF_8));
+						OutputStream out = Files.newOutputStream(aw);
+						BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(out, StandardCharsets.UTF_8))) {
 					reader.mark(2048); //It should only need to read the expected header
 					String[] header = reader.readLine().split("\\s+");
 
@@ -151,7 +164,7 @@ public class AccessTransformerHelper {
 					case "named":
 						reader.reset();
 						IOUtils.copy(reader, out, StandardCharsets.UTF_8);
-						return; //Probably nothing to do
+						break out; //Probably nothing to do
 
 					case "intermediary":
 						writer.write(BAD_AT_NAME + "\tv1\tnamed");
@@ -217,25 +230,16 @@ public class AccessTransformerHelper {
 							throw new UnsupportedOperationException("Unsupported type " + parts[1] + " on line " + line);
 						}
 					}
-				} finally {
-					writer.flush(); //Both the in and out streams are expected to not be closed, so we'll explicitly flush instead
 				}
+
+				output.addNonClassFile(aw, entry.getName());
+				hasWritten = true;
 			}
-		}));
 
-		return ZipUtil.transformEntries(jar, transformers.toArray(new ZipEntryTransformerEntry[0]));
-	}
-
-	private static String findAW(byte[] modJSON) {
-		if (modJSON != null) {
-			JsonElement json = new JsonParser().parse(new InputStreamReader(new ByteArrayInputStream(modJSON)));
-
-			if (json.isJsonObject() && json.getAsJsonObject().has(BAD_AT_NAME)) {
-				return json.getAsJsonObject().get(BAD_AT_NAME).getAsString();
-			}
+			return hasWritten;
+		} finally {
+			Files.walkFileTree(temp, new DeletingFileVisitor());
 		}
-
-		return null;
 	}
 
 	private static void readATs(Reader from, BufferedWriter to, Remapper remapper) throws IOException {
