@@ -189,16 +189,16 @@ public class ModProcessor {
 			remapper.readClassPath(mcDeps);
 			remapper.readInputs(inputPath);
 			remapper.apply(outputConsumer);
+
+			if (AccessTransformerHelper.deobfATs(remapper, output)) {
+				project.getLogger().info("Found and remapped access transformer in " + input.getName());
+			}
 		} finally {
 			remapper.finish();
 		}
 
 		if (!output.exists()) {
-			throw new RuntimeException("Failed to remap JAR to " + toM + " file not found: " + output.getAbsolutePath());
-		}
-
-		if (AccessTransformerHelper.deobfATs(remapper, output)) {
-			project.getLogger().info("Found and remapped access transformer in " + input.getName());
+			throw new RuntimeException("Failed to remap " + input + " to " + toM + " (file not found: " + output.getAbsolutePath() + ')');
 		}
 	}
 
