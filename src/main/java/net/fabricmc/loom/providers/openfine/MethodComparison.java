@@ -69,17 +69,16 @@ public class MethodComparison {
 	}
 
 	private static int nextInterestingNode(InsnList list, int start) {
-		AbstractInsnNode node = list.get(start);
-
-		while (node.getType() == AbstractInsnNode.LINE || node.getType() == AbstractInsnNode.FRAME) {
-			if (++start >= list.size()) {
+		AbstractInsnNode node;
+		do {
+			if (start >= list.size()) {
 				return -1;
 			}
 
-			node = list.get(start);
-		}
+			node = list.get(start++);
+		} while (node.getType() == AbstractInsnNode.LINE || node.getType() == AbstractInsnNode.FRAME);
 
-		return start;
+		return start - 1;
 	}
 
 	private boolean compare(InsnList listA, InsnList listB) {
