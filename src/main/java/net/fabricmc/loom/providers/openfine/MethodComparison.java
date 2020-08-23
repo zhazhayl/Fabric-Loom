@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import org.objectweb.asm.Handle;
@@ -41,8 +42,9 @@ public class MethodComparison {
 	public final AccessChange access;
 	public final FinalityChange finality;
 	public final Set<String> gainedExceptions, lostExceptions;
-	public final boolean equal;
-	private final List<String> lambdaHandles = new ArrayList<>();
+	public final boolean equal, effectivelyEqual;
+	private final List<Lambda> originalLambdas = new ArrayList<>();
+	private final List<Lambda> patchedLambdas = new ArrayList<>();
 
 	public MethodComparison(MethodNode original, MethodNode patched) {
 		assert Objects.equals(original.name, patched.name);
@@ -53,39 +55,57 @@ public class MethodComparison {
 		finality = FinalityChange.forAccess(original.access, patched.access);
 
 		if (!Objects.equals(original.exceptions, patched.exceptions)) {
-			//Sets.symmetricDifference(ImmutableSet.copyOf(original.exceptions), ImmutableSet.copyOf(patched.exceptions));
-			gainedExceptions = Sets.difference(ImmutableSet.copyOf(patched.exceptions), ImmutableSet.copyOf(original.exceptions));
-			lostExceptions = Sets.difference(ImmutableSet.copyOf(original.exceptions), ImmutableSet.copyOf(patched.exceptions));
+			Set<String> originalExceptions = ImmutableSet.copyOf(original.exceptions);
+			Set<String> patchedExceptions = ImmutableSet.copyOf(patched.exceptions);
+
+			gainedExceptions = Sets.difference(patchedExceptions, originalExceptions);
+			lostExceptions = Sets.difference(originalExceptions, patchedExceptions);
 		} else {
 			gainedExceptions = lostExceptions = Collections.emptySet();
 		}
 
-		if (original.instructions.size() == patched.instructions.size()) {
-			equal = compare(original.instructions, patched.instructions);
-		} else {
-			equal = false;
-			findHandles(patched.instructions, 0, this::logLambda);
+		effectivelyEqual = compare(original.instructions, patched.instructions);
+		equal = effectivelyEqual && originalLambdas.equals(patchedLambdas);
+	}
+
+	private static int nextInterestingNode(InsnList list, int start) {
+		AbstractInsnNode node = list.get(start);
+
+		while (node.getType() == AbstractInsnNode.LINE || node.getType() == AbstractInsnNode.FRAME) {
+			if (++start >= list.size()) {
+				return -1;
+			}
+
+			node = list.get(start);
 		}
+
+		return start;
 	}
 
 	private boolean compare(InsnList listA, InsnList listB) {
-		assert listA.size() == listB.size();
+		int a = nextInterestingNode(listA, 0);
+		int b = nextInterestingNode(listB, 0);
 
-		for (int i = 0; i < listA.size(); i++) {
-			AbstractInsnNode insnA = listA.get(i);
-			AbstractInsnNode insnB = listB.get(i);
+		while (a >= 0 && b >= 0) {
+			AbstractInsnNode insnA = listA.get(a);
+			AbstractInsnNode insnB = listB.get(a);
 
 			if (!compare(listA, listB, insnA, insnB)) {
-				findHandles(listB, i + 1, this::logLambda);
+				//Log the lambdas from the current instruction
+				findHandles(listA, a, this::logOriginalLambda);
+				findHandles(listB, b, this::logPatchedLambda);
 				return false;
 			}
+
+			a = nextInterestingNode(listA, a + 1);
+			b = nextInterestingNode(listB, b + 1);
 		}
 
-		return true;
+		return a == b;
 	}
 
 	private boolean compare(InsnList listA, InsnList listB, AbstractInsnNode insnA, AbstractInsnNode insnB) {
-		if (insnA.getOpcode() != insnB.getOpcode()) return false;
+		if (insnA.getType() != insnB.getType() || insnA.getOpcode() != insnB.getOpcode()) return false;
 
 		switch (insnA.getType()) {
 		case AbstractInsnNode.INT_INSN: {
@@ -149,17 +169,10 @@ public class MethodComparison {
 				case Opcodes.H_INVOKESPECIAL:
 				case Opcodes.H_NEWINVOKESPECIAL:
 				case Opcodes.H_INVOKEINTERFACE:
-					logLambda(implB);
+					logOriginalLambda(a, implA);
+					logPatchedLambda(b, implB);
 
-					if (!Objects.equals(implA.getOwner(), implB.getOwner()) || !Objects.equals(implA.getName(), implB.getName()) || !Objects.equals(implA.getDesc(), implB.getDesc())) {
-						return false;
-					}
-					if (implA.isInterface() != implB.isInterface()) {
-						//More debatable if the actual method is the same, we'll go with it being a change for now
-						return false;
-					}
-
-					return true;
+					return true; //Taken as true so that lambda renames don't count as the entire method being different
 
 				default:
 					throw new IllegalStateException("Unexpected impl tag: " + implA.getTag());
@@ -173,7 +186,7 @@ public class MethodComparison {
 			JumpInsnNode a = (JumpInsnNode) insnA;
 			JumpInsnNode b = (JumpInsnNode) insnB;
 
-			// check if the 2 jumps have the same direction
+			//Check if the 2 jumps have the same direction, possibly should check if it's to the same positioned labels
 			return Integer.signum(listA.indexOf(a.label) - listA.indexOf(a)) == Integer.signum(listB.indexOf(b.label) - listB.indexOf(b));
 		}
 
@@ -232,12 +245,12 @@ public class MethodComparison {
 		}
 
 		case AbstractInsnNode.INSN:
-		case AbstractInsnNode.LABEL:
-		case AbstractInsnNode.LINE:
-		case AbstractInsnNode.FRAME: {
-			return true;
+		case AbstractInsnNode.LABEL: {
+			return true; //Doesn't need any additional comparisons
 		}
 
+		case AbstractInsnNode.LINE:
+		case AbstractInsnNode.FRAME:
 		default:
 			throw new IllegalArgumentException("Unexpected instructions: " + insnA + ", " + insnB);
 		}
@@ -253,13 +266,7 @@ public class MethodComparison {
 				) && !bsm.isInterface();
 	}
 
-	public static List<String> lambdas(InsnList instructions) {
-		List<String> lambdas = new ArrayList<>();
-		findHandles(instructions, 0, handle -> lambdas.add(handle.getOwner() + '#' + handle.getName() + handle.getDesc()));
-		return Collections.unmodifiableList(lambdas);
-	}
-
-	public static void findHandles(InsnList instructions, int from, Consumer<Handle> lambdaEater) {
+	public static void findHandles(InsnList instructions, int from, BiConsumer<InvokeDynamicInsnNode, Handle> lambdaEater) {
 		findLambdas(instructions, from, idin -> {
 			Handle impl = (Handle) idin.bsmArgs[1];
 
@@ -269,7 +276,7 @@ public class MethodComparison {
 			case Opcodes.H_INVOKESPECIAL:
 			case Opcodes.H_NEWINVOKESPECIAL:
 			case Opcodes.H_INVOKEINTERFACE:
-				lambdaEater.accept(impl);
+				lambdaEater.accept(idin, impl);
 				break;
 
 			default:
@@ -294,16 +301,24 @@ public class MethodComparison {
 		}
 	}
 
-	private void logLambda(Handle handle) {
-		lambdaHandles.add(handle.getOwner() + '#' + handle.getName() + handle.getDesc());
+	private void logOriginalLambda(InvokeDynamicInsnNode node, Handle handle) {
+		originalLambdas.add(new Lambda(handle.getOwner(), handle.getName(), handle.getDesc(), node.name.concat(node.desc)));
+	}
+
+	private void logPatchedLambda(InvokeDynamicInsnNode node, Handle handle) {
+		patchedLambdas.add(new Lambda(handle.getOwner(), handle.getName(), handle.getDesc(), node.name.concat(node.desc)));
 	}
 
 	public boolean hasLambdas() {
-		return !lambdaHandles.isEmpty();
+		return !originalLambdas.isEmpty() && !patchedLambdas.isEmpty();
 	}
 
-	public List<String> getLambads() {
-		return Collections.unmodifiableList(lambdaHandles);
+	public List<Lambda> getOriginalLambads() {
+		return Collections.unmodifiableList(originalLambdas);
+	}
+
+	public List<Lambda> getPatchedLambads() {
+		return Collections.unmodifiableList(patchedLambdas);
 	}
 
 	public boolean hasChanged() {

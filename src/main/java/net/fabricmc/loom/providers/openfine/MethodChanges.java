@@ -8,30 +8,28 @@
 package net.fabricmc.loom.providers.openfine;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
-import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.MethodNode;
 
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Streams;
+import com.google.common.util.concurrent.Runnables;
 
 public class MethodChanges {
 	private final String className;
-	private final List<MethodComparison> modifiedMethods = new ArrayList<>();
+	private final List<MethodComparison> commonMethods = new ArrayList<>();
 	private final List<MethodNode> lostMethods = new ArrayList<>();
 	private final List<MethodNode> gainedMethods = new ArrayList<>();
 
@@ -45,7 +43,7 @@ public class MethodChanges {
 
 			if (originalMethod != null) {
 				if (patchedMethod != null) {//Both have the method
-					modifiedMethods.add(new MethodComparison(originalMethod, patchedMethod));
+					commonMethods.add(new MethodComparison(originalMethod, patchedMethod));
 				} else {//Just the original has the method
 					lostMethods.add(originalMethod);
 				}
@@ -63,53 +61,119 @@ public class MethodChanges {
 	}
 
 	void sortModifiedMethods(List<MethodNode> patched) {
-		modifiedMethods.sort(Comparator.comparingInt(method -> !"<clinit>".equals(method.node.name) ? patched.indexOf(method.node) : "com/mojang/blaze3d/platform/GLX".equals(className) ? patched.size() : -1));
+		commonMethods.sort(Comparator.comparingInt(method -> !"<clinit>".equals(method.node.name) ? patched.indexOf(method.node) : "com/mojang/blaze3d/platform/GLX".equals(className) ? patched.size() : -1));
 	}
 
 	public boolean couldNeedLambdasFixing() {
-		return modifiedMethods.stream().anyMatch(method -> !method.equal && method.hasLambdas()) && !lostMethods.isEmpty() && !gainedMethods.isEmpty();
+		return commonMethods.stream().anyMatch(method -> !method.equal && method.hasLambdas()) && !lostMethods.isEmpty() && !gainedMethods.isEmpty();
 	}
 
-	public boolean tryFixLambdas(Map<String, String> fixes) {//How do you fix lambdas? With dozens of other lambdas of course
+	public boolean tryFixLambdas(Map<String, String> fixes) {
 		List<MethodNode> gainedLambdas = gainedMethods.stream().filter(method -> (method.access & Opcodes.ACC_SYNTHETIC) != 0 && method.name.startsWith("lambda$")).collect(Collectors.toList());
 		if (gainedLambdas.isEmpty()) return true; //Nothing looks like a lambda
 
-		Set<String> possibleLambdas = gainedLambdas.stream().map(method -> className + '#' + method.name + method.desc).collect(Collectors.toSet()); //The collection of lambdas we're looking to fix, any others are irrelevant from the point of view that they're probably fine
+		Map<String, MethodNode> possibleLambdas = gainedLambdas.stream().collect(Collectors.toMap(method -> method.name.concat(method.desc), Function.identity())); //The collection of lambdas we're looking to fix, any others are irrelevant from the point of view that they're probably fine
+		Map<String, MethodNode> nameToLosses = lostMethods.stream().collect(Collectors.toMap(method -> method.name.concat(method.desc), Function.identity()));
 
-		if (gainedLambdas.size() == lostMethods.size()) {
-			int[] lambdaDemand = modifiedMethods.stream().mapToLong(comparison -> comparison.getLambads().stream().filter(possibleLambdas::contains).count()).filter(count -> count > 0).mapToInt(Math::toIntExact).toArray();
-			Pattern regex = Pattern.compile("lambda\\$(\\w+)\\$(\\d+)");
-			int[] lambdaSupply = gainedLambdas.stream().map(method -> regex.matcher(method.name)).filter(Matcher::matches).sorted(Comparator.comparingInt(matcher -> Integer.parseInt(matcher.group(2)))).collect(Collectors.groupingBy(matcher -> matcher.group(1), LinkedHashMap::new, Collectors.counting())).values().stream().mapToInt(Long::intValue).toArray();
+		for (int i = 0; i < commonMethods.size(); i++) {//Indexed for loop as each added fix will add to commonMethods
+			MethodComparison method = commonMethods.get(i);
 
-			if (Arrays.equals(lambdaDemand, lambdaSupply)) {//The gained lambdas match completely with the lost methods, map directly
-				Streams.forEachPair(lostMethods.stream(), gainedLambdas.stream(), (lost, gained) -> addFix(fixes, gained, lost));
-				gainedMethods.removeAll(gainedLambdas);
-				lostMethods.clear();
-				return true; //Nothing more to do
+			if (method.effectivelyEqual) resolveCloseMethod(method, fixes, nameToLosses, possibleLambdas);
+		}
+
+		for (int i = 0; i < commonMethods.size(); i++) {
+			MethodComparison method = commonMethods.get(i);
+			if (method.effectivelyEqual) continue; //Already handled this method
+
+			List<Lambda> originalLambdas = method.getOriginalLambads();
+			List<Lambda> patchedLambdas = method.getPatchedLambads();
+
+			out: if (originalLambdas.size() == patchedLambdas.size()) {
+				for (Iterator<Lambda> itOriginal = originalLambdas.iterator(), itPatched = patchedLambdas.iterator(); itOriginal.hasNext() && itPatched.hasNext();) {
+					Lambda original = itOriginal.next();
+					Lambda patched = itPatched.next();
+
+					//Check if the lambdas are acting as the same method implementation
+					if (!Objects.equals(original.method, patched.method)) break out;
+				}
+
+				pairUp(originalLambdas, patchedLambdas, fixes, nameToLosses, possibleLambdas, () -> {
+					for (int j = commonMethods.size() - 1; j < commonMethods.size(); j++) {
+						MethodComparison innerMethod = commonMethods.get(j);
+
+						if (innerMethod.effectivelyEqual) resolveCloseMethod(innerMethod, fixes, nameToLosses, possibleLambdas);
+					}
+				});
+
+				continue; //Matched all the lambdas up for method
+			}
+
+			Collector<Lambda, ?, Map<String, Map<String, List<Lambda>>>> lambdaCategorisation = Collectors.groupingBy(lambda -> lambda.desc, Collectors.groupingBy(lambda -> lambda.method));
+			Map<String, Map<String, List<Lambda>>> descToOriginalLambda = originalLambdas.stream().collect(lambdaCategorisation);
+			Map<String, Map<String, List<Lambda>>> descToPatchedLambda = patchedLambdas.stream().collect(lambdaCategorisation);
+
+			Set<String> commonDescs = Sets.intersection(descToOriginalLambda.keySet(), descToPatchedLambda.keySet()); //Unique descriptions that are found in both the lost methods and gained lambdas
+			if (!commonDescs.isEmpty()) {
+				int fixedLambdas = 0;
+
+				for (String desc : commonDescs) {
+					Map<String, List<Lambda>> typeToOriginalLambda = descToOriginalLambda.get(desc);
+					Map<String, List<Lambda>> typeToPatchedLambda = descToPatchedLambda.get(desc);
+
+					for (String type : Sets.intersection(typeToOriginalLambda.keySet(), typeToPatchedLambda.keySet())) {
+						List<Lambda> matchedOriginalLambdas = typeToOriginalLambda.get(type);
+						List<Lambda> matchedPatchedLambdas = typeToPatchedLambda.get(type);
+
+						if (matchedOriginalLambdas.size() == matchedPatchedLambdas.size()) {//Presume if the size is more than one they're in the same order
+							fixedLambdas += matchedOriginalLambdas.size();
+
+							pairUp(matchedOriginalLambdas, matchedPatchedLambdas, fixes, nameToLosses, possibleLambdas, () -> {
+								for (int j = commonMethods.size() - 1; j < commonMethods.size(); j++) {
+									MethodComparison innerMethod = commonMethods.get(j);
+
+									if (innerMethod.effectivelyEqual) resolveCloseMethod(innerMethod, fixes, nameToLosses, possibleLambdas);
+								}
+							});
+						}
+					}
+				}
+
+				if (fixedLambdas == originalLambdas.size()) return true; //Caught all the lambdas
 			}
 		}
 
-		Map<String, MethodNode> newDescToLambda = gainedLambdas.stream().collect(Collectors.groupingBy(lambda -> lambda.desc)).entrySet().stream().filter(entry -> entry.getValue().size() == 1).collect(Collectors.toMap(Entry::getKey, entry -> Iterables.getOnlyElement(entry.getValue())));
-		Map<String, MethodNode> oldDescToMethod = lostMethods.stream().collect(Collectors.groupingBy(lambda -> lambda.desc)).entrySet().stream().filter(entry -> entry.getValue().size() == 1).collect(Collectors.toMap(Entry::getKey, entry -> Iterables.getOnlyElement(entry.getValue())));
+		return possibleLambdas.isEmpty(); //All the lambda-like methods which could be matched up if possibleLambdas is empty
+	}
 
-		Set<String> commonDescs = Sets.intersection(newDescToLambda.keySet(), oldDescToMethod.keySet()); //Unique descriptions that are found in both the lost methods and gained lambdas
-		if (!commonDescs.isEmpty()) {
-			boolean complete = modifiedMethods.stream().flatMap(comparison -> comparison.getLambads().stream().filter(possibleLambdas::contains)).allMatch(lambda -> commonDescs.contains(lambda.substring(lambda.indexOf('('))));
+	private void resolveCloseMethod(MethodComparison method, Map<String, String> fixes, Map<String, MethodNode> nameToLosses, Map<String, MethodNode> possibleLambdas) {
+		assert method.effectivelyEqual;
 
-			Map<MethodNode, MethodNode> lostToGained = newDescToLambda.entrySet().stream().filter(entry -> oldDescToMethod.containsKey(entry.getKey())).collect(Collectors.toMap(entry -> oldDescToMethod.get(entry.getKey()), Entry::getValue));
-			if (lostToGained.containsKey(null)) {//Should find all these
-				throw new IllegalStateException("Unable to find lostMethod from " + newDescToLambda.keySet() + " => " + oldDescToMethod.keySet());
+		if (!method.equal) {
+			if (method.getOriginalLambads().size() != method.getPatchedLambads().size()) {
+				throw new IllegalStateException("Bytecode in " + className + '#' + method.node.name + method.node.desc + " appeared unchanged but lambda count changed?");
 			}
 
-			lostToGained.forEach((lost, gained) -> addFix(fixes, gained, lost));
-			lostMethods.removeAll(lostToGained.keySet());
-			gainedMethods.removeAll(lostToGained.values());
-
-			if (complete) return true; //Caught all the lambdas
-			gainedLambdas.retainAll(gainedMethods);
+			pairUp(method.getOriginalLambads(), method.getPatchedLambads(), fixes, nameToLosses, possibleLambdas, Runnables.doNothing());
+		} else {
+			assert method.getOriginalLambads().stream().filter(lambda -> className.equals(lambda.owner)).map(Lambda::getName).noneMatch(lostMethod -> lostMethods().anyMatch(lostMethod::equals));
+			assert method.getPatchedLambads().stream().filter(lambda -> className.equals(lambda.owner)).map(Lambda::getName).noneMatch(gainedMethod -> gainedLambdas().anyMatch(gainedMethod::equals));
 		}
+	}
 
-		return false; //Still some lambda-like methods which couldn't be matched up
+	private void pairUp(List<Lambda> originalLambdas, List<Lambda> patchedLambdas, Map<String, String> fixes, Map<String, MethodNode> nameToLosses, Map<String, MethodNode> possibleLambdas, Runnable onPair) {
+		Streams.forEachPair(originalLambdas.stream(), patchedLambdas.stream(), (lost, gained) -> {
+			if (!className.equals(lost.owner)) return;
+			assert className.equals(gained.owner);
+
+			MethodNode lostMethod = nameToLosses.remove(lost.getName());
+			MethodNode gainedMethod = possibleLambdas.remove(gained.getName());
+
+			if (addFix(fixes, gainedMethod, lostMethod)) {
+				lostMethods.remove(lostMethod);
+				gainedMethods.remove(gainedMethod);
+				onPair.run();
+			}
+		});
 	}
 
 	private boolean addFix(Map<String, String> fixes, MethodNode from, MethodNode to) {
@@ -121,7 +185,7 @@ public class MethodChanges {
 		fixes.put(className + '#' + from.name + from.desc, className + '#' + to.name + to.desc);
 
 		from.name = to.name; //Apply the rename to the actual method node too
-		modifiedMethods.add(new MethodComparison(to, from));
+		commonMethods.add(new MethodComparison(to, from));
 		return true;
 	}
 
@@ -136,7 +200,7 @@ public class MethodChanges {
 	public void refreshChanges(List<MethodNode> original) {
 		Map<String, MethodNode> originalMethods = original.stream().collect(Collectors.toMap(method -> method.name + method.desc, Function.identity()));
 
-		for (ListIterator<MethodComparison> it = modifiedMethods.listIterator(); it.hasNext();) {
+		for (ListIterator<MethodComparison> it = commonMethods.listIterator(); it.hasNext();) {
 			MethodComparison comparison = it.next();
 
 			MethodNode originalMethod = originalMethods.get(comparison.node.name + comparison.node.desc);
@@ -149,6 +213,6 @@ public class MethodChanges {
 	public void annotate(Annotator annotator) {
 		lostMethods.stream().map(method -> method.name.concat(method.desc)).forEach(annotator::dropMethod);
 		gainedMethods.stream().map(method -> method.name + method.desc).forEach(annotator::addMethod);
-		modifiedMethods.stream().filter(MethodComparison::hasChanged).collect(Collectors.toMap(comparison -> comparison.node.name + comparison.node.desc, MethodComparison::toChangeSet)).forEach(annotator::addChangedMethod);
+		commonMethods.stream().filter(MethodComparison::hasChanged).collect(Collectors.toMap(comparison -> comparison.node.name + comparison.node.desc, MethodComparison::toChangeSet)).forEach(annotator::addChangedMethod);
 	}
 }
