@@ -431,7 +431,12 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 						logger.warn("Using Mojang name for sixth Combat Test, Intermediaries are published as 1_16_combat-0 instead");
 					case "1_16_combat-0": //Combat Test 6
 						//Extracted from https://launcher.mojang.com/experiments/combat/5a8ceec8681ed96ab6ecb9607fb5d19c8a755559/1_16_combat-0.zip
-						url = "https://gist.github.com/Chocohead/b62b1e94d8d4b32ef3326df63cf407f2/raw/139228e3b641866284e111b148d028236f51ddc9/1_16_combat-0.json";
+						url = "https://gist.github.com/Chocohead/b62b1e94d8d4b32ef3326df63cf407f2/raw/139228e3b641866284e111b148d028236f51ddc9/1.16_combat-0.json";
+						break;
+
+					case "1.16_combat-3": //Combat Test 7c
+						//Extracted from https://launcher.mojang.com/experiments/combat/2557b99d95588505e988886220779087d7d6b1e9/1_16_combat-3.zip
+						url = "https://gist.github.com/Chocohead/b62b1e94d8d4b32ef3326df63cf407f2/raw/dea3c65606f9bdb868fa73ab90c61bfcc64bc25d/1.16_combat-3.json";
 						break;
 
 					default:
