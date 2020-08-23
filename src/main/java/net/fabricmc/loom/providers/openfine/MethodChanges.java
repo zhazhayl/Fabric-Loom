@@ -168,6 +168,17 @@ public class MethodChanges {
 			MethodNode lostMethod = nameToLosses.remove(lost.getName());
 			MethodNode gainedMethod = possibleLambdas.remove(gained.getName());
 
+			if (lostMethod == null) {
+				if (gainedMethod == null) {
+					assert Objects.equals(lost.getFullName(), gained.getFullName());
+					return;
+				} else {
+					throw new IllegalStateException("Couldn't find original method for lambda: " + lost.getFullName());
+				}
+			} else if (gainedMethod == null) {
+				throw new IllegalStateException("Couldn't find patched method for lambda: " + gained.getFullName());
+			}
+
 			if (addFix(fixes, gainedMethod, lostMethod)) {
 				lostMethods.remove(lostMethod);
 				gainedMethods.remove(gainedMethod);
