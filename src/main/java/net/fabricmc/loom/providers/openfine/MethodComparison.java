@@ -88,7 +88,7 @@ public class MethodComparison {
 
 		while (a >= 0 && b >= 0) {
 			AbstractInsnNode insnA = listA.get(a);
-			AbstractInsnNode insnB = listB.get(a);
+			AbstractInsnNode insnB = listB.get(b);
 
 			if (!compare(listA, listB, insnA, insnB)) {
 				//Log the lambdas from the current instruction
