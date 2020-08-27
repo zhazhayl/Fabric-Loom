@@ -508,7 +508,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 						for (MethodEntry method : entry.getValue().getLeft()) {
 							EntryTriple[] methodMappings = minecraftProvider.getNeededHeaders().stream().map(method::get).toArray(EntryTriple[]::new);
 
-							if (!Arrays.stream(methodMappings).skip(1).filter(Objects::nonNull).map(EntryTriple::getName).allMatch(Predicate.isEqual(methodMappings[0].getName()))) {
+							if (!Arrays.stream(methodMappings).skip(1).anyMatch(Objects::nonNull)) {
 								Method methodMapping = mapping.method(methodMappings[0]);
 								writer.acceptMethod(className, methodMappings[0].getDesc(), Stream.concat(Arrays.stream(methodMappings).map(nullSafe(EntryTriple::getName)), Stream.of(methodMapping.nameOr(methodMappings[0].getName()))).toArray(String[]::new));
 							}
