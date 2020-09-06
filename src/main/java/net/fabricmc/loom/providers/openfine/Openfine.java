@@ -303,7 +303,7 @@ public class Openfine {
 											String clazz = namedToNotch.get(className);
 											if (clazz != null) {
 												String remap = clazz + '/' + (method ? MemberInstance.getMethodId(name, desc) : MemberInstance.getFieldId(name, desc, false));
-												name = notchToNamed.getOrDefault(remap, remap);
+												name = notchToNamed.getOrDefault(remap, name);
 											} else {
 												logger.warn("Unable to find backwards mapping for ".concat(className));
 											}
