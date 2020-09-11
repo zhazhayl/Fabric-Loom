@@ -30,17 +30,13 @@ import java.util.List;
 
 import com.google.gson.JsonObject;
 
-import org.gradle.api.InvalidUserDataException;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
-import org.gradle.api.artifacts.Dependency;
-import org.gradle.api.artifacts.DependencySet;
 import org.gradle.api.artifacts.ExternalModuleDependency;
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
 import org.gradle.api.plugins.JavaPlugin;
 
 import net.fabricmc.loom.LoomGradleExtension;
-import net.fabricmc.loom.dependencies.PhysicalDependencyProvider.DependencyInfo;
 import net.fabricmc.loom.util.Constants;
 
 public class LoomDependencyManager {
@@ -97,38 +93,10 @@ public class LoomDependencyManager {
 		List<Runnable> afterTasks = new ArrayList<>();
 
 		for (DependencyProvider provider : graph.asIterable()) {
-			if (provider instanceof PhysicalDependencyProvider) {
-				PhysicalDependencyProvider physicalProvider = (PhysicalDependencyProvider) provider;
-
-				Configuration configuration = project.getConfigurations().getByName(physicalProvider.getTargetConfig());
-				DependencySet dependencies = configuration.getDependencies();
-
-				if (physicalProvider.isRequired() && dependencies.size() < 1) {
-					throw new InvalidUserDataException("Missing dependency for " + configuration.getName() + " configuration");
-				}
-
-				if (physicalProvider.isUnique() && dependencies.size() > 1) {
-					throw new InvalidUserDataException("Duplicate dependencies for " + configuration.getName() + " configuration");
-				}
-
-				for (Dependency dependency : dependencies) {
-					DependencyInfo info = DependencyInfo.create(project, dependency, configuration);
-
-					try {
-						physicalProvider.provide(info, project, extension, afterTasks::add);
-					} catch (Throwable t) {
-						throw new RuntimeException(String.format("%s failed to provide %s:%s:%s for %s", provider.getClass(),
-									dependency.getGroup(), dependency.getName(), dependency.getVersion(), physicalProvider.getTargetConfig()), t);
-					}
-				}
-			} else if (provider instanceof LogicalDependencyProvider) {
-				try {
-					((LogicalDependencyProvider) provider).provide(project, extension, afterTasks::add);
-				} catch (Throwable t) {
-					throw new RuntimeException("Failed to provide logical dependency of type " + provider.getClass(), t);
-				}
-			} else {
-				throw new IllegalStateException("Unexpected dependency provider type for " + provider + ": " + provider.getClass());
+			try {
+				provider.provide(project, extension, afterTasks::add);
+			} catch (Throwable t) {
+				throw new RuntimeException("Failed to provide " + provider.getType() + " dependency of type " + provider.getClass(), t);
 			}
 
 			graph.markComplete(provider);
