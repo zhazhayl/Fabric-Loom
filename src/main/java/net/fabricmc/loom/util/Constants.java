@@ -41,12 +41,13 @@ public class Constants {
 
 	public static final String MOD_COMPILE_CLASSPATH = "modCompileClasspath";
 	public static final String MOD_COMPILE_CLASSPATH_MAPPED = "modCompileClasspathMapped";
+	public static final RemappedConfigurationEntry MOD_COMPILE, MOD_API, MOD_IMPLEMENTATION, MOD_RUNTIME, MOD_COMPILE_ONLY;
 	public static final List<RemappedConfigurationEntry> MOD_COMPILE_ENTRIES = ImmutableList.of(
-			new RemappedConfigurationEntry("modCompile", "compile", true, "compile"),
-			new RemappedConfigurationEntry("modApi", "api", true, "compile"),
-			new RemappedConfigurationEntry("modImplementation", "implementation", true, "runtime"),
-			new RemappedConfigurationEntry("modRuntime", "runtimeOnly", false, ""),
-			new RemappedConfigurationEntry("modCompileOnly", "compileOnly", true, "")
+			MOD_COMPILE = new RemappedConfigurationEntry("modCompile", "compile", true, "compile"),
+			MOD_API = new RemappedConfigurationEntry("modApi", "api", true, "compile"),
+			MOD_IMPLEMENTATION = new RemappedConfigurationEntry("modImplementation", "implementation", true, "runtime"),
+			MOD_RUNTIME = new RemappedConfigurationEntry("modRuntime", "runtimeOnly", false, ""),
+			MOD_COMPILE_ONLY = new RemappedConfigurationEntry("modCompileOnly", "compileOnly", true, "")
 	);
 
 	public static final String INCLUDE = "include";

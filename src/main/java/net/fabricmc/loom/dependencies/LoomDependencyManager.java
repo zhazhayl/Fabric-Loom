@@ -25,15 +25,23 @@
 package net.fabricmc.loom.dependencies;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.jar.JarFile;
+import java.util.zip.ZipEntry;
 
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.ExternalModuleDependency;
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
+import org.gradle.api.logging.Logger;
 import org.gradle.api.plugins.JavaPlugin;
 
 import net.fabricmc.loom.LoomGradleExtension;
@@ -108,7 +116,7 @@ public class LoomDependencyManager {
 			Configuration configuration = project.getConfigurations().getByName(Constants.MOD_COMPILE_CLASSPATH);
 
 			for (File input : configuration.resolve()) {
-				JsonObject jsonObject = ModProcessor.readInstallerJson(input, project);
+				JsonObject jsonObject = findInstallerJson(project.getLogger(), input, extension.getLoaderLaunchMethod());
 
 				if (jsonObject != null) {
 					if (extension.getInstallerJson() != null) {
@@ -131,6 +139,36 @@ public class LoomDependencyManager {
 		for (Runnable runnable : afterTasks) {
 			runnable.run();
 		}
+	}
+
+	private static JsonObject findInstallerJson(Logger logger, File file, String launchMethod) {
+		try (JarFile jarFile = new JarFile(file)) {
+			ZipEntry entry = null;
+
+			if (!launchMethod.isEmpty()) {
+				entry = jarFile.getEntry("fabric-installer." + launchMethod + ".json");
+
+				if (entry == null) {
+					logger.warn("Could not find loader launch method '{}', falling back", launchMethod);
+				}
+			}
+
+			if (entry == null) {
+				entry = jarFile.getEntry("fabric-installer.json");
+
+				if (entry == null) {
+					return null;
+				}
+			}
+
+			try (Reader reader = new InputStreamReader(jarFile.getInputStream(entry), StandardCharsets.UTF_8)) {
+				return new JsonParser().parse(reader).getAsJsonObject();
+			}
+		} catch (IOException e) {
+			logger.warn("Error finding installer JSON in {}", file.getPath(), e);
+		}
+
+		return null;
 	}
 
 	private static void handleInstallerJson(JsonObject jsonObject, Project project) {

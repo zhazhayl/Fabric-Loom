@@ -58,7 +58,7 @@ import org.gradle.plugins.ide.idea.model.IdeaModel;
 import net.fabricmc.loom.dependencies.LoomDependencyManager;
 import net.fabricmc.loom.dependencies.RemappedConfigurationEntry;
 import net.fabricmc.loom.providers.LaunchProvider;
-import net.fabricmc.loom.providers.MappedModsProvider;
+import net.fabricmc.loom.providers.MappedModsCollectors;
 import net.fabricmc.loom.providers.MinecraftMappedProvider;
 import net.fabricmc.loom.providers.MinecraftProvider;
 import net.fabricmc.loom.providers.StackedMappingsProvider;
@@ -317,7 +317,7 @@ public class AbstractPlugin implements Plugin<Project> {
 			dependencyManager.addProvider(new MinecraftProvider());
 			dependencyManager.addProvider(new StackedMappingsProvider());
 			dependencyManager.addProvider(new MinecraftMappedProvider());
-			dependencyManager.addProvider(new MappedModsProvider());
+			MappedModsCollectors.addAll(dependencyManager);
 			dependencyManager.addProvider(new LaunchProvider());
 
 			dependencyManager.handleDependencies(project);

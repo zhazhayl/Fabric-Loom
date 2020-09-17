@@ -45,7 +45,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.gson.JsonObject;
 
-import org.cadixdev.lorenz.MappingSet;
 import org.cadixdev.mercury.Mercury;
 
 import org.gradle.api.Project;
@@ -142,12 +141,7 @@ public class LoomGradleExtension {
 	private final Project project;
 	private LoomDependencyManager dependencyManager;
 	private JsonObject installerJson;
-	private MappingSet[] srcMappingCache = new MappingSet[2];
 	private Mercury[] srcMercuryCache = new Mercury[2];
-
-	public MappingSet getOrCreateSrcMappingCache(int id, Supplier<MappingSet> factory) {
-		return srcMappingCache[id] != null ? srcMappingCache[id] : (srcMappingCache[id] = factory.get());
-	}
 
 	public Mercury getOrCreateSrcMercuryCache(int id, Supplier<Mercury> factory) {
 		return srcMercuryCache[id] != null ? srcMercuryCache[id] : (srcMercuryCache[id] = factory.get());
