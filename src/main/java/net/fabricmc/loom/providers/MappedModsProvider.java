@@ -196,8 +196,10 @@ public class MappedModsProvider extends LogicalDependencyProvider {
 
 			TinyRemapper bonusRemapper = null;
 			if (sourcesExist) {
-				bonusRemapper = remapper.cloner().renameInvalidLocals(true).build();
-				closer.register(bonusRemapper::finish);
+				if (!unsourcedMods.isEmpty()) {
+					bonusRemapper = remapper.cloner().renameInvalidLocals(true).build();
+					closer.register(bonusRemapper::finish);
+				}
 			} else {
 				bonusRemapper = remapper;
 				remapper = null;
