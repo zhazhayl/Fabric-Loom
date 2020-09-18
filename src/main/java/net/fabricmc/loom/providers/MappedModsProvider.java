@@ -97,7 +97,7 @@ public class MappedModsProvider extends LogicalDependencyProvider {
 
 		final String fromM = "intermediary";
 		final String toM = "named";
-		logger.lifecycle(":remapping {} mods (TinyRemapper, " + fromM + " -> " + toM + ')', sourced.size() + unsourced.size());
+		logger.lifecycle(":remapping {} mod(s) (TinyRemapper, " + fromM + " -> " + toM + ')', sourced.size() + unsourced.size());
 
 		// If the sources don't exist, we want remapper to give nicer names to the missing variable names.
 		// However, if the sources do exist, if remapper gives names to the parameters that prevents IDEs (at least IDEA)
