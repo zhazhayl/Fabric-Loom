@@ -25,6 +25,8 @@
 package net.fabricmc.loom;
 
 import java.io.File;
+import java.net.URI;
+import java.net.URL;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -64,6 +66,7 @@ import net.fabricmc.loom.providers.MappingsProvider;
 import net.fabricmc.loom.providers.MinecraftMappedProvider;
 import net.fabricmc.loom.providers.MinecraftProvider;
 import net.fabricmc.loom.util.Constants;
+import net.fabricmc.loom.util.TinyRemapperMappingsHelper.LocalNameSuggestor;
 import net.fabricmc.stitch.commands.CommandProposeFieldNames.NameAcceptor;
 
 public class LoomGradleExtension {
@@ -133,6 +136,7 @@ public class LoomGradleExtension {
 	private JarMergeOrder mergeOrder = JarMergeOrder.INDIFFERENT;
 	private boolean bulldozeMappings;
 	private NameAcceptor fieldInferenceFilter = (inputMapping, originalName, replacementName) -> originalName.startsWith("field_");
+	private final List<LocalNameSuggestor> nameSuggestors = new ArrayList<>();
 	private File atFile;
 	private File optifine;
 	private List<Path> unmappedModsBuilt = new ArrayList<>();
@@ -149,6 +153,10 @@ public class LoomGradleExtension {
 
 	public LoomGradleExtension(Project project) {
 		this.project = project;
+
+		//Common Java types which get silly local names from the capitalisation by default
+		addLocalName(URL.class.getName(), "url");
+		addLocalName(URI.class.getName(), "uri");
 	}
 
 	public void addUnmappedMod(Path file) {
@@ -441,6 +449,24 @@ public class LoomGradleExtension {
 
 	public NameAcceptor getFieldInferenceFilter() {
 		return fieldInferenceFilter;
+	}
+
+	public void addLocalName(String typeName, String localName) {
+		addLocalName(typeName, localName, localName + 's');
+	}
+
+	public void addLocalName(String typeName, String localName, String pluralLocalName) {
+		String internalType = Objects.requireNonNull(typeName, "Passed in a null type").replace('.', '/');
+
+		addLocalNamer((type, plural) -> internalType.equals(type) ? plural ? pluralLocalName : localName : null);
+	}
+
+	public void addLocalNamer(LocalNameSuggestor suggestor) {
+		nameSuggestors.add(suggestor);
+	}
+
+	public List<LocalNameSuggestor> getLocalSuggestors() {
+		return Collections.unmodifiableList(nameSuggestors);
 	}
 
 	public void setAT(Object file) {

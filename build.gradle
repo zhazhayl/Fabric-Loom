@@ -59,7 +59,7 @@ dependencies {
 	}
 
 	// tinyfile management
-	implementation ('com.github.Chocohead:tiny-remapper:b933155') {
+	implementation ('com.github.Chocohead:tiny-remapper:0c3dfd1') {
 		transitive = false
 	}
 	implementation 'cuchaz:enigma:0.15.3+build.170:lib'

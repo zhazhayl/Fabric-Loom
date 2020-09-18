@@ -105,7 +105,7 @@ public class MappedModsProvider extends LogicalDependencyProvider {
 		boolean sourcesExist = !sourced.isEmpty();
 
 		TinyRemapper remapper = TinyRemapper.newRemapper()
-						.withMappings(TinyRemapperMappingsHelper.create(mappingsProvider.getMappings(), fromM, toM, false))
+						.withMappings(TinyRemapperMappingsHelper.create(extension, mappingsProvider.getMappings(), fromM, toM))
 						.ignoreConflicts(extension.shouldBulldozeMappings())
 						.renameInvalidLocals(!sourcesExist)
 						.build();

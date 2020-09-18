@@ -625,7 +625,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 			}
 
 			mcRemappingFactory = (fromM, toM) -> new IMappingProvider() {
-				private final IMappingProvider normal = TinyRemapperMappingsHelper.create(getMappings(), fromM, toM, false);
+				private final IMappingProvider normal = TinyRemapperMappingsHelper.create(extension, getMappings(), fromM, toM);
 
 				@Override
 				public void load(Map<String, String> classMap, Map<String, String> fieldMap, Map<String, String> methodMap, Map<String, String[]> localMap) {
@@ -639,9 +639,14 @@ public class MappingsProvider extends LogicalDependencyProvider {
 				public void load(Map<String, String> classMap, Map<String, String> fieldMap, Map<String, String> methodMap) {
 					normal.load(classMap, fieldMap, methodMap);
 				}
+
+				@Override
+				public String suggestLocalName(String type, boolean plural) {
+					return normal.suggestLocalName(type, plural);
+				}
 			};
 		} else {
-			mcRemappingFactory = (fromM, toM) -> TinyRemapperMappingsHelper.create(getMappings(), fromM, toM, false);
+			mcRemappingFactory = (fromM, toM) -> TinyRemapperMappingsHelper.create(extension, getMappings(), fromM, toM);
 		}
 
 		File mappingJar;
