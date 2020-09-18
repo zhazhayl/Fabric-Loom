@@ -145,6 +145,7 @@ public class LoomGradleExtension {
 	//Not to be set in the build.gradle
 	private final Project project;
 	private LoomDependencyManager dependencyManager;
+	private boolean parallelLoad = true;
 	private JsonObject installerJson;
 	private Mercury[] srcMercuryCache = new Mercury[2];
 
@@ -379,6 +380,14 @@ public class LoomGradleExtension {
 
 	public String getLoaderLaunchMethod() {
 		return loaderLaunchMethod != null ? loaderLaunchMethod : "";
+	}
+
+	public void setParallelLoad(boolean inParallel) {
+		parallelLoad = inParallel;
+	}
+
+	public boolean shouldLoadInParallel() {
+		return parallelLoad;
 	}
 
 	public LoomDependencyManager getDependencyManager() {

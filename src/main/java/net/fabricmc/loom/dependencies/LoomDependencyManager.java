@@ -31,6 +31,7 @@ import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ForkJoinPool;
 import java.util.jar.JarFile;
 import java.util.zip.ZipEntry;
 
@@ -100,14 +101,34 @@ public class LoomDependencyManager {
 		DependencyGraph graph = new DependencyGraph(dependencyProviderList);
 		List<Runnable> afterTasks = new ArrayList<>();
 
-		for (DependencyProvider provider : graph.asIterable()) {
+		if (extension.shouldLoadInParallel()) {
 			try {
-				provider.provide(project, extension, afterTasks::add);
-			} catch (Throwable t) {
-				throw new RuntimeException("Failed to provide " + provider.getType() + " dependency of type " + provider.getClass(), t);
-			}
+				while (graph.waitForWork()) {
+					for (DependencyProvider provider : graph.allAvailable()) {
+						ForkJoinPool.commonPool().execute(() -> {
+							try {
+								provider.provide(project, extension, afterTasks::add);
+							} catch (Throwable t) {
+								throw new RuntimeException("Failed to provide " + provider.getType() + " dependency of type " + provider.getClass(), t);
+							}
 
-			graph.markComplete(provider);
+							graph.markComplete(provider);
+						});
+					}
+				}
+			} catch (InterruptedException e) {
+				throw new RuntimeException("Unexpected halt to processing dependencies", e);
+			}
+		} else {
+			for (DependencyProvider provider : graph.asIterable()) {
+				try {
+					provider.provide(project, extension, afterTasks::add);
+				} catch (Throwable t) {
+					throw new RuntimeException("Failed to provide " + provider.getType() + " dependency of type " + provider.getClass(), t);
+				}
+
+				graph.markComplete(provider);
+			}
 		}
 
 		if (extension.getInstallerJson() == null) {
