@@ -137,6 +137,7 @@ public class LoomGradleExtension {
 	private boolean bulldozeMappings;
 	private NameAcceptor fieldInferenceFilter = (inputMapping, originalName, replacementName) -> originalName.startsWith("field_");
 	private final List<LocalNameSuggestor> nameSuggestors = new ArrayList<>();
+	private final Map<String, String> tokens = new HashMap<>();
 	private File atFile;
 	private File optifine;
 	private List<Path> unmappedModsBuilt = new ArrayList<>();
@@ -468,6 +469,32 @@ public class LoomGradleExtension {
 	public List<LocalNameSuggestor> getLocalSuggestors() {
 		return Collections.unmodifiableList(nameSuggestors);
 	}
+
+	public void token(CharSequence name) {
+        token(name, "true");
+    }
+
+    public void token(CharSequence name, CharSequence value) {
+    	String cleanName = name.toString().trim();
+    	if (cleanName.indexOf(';') >= 0) throw new IllegalArgumentException("Token name cannot contain ;");
+
+    	String cleanValue = value.toString().trim();
+    	if (cleanValue.indexOf(';') >= 0) throw new IllegalArgumentException("Token value cannot contain ;");
+
+        tokens.put(cleanName, cleanValue);
+    }
+
+    public void tokens(Map<CharSequence, CharSequence> tokens) {
+    	tokens.forEach(this::token);
+    }
+
+    public boolean hasTokens() {
+    	return !tokens.isEmpty();
+    }
+
+    public Map<String, String> getTokens() {
+    	return Collections.unmodifiableMap(tokens);
+    }
 
 	public void setAT(Object file) {
 		atFile = project.file(file);

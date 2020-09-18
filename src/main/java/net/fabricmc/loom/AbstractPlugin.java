@@ -295,6 +295,19 @@ public class AbstractPlugin implements Plugin<Project> {
 					arg.append(Character.toTitleCase(to.charAt(0))).append(to.substring(1));
 					javaCompileTask.getOptions().getCompilerArgs().add(arg.append('=').append(mappingFile.toAbsolutePath()).toString());
 				});
+
+				javaCompileTask.doFirst(task -> {
+					if (extension.hasTokens()) {
+						StringBuilder arg = new StringBuilder("-Atokens=");
+
+						for (Entry<String, String> entry : extension.getTokens().entrySet()) {
+							arg.append(entry.getKey()).append('=').append(entry.getValue()).append(';');
+						}
+
+						task.getLogger().info("Appending {} Mixin tokens", extension.getTokens().size());
+						javaCompileTask.getOptions().getCompilerArgs().add(arg.substring(0, arg.length() - 1));
+					}
+				});
 			}
 		});
 
