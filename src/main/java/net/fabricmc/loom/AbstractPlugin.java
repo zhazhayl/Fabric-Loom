@@ -210,7 +210,7 @@ public class AbstractPlugin implements Plugin<Project> {
 				javaCompileTask.getExtensions().create("mappings", MappingContainer.class, (Object) null);
 				javaCompileTask.doFirst(task -> {
 					MappingContainer extraMappings = task.getExtensions().getByType(MappingContainer.class);
-					if (!extraMappings.isEmpty()) return; //Nothing to do
+					if (extraMappings.isEmpty()) return; //Nothing to do
 
 					Path mappingFile;
 					try {
