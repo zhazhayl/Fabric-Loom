@@ -66,6 +66,7 @@ import net.fabricmc.loom.providers.MappingsProvider;
 import net.fabricmc.loom.providers.MinecraftMappedProvider;
 import net.fabricmc.loom.providers.MinecraftProvider;
 import net.fabricmc.loom.util.Constants;
+import net.fabricmc.loom.util.GradleSupport;
 import net.fabricmc.loom.util.TinyRemapperMappingsHelper.LocalNameSuggestor;
 import net.fabricmc.stitch.commands.CommandProposeFieldNames.NameAcceptor;
 
@@ -145,7 +146,7 @@ public class LoomGradleExtension {
 	//Not to be set in the build.gradle
 	private final Project project;
 	private LoomDependencyManager dependencyManager;
-	private boolean parallelLoad = true;
+	private boolean parallelLoad;
 	private JsonObject installerJson;
 	private Mercury[] srcMercuryCache = new Mercury[2];
 
@@ -159,6 +160,10 @@ public class LoomGradleExtension {
 		//Common Java types which get silly local names from the capitalisation by default
 		addLocalName(URL.class.getName(), "url");
 		addLocalName(URI.class.getName(), "uri");
+
+		//Gradle 6 tightens the rules for resolving configurations off thread (by not allowing it at all)
+		//There are ways around it, but said ways need implementing within LoomDependencyManager
+		parallelLoad = GradleSupport.majorGradleVersion(project) < 6;
 	}
 
 	public void addUnmappedMod(Path file) {
