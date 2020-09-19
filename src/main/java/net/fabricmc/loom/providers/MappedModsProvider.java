@@ -108,6 +108,7 @@ public class MappedModsProvider extends LogicalDependencyProvider {
 						.withMappings(TinyRemapperMappingsHelper.create(extension, mappingsProvider.getMappings(), fromM, toM))
 						.ignoreConflicts(extension.shouldBulldozeMappings())
 						.renameInvalidLocals(!sourcesExist)
+						.keepInputData(sourcesExist && !unsourced.isEmpty()) //Retain the class data if the second remapper will use it too
 						.build();
 
 		try (Closer closer = Closer.create((sourcesExist ? !unsourced.isEmpty() ? sourced.size() + 1 + unsourced.size() : sourced.size() : unsourced.size()) + 1)) {
