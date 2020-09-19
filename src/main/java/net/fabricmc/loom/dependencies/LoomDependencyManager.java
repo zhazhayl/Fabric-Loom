@@ -31,10 +31,14 @@ import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.jar.JarFile;
 import java.util.zip.ZipEntry;
 
+import com.google.common.base.Throwables;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -102,22 +106,64 @@ public class LoomDependencyManager {
 		List<Runnable> afterTasks = new ArrayList<>();
 
 		if (extension.shouldLoadInParallel()) {
+			List<CompletableFuture<?>> tasks = new ArrayList<>();
+			AtomicBoolean didBreak = new AtomicBoolean();
+
 			try {
-				while (graph.waitForWork()) {
+				while (graph.waitForWork() && !didBreak.get()) {
 					for (DependencyProvider provider : graph.allAvailable()) {
-						ForkJoinPool.commonPool().execute(() -> {
+						tasks.add(CompletableFuture.runAsync(() -> {
 							try {
 								provider.provide(project, extension, afterTasks::add);
 							} catch (Throwable t) {
 								throw new RuntimeException("Failed to provide " + provider.getType() + " dependency of type " + provider.getClass(), t);
 							}
+						}).whenComplete((success, exception) -> {
+							if (exception == null) {
+								graph.markComplete(provider);
+							} else {
+								didBreak.set(true);
 
-							graph.markComplete(provider);
-						});
+								synchronized (graph) {
+									graph.notifyAll();
+								}
+							}
+						}));
 					}
 				}
 			} catch (InterruptedException e) {
 				throw new RuntimeException("Unexpected halt to processing dependencies", e);
+			}
+
+			if (didBreak.get()) {//Bailed early, time to unpack the exceptions
+				Throwable thrown = null;
+
+				for (CompletableFuture<?> task : tasks) {
+					try {
+						task.join();
+					} catch (CancellationException e) {
+						//Well it didn't strictly go wrong if cancelled
+					} catch (CompletionException e) {
+						if (thrown == null) {
+							thrown = e.getCause();
+						} else {
+							thrown.addSuppressed(e.getCause());
+						}
+					} catch (Throwable t) {
+						if (thrown == null) {
+							thrown = t;
+						} else {
+							thrown.addSuppressed(t);
+						}
+					}
+				}
+
+				if (thrown == null) {
+					throw new IllegalStateException("Error processing dependencies, unable to find cause");
+				} else {
+					Throwables.throwIfUnchecked(thrown);
+					throw new RuntimeException("Error processing dependencies", thrown);
+				}
 			}
 		} else {
 			for (DependencyProvider provider : graph.asIterable()) {
