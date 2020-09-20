@@ -107,6 +107,8 @@ public class Openfine {
 		} catch (ReflectiveOperationException e) {
 			throw new RuntimeException("Error running OptiFine installer", e);
 		}
+
+		System.gc(); //The OptiFine installer leaks a ZipFile of the client jar, try to clean the reference back up
 	}
 
 	private static void merge(Logger logger, File client, File optifine, File server, File to) throws IOException {
