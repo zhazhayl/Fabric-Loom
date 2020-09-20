@@ -134,7 +134,7 @@ public class MappedModsProvider extends LogicalDependencyProvider {
 
 				public OutputConsumerPath startRemapping(TinyRemapper remapper) throws IOException {
 					if (outputConsumer != null) throw new IllegalStateException("Already started remapping");
-					OutputConsumerPath outputConsumer = new OutputConsumerPath(output.toPath());
+					outputConsumer = new OutputConsumerPath(output.toPath());
 
 					outputConsumer.addNonClassFiles(input.toPath());
 					remapper.apply(outputConsumer, tag);
