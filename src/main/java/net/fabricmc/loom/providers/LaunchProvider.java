@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,8 +38,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Streams;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -60,11 +64,14 @@ public class LaunchProvider extends LogicalDependencyProvider {
 
 	@Override
 	public void provide(Project project, LoomGradleExtension extension, Consumer<Runnable> postPopulationScheduler) throws IOException {
+		File remapClasspath = new File(extension.getDevLauncherConfig().getParentFile(), "remapClasspath.txt");
+
 		File log4jConfig = new File(extension.getDevLauncherConfig().getParentFile(), "log4j.xml");
 		writeLog4jConfig("log4j2.fabric.xml", log4jConfig);
 
 		final LaunchConfig launchConfig = new LaunchConfig()
 				.property("fabric.development", "true")
+				.property("fabric.remapClasspathFile", remapClasspath.getAbsolutePath())
 				.property("log4j.configurationFile", log4jConfig.getAbsolutePath())
 
 				.argument("client", "--assetIndex")
@@ -86,6 +93,20 @@ public class LaunchProvider extends LogicalDependencyProvider {
 
 		addDependency("net.fabricmc:dev-launch-injector:" + Constants.DEV_LAUNCH_INJECTOR_VERSION, project, JavaPlugin.RUNTIME_ONLY_CONFIGURATION_NAME);
 		addDependency("net.minecrell:terminalconsoleappender:" + Constants.TERMINAL_CONSOLE_APPENDER_VERSION, project, JavaPlugin.RUNTIME_ONLY_CONFIGURATION_NAME);
+
+		postPopulationScheduler.accept(() -> {
+			MinecraftMappedProvider mappedProvider = getProvider(MinecraftMappedProvider.class);
+			String classpath = Streams.concat(Stream.of(mappedProvider.getIntermediaryJar()), mappedProvider.getMapperPaths().stream(),
+									getProvider(MappedModsProvider.class).getClasspath().stream()).map(File::getAbsolutePath).collect(Collectors.joining(File.pathSeparator));
+
+			try {
+				if (remapClasspath.exists() && classpath.equals(FileUtils.readFileToString(remapClasspath, StandardCharsets.UTF_8))) return;
+
+				FileUtils.writeStringToFile(remapClasspath, classpath, StandardCharsets.UTF_8);
+			} catch (IOException e) {
+				throw new UncheckedIOException("Failed to generate remap classpath", e);
+			}
+		});
 	}
 
 	private static void writeLog4jConfig(String xml, File log4jConfig) throws IOException {

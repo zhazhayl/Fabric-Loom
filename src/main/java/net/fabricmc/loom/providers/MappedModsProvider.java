@@ -256,4 +256,8 @@ public class MappedModsProvider extends LogicalDependencyProvider {
 			});
 		}
 	}
+
+	public Set<File> getClasspath() {
+		return ImmutableSet.<File>builder().addAll(extraClasspath).addAll(sourced.keySet()).addAll(unsourced.keySet()).build();
+	}
 }
