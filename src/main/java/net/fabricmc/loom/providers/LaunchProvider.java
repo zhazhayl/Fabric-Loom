@@ -25,9 +25,12 @@
 package net.fabricmc.loom.providers;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,10 +38,13 @@ import java.util.Set;
 import java.util.StringJoiner;
 import java.util.function.Consumer;
 
-import org.apache.commons.io.FileUtils;
-import org.gradle.api.Project;
-
 import com.google.common.collect.ImmutableSet;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
+
+import org.gradle.api.Project;
+import org.gradle.api.plugins.JavaPlugin;
 
 import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.dependencies.DependencyProvider;
@@ -54,8 +60,12 @@ public class LaunchProvider extends LogicalDependencyProvider {
 
 	@Override
 	public void provide(Project project, LoomGradleExtension extension, Consumer<Runnable> postPopulationScheduler) throws IOException {
+		File log4jConfig = new File(extension.getDevLauncherConfig().getParentFile(), "log4j.xml");
+		writeLog4jConfig("log4j2.fabric.xml", log4jConfig);
+
 		final LaunchConfig launchConfig = new LaunchConfig()
 				.property("fabric.development", "true")
+				.property("log4j.configurationFile", log4jConfig.getAbsolutePath())
 
 				.argument("client", "--assetIndex")
 				.argument("client", extension.getMinecraftProvider().getAssetIndex().getFabricId(extension.getMinecraftProvider().minecraftVersion))
@@ -67,9 +77,27 @@ public class LaunchProvider extends LogicalDependencyProvider {
 						.property("client", "org.lwjgl.librarypath", extension.getNativesDirectory().getAbsolutePath());
 		}
 
+		//Enable ansi by default for idea and vscode
+		if (Arrays.stream(project.getRootDir().listFiles()).map(File::getName).anyMatch(file -> ".vscode".equals(file) || ".idea".equals(file) || file.endsWith(".iws"))) {
+			launchConfig.property("fabric.log.disableAnsi", "false");
+		}
+
 		FileUtils.writeStringToFile(extension.getDevLauncherConfig(), launchConfig.asString(), StandardCharsets.UTF_8);
 
-		addDependency("net.fabricmc:dev-launch-injector:" + Constants.DEV_LAUNCH_INJECTOR_VERSION, project, "runtimeOnly");
+		addDependency("net.fabricmc:dev-launch-injector:" + Constants.DEV_LAUNCH_INJECTOR_VERSION, project, JavaPlugin.RUNTIME_ONLY_CONFIGURATION_NAME);
+		addDependency("net.minecrell:terminalconsoleappender:" + Constants.TERMINAL_CONSOLE_APPENDER_VERSION, project, JavaPlugin.RUNTIME_ONLY_CONFIGURATION_NAME);
+	}
+
+	private static void writeLog4jConfig(String xml, File log4jConfig) throws IOException {
+		if (log4jConfig.exists()) {
+			try (InputStream expected = LaunchProvider.class.getResourceAsStream(xml); InputStream actual = new FileInputStream(log4jConfig)) {
+				if (IOUtils.contentEquals(expected, actual)) return;
+			}
+		}
+
+		try (InputStream config = LaunchProvider.class.getResourceAsStream(xml)) {
+			FileUtils.copyToFile(config, log4jConfig);
+		}
 	}
 
 	public static class LaunchConfig {

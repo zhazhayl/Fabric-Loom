@@ -62,4 +62,5 @@ public class Constants {
 
 	public static final String MIXIN_COMPILE_EXTENSIONS_VERSION = "0.3.2.6";
 	public static final String DEV_LAUNCH_INJECTOR_VERSION = "0.2.1+build.8";
+	public static final String TERMINAL_CONSOLE_APPENDER_VERSION = "1.2.0";
 }
