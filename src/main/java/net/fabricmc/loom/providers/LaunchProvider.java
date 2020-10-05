@@ -67,7 +67,7 @@ public class LaunchProvider extends LogicalDependencyProvider {
 		File remapClasspath = new File(extension.getDevLauncherConfig().getParentFile(), "remapClasspath.txt");
 
 		File log4jConfig = new File(extension.getDevLauncherConfig().getParentFile(), "log4j.xml");
-		writeLog4jConfig("log4j2.fabric.xml", log4jConfig);
+		writeLog4jConfig("/log4j2.fabric.xml", log4jConfig);
 
 		final LaunchConfig launchConfig = new LaunchConfig()
 				.property("fabric.development", "true")
