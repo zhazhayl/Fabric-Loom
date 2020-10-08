@@ -200,6 +200,10 @@ public class NestedJars {
 		jsonObject.addProperty("version", dependency.getVersion());
 		jsonObject.addProperty("name", dependency.getName());
 
+		JsonObject custom = new JsonObject();
+		custom.addProperty("fabric-loom:generated", true);
+		jsonObject.add("custom", custom);
+
 		return GSON.toJson(jsonObject);
 	}
 
