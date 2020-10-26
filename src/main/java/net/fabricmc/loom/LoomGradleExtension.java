@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -53,6 +54,7 @@ import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.ConfigurationContainer;
+import org.gradle.api.artifacts.Dependency;
 import org.gradle.api.artifacts.ModuleVersionIdentifier;
 import org.gradle.api.artifacts.ResolvedArtifact;
 import org.gradle.api.file.FileCollection;
@@ -141,7 +143,8 @@ public class LoomGradleExtension {
 	private final Map<String, String> tokens = new HashMap<>();
 	private File atFile;
 	private File optifine;
-	private List<Path> unmappedModsBuilt = new ArrayList<>();
+	private final List<Path> unmappedModsBuilt = new ArrayList<>();
+	private final List<BiConsumer<Dependency, JsonObject>> includeTweakers = new ArrayList<>();
 
 	//Not to be set in the build.gradle
 	private final Project project;
@@ -532,5 +535,13 @@ public class LoomGradleExtension {
 
 	public File getOptiFine() {
 		return optifine;
+	}
+
+	public void addIncludeTweaker(BiConsumer<Dependency, JsonObject> action) {
+		includeTweakers.add(action);
+	}
+
+	public List<BiConsumer<Dependency, JsonObject>> getIncludeTweakers() {
+		return Collections.unmodifiableList(includeTweakers);
 	}
 }

@@ -32,6 +32,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.zip.ZipEntry;
 
 import com.google.gson.Gson;
@@ -69,7 +70,7 @@ public class NestedJars {
 
 		ZipUtil.addOrReplaceEntries(modJar, containedJars.stream().map(file -> new FileSource("META-INF/jars/" + file.getName(), file)).toArray(ZipEntrySource[]::new));
 
-		return ZipUtil.transformEntries(modJar, single(new ZipEntryTransformerEntry("fabric.mod.json", new StringZipEntryTransformer() {
+		return ZipUtil.transformEntry(modJar, new ZipEntryTransformerEntry("fabric.mod.json", new StringZipEntryTransformer() {
 			@Override
 			protected String transform(ZipEntry zipEntry, String input) throws IOException {
 				JsonObject json = GSON.fromJson(input, JsonObject.class);
@@ -89,7 +90,7 @@ public class NestedJars {
 
 				return GSON.toJson(json);
 			}
-		})));
+		}));
 	}
 
 	private static List<File> getContainedJars(Project project) {
@@ -181,7 +182,7 @@ public class NestedJars {
 					throw new RuntimeException("Failed to copy file", e);
 				}
 
-				ZipUtil.addEntry(tempFile, "fabric.mod.json", getMod(dependency).getBytes());
+				ZipUtil.addEntry(tempFile, "fabric.mod.json", getMod(dependency, extension.getIncludeTweakers()).getBytes());
 				fileList.add(tempFile);
 			} else {
 				//Default copy the jar right in
@@ -193,7 +194,7 @@ public class NestedJars {
 	}
 
 	//Generates a barebones mod for a dependency
-	private static String getMod(Dependency dependency) {
+	private static String getMod(Dependency dependency, List<BiConsumer<Dependency, JsonObject>> includeTweakers) {
 		JsonObject jsonObject = new JsonObject();
 		jsonObject.addProperty("schemaVersion", 1);
 		jsonObject.addProperty("id", (dependency.getGroup() + "_" + dependency.getName()).replaceAll("\\.", "_").toLowerCase(Locale.ENGLISH));
@@ -204,10 +205,10 @@ public class NestedJars {
 		custom.addProperty("fabric-loom:generated", true);
 		jsonObject.add("custom", custom);
 
-		return GSON.toJson(jsonObject);
-	}
+		for (BiConsumer<Dependency, JsonObject> tweaker : includeTweakers) {
+			tweaker.accept(dependency, jsonObject);
+		}
 
-	private static ZipEntryTransformerEntry[] single(ZipEntryTransformerEntry element) {
-		return new ZipEntryTransformerEntry[]{element};
+		return GSON.toJson(jsonObject);
 	}
 }
