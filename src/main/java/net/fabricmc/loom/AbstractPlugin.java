@@ -502,6 +502,10 @@ public class AbstractPlugin implements Plugin<Project> {
 				AbstractArchiveTask jarTask = (AbstractArchiveTask) project.getTasks().getByName("jar");
 				extension.addUnmappedMod(jarTask.getArchivePath().toPath());
 			}
+
+			// Disable some things used by log4j via the mixin AP that prevent it from being garbage collected
+			System.setProperty("log4j2.disable.jmx", "true");
+			System.setProperty("log4j.shutdownHookEnabled", "false");
 		});
 	}
 
