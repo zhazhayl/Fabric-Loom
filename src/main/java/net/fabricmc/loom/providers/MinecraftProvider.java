@@ -142,7 +142,7 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 						}
 						JarNamingStrategy nameStrategy = makeNamingStrategy();
 
-						Path interClient = mergedJar.toPath().resolve(JarNameFactory.CLIENT_INTERMEDIARY.getJarName(nameStrategy));
+						Path interClient = mergedJar.toPath().resolveSibling(JarNameFactory.CLIENT_INTERMEDIARY.getJarName(nameStrategy));
 						if (Files.notExists(interClient)) {
 							//Can't use the library provider yet as the configuration might need more things adding to it
 							Set<File> libraries = getJavaLibraries(project);
