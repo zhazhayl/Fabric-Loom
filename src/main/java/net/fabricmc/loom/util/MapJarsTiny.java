@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -69,7 +70,7 @@ import net.fabricmc.tinyremapper.TinyRemapper;
 import net.fabricmc.tinyremapper.TinyUtils;
 
 public class MapJarsTiny {
-	public void mapJars(MinecraftProvider jarProvider, MinecraftMappedProvider mapProvider, Project project) throws IOException {
+	public static void mapJars(MinecraftProvider jarProvider, MinecraftMappedProvider mapProvider, Project project) throws IOException {
 		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
 		MappingsProvider mappingsProvider = extension.getMappingsProvider();
 
@@ -108,6 +109,8 @@ public class MapJarsTiny {
 
 		mapJar(project.getLogger(), extension, mappingsProvider, mapProvider.getIntermediaryJar().toPath(), classpath, mapProvider.getMappedJar(), "intermediary", "named");
 		CommandFixNesting.run(mapProvider.getMappedJar());
+
+		if (extension.shouldAddVersionIfNeeded() && !ZipUtil.containsEntry(mapProvider.getMappedJar(), "version.json")) addVersionJSON(mapProvider.getMappedJar(), jarProvider.minecraftVersion);
 	}
 
 	private static void mapJar(Logger logger, LoomGradleExtension extension, MappingsProvider mappingsProvider, Path input, Path[] classpath, File output, String fromM, String toM) throws IOException {
@@ -307,5 +310,14 @@ public class MapJarsTiny {
 			}
 			throw new IllegalStateException("Finished transforming but missed " + missed);
 		}
+	}
+
+	private static void addVersionJSON(File jar, String version) {
+		//Add the minimum needed for Fabric Loader's McVersionLookup to infer a semver version
+		//Included from every version since 18w47b, but never before that
+		ZipUtil.addEntry(jar, "version.json", String.join("\n", "{" +
+				"	\"id\": \"" + version + "\"," +
+				"	\"release_target\": \"" + version + "\"" +
+				"}").getBytes(StandardCharsets.UTF_8));
 	}
 }

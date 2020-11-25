@@ -143,6 +143,7 @@ public class LoomGradleExtension {
 	private final Map<String, String> tokens = new HashMap<>();
 	private File atFile;
 	private File optifine;
+	private boolean addVersionIfNeeded = true;
 	private final List<Path> unmappedModsBuilt = new ArrayList<>();
 	private final List<BiConsumer<Dependency, JsonObject>> includeTweakers = new ArrayList<>();
 
@@ -535,6 +536,14 @@ public class LoomGradleExtension {
 
 	public File getOptiFine() {
 		return optifine;
+	}
+
+	public void setAddVersionIfNeeded(boolean addVersion) {
+		addVersionIfNeeded = addVersion;
+	}
+
+	public boolean shouldAddVersionIfNeeded() {
+		return addVersionIfNeeded;
 	}
 
 	public void addIncludeTweaker(BiConsumer<Dependency, JsonObject> action) {
