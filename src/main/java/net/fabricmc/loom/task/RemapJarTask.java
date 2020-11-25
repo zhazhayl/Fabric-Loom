@@ -130,6 +130,8 @@ public class RemapJarTask extends Jar {
 
 		if (addNestedDependencies && NestedJars.addNestedJars(project, output)) {
 			project.getLogger().debug("Added nested jar paths to mod json");
+		} else {
+			project.getLogger().debug(addNestedDependencies ? "No nested jars to add" : "Skipping trying to nest any jars");
 		}
 	}
 

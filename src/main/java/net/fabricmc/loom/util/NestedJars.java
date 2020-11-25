@@ -60,12 +60,15 @@ public class NestedJars {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
 	public static boolean addNestedJars(Project project, Path modJarPath) {
+		project.getLogger().debug("Looking for nested jars for {}", modJarPath);
 		List<File> containedJars = getContainedJars(project);
 
 		if (containedJars.isEmpty()) {
+			project.getLogger().debug("Found nothing to nest");
 			return false;
 		}
 
+		project.getLogger().debug("Found {} nested jars: {}", containedJars.size(), containedJars);
 		File modJar = modJarPath.toFile();
 
 		ZipUtil.addOrReplaceEntries(modJar, containedJars.stream().map(file -> new FileSource("META-INF/jars/" + file.getName(), file)).toArray(ZipEntrySource[]::new));
@@ -99,14 +102,17 @@ public class NestedJars {
 		Configuration configuration = project.getConfigurations().getByName(Constants.INCLUDE);
 		DependencySet dependencies = configuration.getDependencies();
 
+		project.getLogger().debug("Finding {} include dependencies", dependencies.size());
 		for (Dependency dependency : dependencies) {
 			if (dependency instanceof ProjectDependency) {
 				ProjectDependency projectDependency = (ProjectDependency) dependency;
 				Project dependencyProject = projectDependency.getDependencyProject();
+				project.getLogger().debug("Passing dependent project: {} (from {})", dependencyProject, projectDependency);
 
 				//TODO change this to allow just normal jar tasks, so a project can have a none loom sub project
 				Collection<Task> remapJarTasks = dependencyProject.getTasksByName("remapJar", false);
 				Collection<Task> jarTasks = dependencyProject.getTasksByName("jar", false);
+				project.getLogger().debug("Found {} remapJar tasks and {} jar tasks", remapJarTasks.size(), jarTasks.size());
 
 				for (Task task : remapJarTasks.isEmpty() ? jarTasks : remapJarTasks) {
 					if (task instanceof RemapJarTask) {
@@ -116,6 +122,7 @@ public class NestedJars {
 					}
 				}
 			} else {
+				project.getLogger().debug("Passing included dependency: {}", dependency);
 				fileList.addAll(prepareForNesting(configuration.files(dependency), dependency, project));
 			}
 		}
@@ -158,11 +165,14 @@ public class NestedJars {
 
 	//This is a good place to do pre-nesting operations, such as adding a fabric.mod.json to a library
 	private static List<File> prepareForNesting(Set<File> files, Dependency dependency, Project project) {
+		project.getLogger().debug("Preparing {} files for nesting: {}", files.size(), files);
 		List<File> fileList = new ArrayList<>();
 
 		for (File file : files) {
 			//A lib that doesnt have a mod.json, we turn it into a fake mod
 			if (!ZipUtil.containsEntry(file, "fabric.mod.json")) {
+				project.getLogger().debug("Preparing non-mod file: {}", file);
+
 				LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
 				File tempDir = new File(extension.getUserCache(), "temp/modprocessing");
 
@@ -177,19 +187,24 @@ public class NestedJars {
 				}
 
 				try {
+					project.getLogger().debug("Copying from {} to {}", file, tempFile);
 					FileUtils.copyFile(file, tempFile);
 				} catch (IOException e) {
 					throw new RuntimeException("Failed to copy file", e);
 				}
 
+				project.getLogger().debug("Adding a fabric.mod.json to {}", tempFile);
 				ZipUtil.addEntry(tempFile, "fabric.mod.json", getMod(dependency, extension.getIncludeTweakers()).getBytes());
 				fileList.add(tempFile);
 			} else {
+				project.getLogger().debug("Preparing mod file: {}", file);
+
 				//Default copy the jar right in
 				fileList.add(file);
 			}
 		}
 
+		project.getLogger().debug("Produced {} nest ready files: {}", fileList.size(), fileList);
 		return fileList;
 	}
 
