@@ -315,9 +315,9 @@ public class MapJarsTiny {
 	private static void addVersionJSON(File jar, String version) {
 		//Add the minimum needed for Fabric Loader's McVersionLookup to infer a semver version
 		//Included from every version since 18w47b, but never before that
-		ZipUtil.addEntry(jar, "version.json", String.join("\n", "{" +
-				"	\"id\": \"" + version + "\"," +
-				"	\"release_target\": \"" + version + "\"" +
+		ZipUtil.addEntry(jar, "version.json", String.join("\n", "{",
+				"	\"id\": \"" + version + "\",",
+				"	\"release_target\": \"" + version + '"',
 				"}").getBytes(StandardCharsets.UTF_8));
 	}
 }

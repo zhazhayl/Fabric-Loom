@@ -18,27 +18,27 @@ class SpecialCases {
 	private enum ServerType {
 		RELEASE {
 			@Override
-			public String getDownload(String version) {
-				return "Omniarchive/Miscellaneous Files/CURLs/maven.sk89q.com/minecraft-server-" + version + ".jar";
+			protected StringBuilder getDownload(StringBuilder url, String version) {
+				return url.append("Omniarchive/Miscellaneous Files/CURLs/maven.sk89q.com/minecraft-server-").append(version).append(".jar");
 			}
 		},
 		BETA {
 			@Override
-			public String getDownload(String version) {
-				return "Omniarchive/Java Edition/Servers/Beta/" + version + "/minecraft_server.jar";
+			protected StringBuilder getDownload(StringBuilder url, String version) {
+				return url.append("Omniarchive/Java Edition/Servers/Beta/").append(version).append("/minecraft_server.jar");
 			}
 		},
 		ALPHA {
 			@Override
-			public String getDownload(String version) {
-				return "Omniarchive/Java Edition/Servers/Alpha/" + version.substring(1) + "/minecraft_server.jar";
+			protected StringBuilder getDownload(StringBuilder url, String version) {
+				return url.append("Omniarchive/Java Edition/Servers/Alpha/").append(version, 1, version.length()).append("/minecraft_server.jar");
 			}
 		};
 
-		protected abstract String getDownload(String version);
+		protected abstract StringBuilder getDownload(StringBuilder url, String version);
 
 		public String getDownloadURL(String version) {
-			return "https://archive.org/download/20180501AoMCollection/Omniarchive.zip/".concat(getDownload(version));
+			return getDownload(new StringBuilder("https://archive.org/download/20180501AoMCollection/Omniarchive.zip/"), version).toString();
 		}
 	}
 
@@ -378,6 +378,86 @@ class SpecialCases {
 
 		case "b1.7.3":
 			return "https://gist.githubusercontent.com/Chocohead/b7ea04058776495a93ed2d13f34d697a/raw/Beta 1.7.3 Merge.tiny".replace(" ", "%20");
+
+		case "inf-20100618":
+			return "https://maven.concern.i.ng/net/textilemc/intermediary/inf-20100618/inf-20100618.tiny";
+
+		case "1.8":
+		//1.8.1-7 aren't included
+		case "1.8.8":
+		case "1.8.9":
+		//15w31a - 1.11.1 aren't included
+		case "1.11.2":
+		//17w06a - 1.12-pre7 aren't included
+		case "1.12":
+		//17w31a - 1.12.2-pre2 aren't included
+		case "1.12.2":
+		case "17w43a":
+		case "17w43b":
+		case "17w45a":
+		case "17w45b":
+		case "17w46a":
+		case "17w47a":
+		case "17w47b":
+		case "17w48a":
+		case "17w49a":
+		case "17w49b":
+		case "17w50a":
+		case "18w01a":
+		case "18w02a":
+		case "18w03a":
+		case "18w03b":
+		case "18w05a":
+		case "18w06a":
+		case "18w07a":
+		case "18w07b":
+		case "18w07c":
+		case "18w08a":
+		case "18w08b":
+		case "18w09a":
+		case "18w10a":
+		case "18w10b":
+		case "18w10c":
+		case "18w10d":
+		case "18w11a":
+		case "18w14a":
+		case "18w14b":
+		case "18w15a":
+		case "18w16a":
+		case "18w19a":
+		case "18w19b":
+		case "18w20a":
+		case "18w20b":
+		case "18w20c":
+		case "18w21a":
+		case "18w21b":
+		case "18w22a":
+		case "18w22b":
+		case "18w22c":
+		case "1.13-pre1":
+		case "1.13-pre2":
+		case "1.13-pre3":
+		case "1.13-pre4":
+		case "1.13-pre5":
+		case "1.13-pre6":
+		case "1.13-pre7":
+		case "1.13-pre8":
+		case "1.13-pre9":
+		case "1.13-pre10":
+		case "1.13":
+		case "18w30a":
+		case "18w30b":
+		case "18w31a":
+		case "18w32a":
+		case "18w33a":
+		case "1.13.1-pre1":
+		case "1.13.1-pre2":
+		case "1.13.1":
+		case "1.13.2-pre1":
+		case "1.13.2-pre2":
+		case "1.13.2":
+		case "18w43a": //18w43b onwards Fabric officially supports
+			return "https://github.com/Legacy-Fabric/Legacy-Intermediaries/raw/master/mappings/" + UrlEscapers.urlPathSegmentEscaper().escape(version) + ".tiny";
 
 		default:
 			return "https://github.com/FabricMC/intermediary/raw/master/mappings/" + UrlEscapers.urlPathSegmentEscaper().escape(version) + ".tiny";
