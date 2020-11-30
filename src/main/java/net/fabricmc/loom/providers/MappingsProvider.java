@@ -15,7 +15,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
@@ -217,7 +216,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 				} else {
 					if (!intermediaryNames.exists()) {//Grab intermediary mappings from Github
 						project.getLogger().lifecycle(":Downloading intermediaries to " + intermediaryNames.getName());
-						FileUtils.copyURLToFile(new URL(SpecialCases.intermediaries(minecraftVersion)), intermediaryNames);
+						SpecialCases.getIntermediaries(minecraftVersion, intermediaryNames);
 					} else {
 						project.getLogger().lifecycle(":Using intermediaries from " + intermediaryNames.getName());
 					}
@@ -708,7 +707,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 
 		if (!intermediaryNames.exists()) {
 			try {
-				FileUtils.copyURLToFile(new URL(SpecialCases.intermediaries(version)), intermediaryNames);
+				SpecialCases.getIntermediaries(version, intermediaryNames);
 			} catch (IOException e) {
 				throw new UncheckedIOException("Error downloading Intermediary mappings for " + version, e);
 			}

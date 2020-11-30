@@ -7,9 +7,21 @@
  */
 package net.fabricmc.loom.providers;
 
+import java.io.File;
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FilenameUtils;
+
 import com.google.common.net.UrlEscapers;
 
 import net.fabricmc.loom.LoomGradleExtension.JarMergeOrder;
+import net.fabricmc.loom.providers.mappings.TinyDuplicator;
 import net.fabricmc.loom.util.MinecraftVersionInfo;
 import net.fabricmc.loom.util.MinecraftVersionInfo.Downloads;
 
@@ -371,7 +383,26 @@ class SpecialCases {
 		version.downloads.put("server", server);
 	}
 
-	static String intermediaries(String version) {
+	static void getIntermediaries(String version, File to) throws IOException {
+		try {
+			FileUtils.copyURLToFile(new URL(SpecialCases.intermediaries(version)), to);
+		} catch (MalformedURLException e) {
+			throw new IllegalArgumentException("Formed bad URL trying to download Intermediaries for " + version + " to " + to);
+		}
+
+		switch (version) {
+		case "inf-20100618": {//Massage the Intermediary mappings to follow our standards
+			Path unextended = to.toPath();
+			Path extended = Files.createTempFile(FilenameUtils.removeExtension(to.getName()), "-extended.tiny");
+
+			TinyDuplicator.duplicateV1Column(unextended, extended, "official", "client");
+			Files.move(extended, unextended, StandardCopyOption.REPLACE_EXISTING);
+			break;
+		}
+		}
+	}
+
+	private static String intermediaries(String version) {
 		switch (version) {
 		case "1.2.5":
 			return "https://gist.githubusercontent.com/Chocohead/b7ea04058776495a93ed2d13f34d697a/raw/1.2.5 Merge.tiny".replace(" ", "%20");

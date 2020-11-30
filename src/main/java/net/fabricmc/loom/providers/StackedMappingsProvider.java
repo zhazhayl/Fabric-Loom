@@ -169,6 +169,9 @@ public class StackedMappingsProvider extends PhysicalDependencyProvider {
 		if (version.contains("+build.")) {
 			minecraftVersion = version.substring(0, version.lastIndexOf('+'));
 			mappingsVersion = version.substring(version.lastIndexOf('.') + 1);
+		} else if (version.startsWith("inf-20100618+build")) {
+			minecraftVersion = "inf-20100618";
+			mappingsVersion = version.substring(/* inf-20100618+build */ 18);
 		} else {
 			try {
 				char splitter = version.contains("-") ? '-' : '.';
