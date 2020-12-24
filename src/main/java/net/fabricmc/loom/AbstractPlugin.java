@@ -441,7 +441,7 @@ public class AbstractPlugin implements Plugin<Project> {
 			project.getTasks().getByName("idea").finalizedBy(project.getTasks().getByName("genIdeaWorkspace"));
 			project.getTasks().getByName("eclipse").finalizedBy(project.getTasks().getByName("genEclipseRuns"));
 
-			if (extension.autoGenIDERuns && isRootProject(project)) {
+			if (extension.autoGenIDERuns) {
 				SetupIntelijRunConfigs.setup(project);
 			}
 
