@@ -194,25 +194,39 @@ public class AbstractPlugin implements Plugin<Project> {
 
 		project.getTasks().withType(JavaCompile.class, javaCompileTask -> {
 			if (!javaCompileTask.getName().contains("Test") && !javaCompileTask.getName().contains("test")) {
+				//Allow adding extra mappings onto a compile for Mixin to generate remaps with
+				//The MinecraftVersion is not really relevant so we'll simplify things and pass null
+				MappingContainer extraMappings = javaCompileTask.getExtensions().create("mappings", MappingContainer.class, (String) null);
+				extraMappings.setFrom("named");
+				extraMappings.setTo("intermediary");
+
 				javaCompileTask.doFirst(task -> {
-					project.getLogger().lifecycle(":setting java compiler args");
+					String from = extraMappings.getFrom();
+					String to = extraMappings.getTo();
+
+					task.getLogger().lifecycle(":setting java compiler args");
 					try {
 						Collections.addAll(javaCompileTask.getOptions().getCompilerArgs(),
 							"-AinMapFileNamedIntermediary=" + extension.getMappingsProvider().MAPPINGS_TINY.getCanonicalPath(),
 							"-AoutMapFileNamedIntermediary=" + extension.getMappingsProvider().MAPPINGS_MIXIN_EXPORT.getCanonicalPath(),
 							"-AoutRefMapFile=" + new File(javaCompileTask.getDestinationDir(), extension.getRefmapName(task)).getCanonicalPath(),
-							"-AdefaultObfuscationEnv=named:intermediary");
+							"-AdefaultObfuscationEnv=" + from + ':' + to);
 					} catch (IOException e) {
-						e.printStackTrace();
+						throw new UncheckedIOException("Unable to canonicalise path", e);
 					}
-				});
 
-				//Allow adding extra mappings onto a compile for Mixin to generate remaps with
-				//The MinecraftVersion is not really relevant so we'll simplify things and pass null
-				javaCompileTask.getExtensions().create("mappings", MappingContainer.class, (Object) null);
-				javaCompileTask.doFirst(task -> {
-					MappingContainer extraMappings = task.getExtensions().getByType(MappingContainer.class);
-					if (extraMappings.isEmpty()) return; //Nothing to do
+					if (extension.hasTokens()) {
+						StringBuilder arg = new StringBuilder("-Atokens=");
+
+						for (Entry<String, String> entry : extension.getTokens().entrySet()) {
+							arg.append(entry.getKey()).append('=').append(entry.getValue()).append(';');
+						}
+
+						task.getLogger().info("Appending {} Mixin tokens", extension.getTokens().size());
+						javaCompileTask.getOptions().getCompilerArgs().add(arg.substring(0, arg.length() - 1));
+					}
+
+					if (extraMappings.isEmpty()) return; //Nothing to else do
 
 					Path mappingFile;
 					try {
@@ -220,9 +234,6 @@ public class AbstractPlugin implements Plugin<Project> {
 					} catch (IOException e) {
 						throw new UncheckedIOException("Failed to create temporary mappings file", e);
 					}
-
-					String from = extraMappings.getFrom();
-					String to = extraMappings.getTo();
 
 					try (TinyWriter writer = new TinyWriter(mappingFile, from, to)) {
 						for (Entry<String, String> entry : extraMappings.getClasses().entrySet()) {
@@ -296,19 +307,6 @@ public class AbstractPlugin implements Plugin<Project> {
 					arg.append(Character.toTitleCase(from.charAt(0))).append(from.substring(1)); //Capitalise the namespaces
 					arg.append(Character.toTitleCase(to.charAt(0))).append(to.substring(1));
 					javaCompileTask.getOptions().getCompilerArgs().add(arg.append('=').append(mappingFile.toAbsolutePath()).toString());
-				});
-
-				javaCompileTask.doFirst(task -> {
-					if (extension.hasTokens()) {
-						StringBuilder arg = new StringBuilder("-Atokens=");
-
-						for (Entry<String, String> entry : extension.getTokens().entrySet()) {
-							arg.append(entry.getKey()).append('=').append(entry.getValue()).append(';');
-						}
-
-						task.getLogger().info("Appending {} Mixin tokens", extension.getTokens().size());
-						javaCompileTask.getOptions().getCompilerArgs().add(arg.substring(0, arg.length() - 1));
-					}
 				});
 			}
 		});
