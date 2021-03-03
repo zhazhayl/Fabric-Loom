@@ -94,7 +94,7 @@ public class RemapJarTask extends Jar {
 			remapperBuilder = remapperBuilder.withMappings(TinyUtils.createTinyMappingProvider(mixinMapPath, fromM, toM));
 		}
 
-		project.getLogger().lifecycle(":remapping " + input.getFileName());
+		task.getLogger().lifecycle(":remapping " + input.getFileName());
 
 		StringBuilder rc = new StringBuilder("Remap classpath: ");
 
@@ -102,7 +102,7 @@ public class RemapJarTask extends Jar {
 			rc.append("\n - ").append(p.toString());
 		}
 
-		project.getLogger().debug(rc.toString());
+		task.getLogger().debug(rc.toString());
 
 		TinyRemapper remapper = remapperBuilder.build();
 
@@ -112,7 +112,7 @@ public class RemapJarTask extends Jar {
 			remapper.readInputs(input);
 			remapper.apply(outputConsumer);
 			if (!skipATs && AccessTransformerHelper.obfATs(extension, task, remapper, outputConsumer)) {
-				project.getLogger().info("Remapped access transformer");
+				task.getLogger().info("Remapped access transformer");
 			}
 		} catch (Exception e) {
 			throw new RuntimeException("Failed to remap " + input + " to " + output, e);
@@ -125,13 +125,13 @@ public class RemapJarTask extends Jar {
 		}
 
 		if (MixinRefmapHelper.addRefmapName(extension.getRefmapName(task), extension.getMixinJsonVersion(), output)) {
-			project.getLogger().debug("Transformed mixin reference maps in output JAR!");
+			task.getLogger().debug("Transformed mixin reference maps in output JAR!");
 		}
 
-		if (addNestedDependencies && NestedJars.addNestedJars(project, output)) {
-			project.getLogger().debug("Added nested jar paths to mod json");
+		if (addNestedDependencies && NestedJars.addNestedJars(project, task.getLogger(), output)) {
+			task.getLogger().debug("Added nested jar paths to mod json");
 		} else {
-			project.getLogger().debug(addNestedDependencies ? "No nested jars to add" : "Skipping trying to nest any jars");
+			task.getLogger().debug(addNestedDependencies ? "No nested jars to add" : "Skipping trying to nest any jars");
 		}
 	}
 
