@@ -137,7 +137,6 @@ public class AbstractPlugin implements Plugin<Project> {
 		//addMavenRepo(target, "SpongePowered", "http://repo.spongepowered.org/maven/");
 		addMavenRepo(target, "Mojang", "https://libraries.minecraft.net/");
 		target.getRepositories().mavenCentral();
-		target.getRepositories().jcenter();
 
 		// Create default configurations
 		makeConfiguration(Constants.MINECRAFT).setCanBeResolved(false); //Only used for determining the Minecraft version to use
