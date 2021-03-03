@@ -57,7 +57,7 @@ import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.task.RemapJarTask;
 
 public class NestedJars {
-	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
 	public static boolean addNestedJars(Project project, Path modJarPath) {
 		project.getLogger().debug("Looking for nested jars for {}", modJarPath);
