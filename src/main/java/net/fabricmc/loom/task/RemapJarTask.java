@@ -55,17 +55,18 @@ public class RemapJarTask extends Jar {
 	private final RegularFileProperty input = GradleSupport.getFileProperty(getProject());
 	private boolean addNestedDependencies;
 	private boolean includeAT = true;
+	private boolean convertAT;
 
 	@TaskAction
 	public void doTask() throws Throwable {
 		Path input = getInput().getAsFile().get().toPath();
 		Path output = getArchivePath().toPath();
 
-		remap(this, input, output, addNestedDependencies, !includeAT);
+		remap(this, input, output, addNestedDependencies, !includeAT, convertAT);
 		getProject().getExtensions().getByType(LoomGradleExtension.class).addUnmappedMod(input);
 	}
 
-	public static void remap(Task task, Path input, Path output, boolean addNestedDependencies, boolean skipATs) throws IOException {
+	public static void remap(Task task, Path input, Path output, boolean addNestedDependencies, boolean skipATs, boolean convertAT) throws IOException {
 		if (!Files.exists(input)) {
 			throw new FileNotFoundException(input.toString());
 		}
@@ -111,8 +112,15 @@ public class RemapJarTask extends Jar {
 			remapper.readClassPath(classpath);
 			remapper.readInputs(input);
 			remapper.apply(outputConsumer);
-			if (!skipATs && AccessTransformerHelper.obfATs(extension, task, remapper, outputConsumer)) {
-				task.getLogger().info("Remapped access transformer");
+			if (!skipATs) {
+				boolean did;
+				if (!convertAT) {
+					did = AccessTransformerHelper.obfATs(extension, task, remapper, outputConsumer);
+				} else {
+					skipATs = !(did = AccessTransformerHelper.convertATs(extension, task, remapper, outputConsumer));
+				}
+
+				if (did) task.getLogger().info("Remapped access transformer");
 			}
 		} catch (Exception e) {
 			throw new RuntimeException("Failed to remap " + input + " to " + output, e);
@@ -124,7 +132,14 @@ public class RemapJarTask extends Jar {
 			throw new RuntimeException("Failed to remap " + input + " to " + output + " - file missing!");
 		}
 
-		if (MixinRefmapHelper.addRefmapName(extension.getRefmapName(task), extension.getMixinJsonVersion(), output)) {
+		if (!skipATs && convertAT) {
+			if (AccessTransformerHelper.noteConversion(task.getLogger(), output.toFile())) {
+				task.getLogger().debug("Noted access widener in fabric.mod.json");
+			} else {
+				task.getLogger().warn("Failed to note access widener in fabric.mod.json!");
+			}
+		}
+
 			task.getLogger().debug("Transformed mixin reference maps in output JAR!");
 		}
 
@@ -147,6 +162,15 @@ public class RemapJarTask extends Jar {
 
 	public void setIncludeAT(boolean include) {
 		includeAT = include;
+	}
+
+	@Input
+	public boolean isConvertAT() {
+		return convertAT;
+	}
+
+	public void setConvertAT(boolean convert) {
+		convertAT = convert;
 	}
 
 	@Input

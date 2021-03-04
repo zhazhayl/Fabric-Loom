@@ -43,6 +43,7 @@ public class RemappingJar extends Jar {
 	public File destination;
 	public boolean nestJar = true;
 	public boolean includeAT = true;
+	public boolean convertAT;
 
 	public RemappingJar() {
 		setGroup("fabric");
@@ -61,7 +62,7 @@ public class RemappingJar extends Jar {
 				Path input = getUnmappedJar().toPath();
 				Files.move(getArchivePath().toPath(), input, StandardCopyOption.REPLACE_EXISTING);
 
-				RemapJarTask.remap(task, input, getArchivePath().toPath(), nestJar, !includeAT);
+				RemapJarTask.remap(task, input, getArchivePath().toPath(), nestJar, !includeAT, convertAT);
 				getProject().getExtensions().getByType(LoomGradleExtension.class).addUnmappedMod(input);
 			} catch (IOException e) {
 				throw new RuntimeException("Failed to remap jar", e);
@@ -77,6 +78,11 @@ public class RemappingJar extends Jar {
 	@Input
 	public boolean isIncludeAT() {
 		return includeAT;
+	}
+
+	@Input
+	public boolean isConvertAT() {
+		return convertAT;
 	}
 
 	@OutputFile

@@ -49,6 +49,7 @@ import java.util.zip.ZipFile;
 import org.apache.commons.io.IOUtils;
 
 import org.gradle.api.Task;
+import org.gradle.api.logging.Logger;
 import org.gradle.api.tasks.AbstractCopyTask;
 
 import org.objectweb.asm.ClassReader;
@@ -58,10 +59,13 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.commons.Remapper;
 
+import org.zeroturnaround.zip.ZipUtil;
 import org.zeroturnaround.zip.transform.ByteArrayZipEntryTransformer;
+import org.zeroturnaround.zip.transform.StringZipEntryTransformer;
 import org.zeroturnaround.zip.transform.ZipEntryTransformerEntry;
 
 import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import net.fabricmc.loom.LoomGradleExtension;
@@ -77,6 +81,7 @@ public class AccessTransformerHelper {
 		void accept(String className, String method) throws IOException;
 	}
 	private static final String MAGIC_AT_NAME = "silky.at";
+	private static final String MAGICALLY_BAD_AT_NAME = "silky.aw";
 	private static final String BAD_AT_NAME = "accessWidener";
 
 	public static void copyInAT(LoomGradleExtension extension, AbstractCopyTask task) {
@@ -110,6 +115,59 @@ public class AccessTransformerHelper {
 		} else {
 			return false;
 		}
+	}
+
+	public static boolean convertATs(LoomGradleExtension extension, Task task, TinyRemapper tiny, OutputConsumerPath consumer) throws IOException {
+		if (extension.hasAT()) {
+			File at = new File(task.getTemporaryDir(), MAGICALLY_BAD_AT_NAME);
+
+			try (BufferedWriter writer = new BufferedWriter(new FileWriter(at))) {
+				writer.write(BAD_AT_NAME + "\tv1\tintermediary");
+				writer.newLine();
+				writer.write("#Remapped from " + extension.getAT().getName());
+				writer.newLine();
+
+				Remapper remapper = tiny.getRemapper();
+				readATs(new FileReader(extension.getAT()), name -> {
+					writer.write("extendable\tclass\t");
+					writer.write(remapper.map(name));
+					writer.newLine();
+				}, (className, method) -> {
+					writer.write("extendable\tmethod\t");
+					writer.write(remapper.map(className));
+					writer.write('\t');
+					int split = method.indexOf('(');
+					String name = method.substring(0, split);
+					String desc = method.substring(split);
+					writer.write(remapper.mapMethodName(className, name, desc));
+					writer.write('\t');
+					writer.write(remapper.mapMethodDesc(desc));
+					writer.newLine();
+				});
+			}
+
+			consumer.addNonClassFile(at.toPath(), at.getName()); //Add at to the root of the obf'd jar
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	public static boolean noteConversion(Logger logger, File modJar) {
+		return ZipUtil.transformEntry(modJar, new ZipEntryTransformerEntry("fabric.mod.json", new StringZipEntryTransformer() {
+			@Override
+			protected String transform(ZipEntry zipEntry, String input) throws IOException {
+				JsonObject json = NestedJars.GSON.fromJson(input, JsonObject.class);
+
+				if (!json.has(BAD_AT_NAME)) {
+					json.addProperty(BAD_AT_NAME, MAGICALLY_BAD_AT_NAME);
+				} else {
+					logger.warn("Already have AW in " + modJar + ": " + json.get(BAD_AT_NAME));
+				}
+
+				return NestedJars.GSON.toJson(json);
+			}
+		}));
 	}
 
 	public static boolean deobfATs(File jar, TinyRemapper tiny, OutputConsumerPath output) throws IOException {
@@ -251,7 +309,8 @@ public class AccessTransformerHelper {
 			int split = method.indexOf('(');
 			String name = method.substring(0, split);
 			String desc = method.substring(split);
-			to.write(remapper.mapMethodName(className, name, desc) + remapper.mapMethodDesc(desc));
+			to.write(remapper.mapMethodName(className, name, desc));
+			to.write(remapper.mapMethodDesc(desc));
 			to.newLine();
 		});
 	}
