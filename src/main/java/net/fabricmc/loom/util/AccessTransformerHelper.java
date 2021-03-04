@@ -391,7 +391,7 @@ public class AccessTransformerHelper {
 			ClassWriter writer = new ClassWriter(reader, 0);
 
 			Set<String> expectedTransforms = new HashSet<>(transforms);
-			reader.accept(new ClassVisitor(Opcodes.ASM8, writer) {
+			reader.accept(new ClassVisitor(Opcodes.ASM7, writer) {
 				private int flipBits(int access, int to) {
 					access &= ~(Opcodes.ACC_PUBLIC | Opcodes.ACC_PROTECTED | Opcodes.ACC_PRIVATE);
 					access |= to;
@@ -412,7 +412,7 @@ public class AccessTransformerHelper {
 				@Override
 				public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
 					if (!transforms.isEmpty()) {
-						return new MethodVisitor(Opcodes.ASM8, super.visitMethod(expectedTransforms.remove(name.concat(descriptor)) ?
+						return new MethodVisitor(api, super.visitMethod(expectedTransforms.remove(name.concat(descriptor)) ?
 																					flipBits(access, Opcodes.ACC_PROTECTED) : access, name, descriptor, signature, exceptions)) {
 							@Override
 							public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
