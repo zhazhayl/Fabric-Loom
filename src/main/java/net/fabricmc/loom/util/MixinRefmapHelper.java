@@ -27,7 +27,6 @@ package net.fabricmc.loom.util;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.zip.ZipEntry;
@@ -48,8 +47,7 @@ public final class MixinRefmapHelper {
 
 	private MixinRefmapHelper() { }
 
-	public static boolean addRefmapName(String filename, String mixinVersion, Path outputPath) {
-		File output = outputPath.toFile();
+	public static boolean addRefmapName(String filename, String mixinVersion, File output) {
 		Set<String> mixinFilenames = findMixins(output);
 
 		if (mixinFilenames.size() > 0) {

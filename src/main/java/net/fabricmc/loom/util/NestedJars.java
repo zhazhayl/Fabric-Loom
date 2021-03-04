@@ -26,7 +26,6 @@ package net.fabricmc.loom.util;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -60,8 +59,8 @@ import net.fabricmc.loom.task.RemapJarTask;
 public class NestedJars {
 	static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
-	public static boolean addNestedJars(Project project, Logger logger, Path modJarPath) {
-		logger.debug("Looking for nested jars for {}", modJarPath);
+	public static boolean addNestedJars(Project project, Logger logger, File modJar) {
+		logger.debug("Looking for nested jars for {}", modJar);
 		List<File> containedJars = getContainedJars(project, logger);
 
 		if (containedJars.isEmpty()) {
@@ -70,10 +69,8 @@ public class NestedJars {
 		}
 
 		logger.debug("Found {} nested jars: {}", containedJars.size(), containedJars);
-		File modJar = modJarPath.toFile();
 
 		ZipUtil.addOrReplaceEntries(modJar, containedJars.stream().map(file -> new FileSource("META-INF/jars/" + file.getName(), file)).toArray(ZipEntrySource[]::new));
-
 		return ZipUtil.transformEntry(modJar, new ZipEntryTransformerEntry("fabric.mod.json", new StringZipEntryTransformer() {
 			@Override
 			protected String transform(ZipEntry zipEntry, String input) throws IOException {

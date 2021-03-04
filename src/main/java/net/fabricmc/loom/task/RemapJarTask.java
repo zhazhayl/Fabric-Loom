@@ -140,10 +140,11 @@ public class RemapJarTask extends Jar {
 			}
 		}
 
+		if (MixinRefmapHelper.addRefmapName(extension.getRefmapName(task), extension.getMixinJsonVersion(), output.toFile())) {
 			task.getLogger().debug("Transformed mixin reference maps in output JAR!");
 		}
 
-		if (addNestedDependencies && NestedJars.addNestedJars(project, task.getLogger(), output)) {
+		if (addNestedDependencies && NestedJars.addNestedJars(project, task.getLogger(), output.toFile())) {
 			task.getLogger().debug("Added nested jar paths to mod json");
 		} else {
 			task.getLogger().debug(addNestedDependencies ? "No nested jars to add" : "Skipping trying to nest any jars");
