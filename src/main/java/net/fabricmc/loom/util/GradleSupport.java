@@ -66,11 +66,6 @@ public class GradleSupport {
 		return matcher.group(3) != null ? Integer.parseUnsignedInt(matcher.group(3)) : 0;
 	}
 
-	public static boolean extractNatives(Project project) {
-		int major = majorGradleVersion(project);
-		return major > 5 || major == 5 && minorGradleVersion(project) >= 6 && patchGradleVersion(project) >= 3;
-	}
-
 	public static RegularFileProperty getFileProperty(Project project) {
 		try {
 			return project.getObjects().fileProperty();

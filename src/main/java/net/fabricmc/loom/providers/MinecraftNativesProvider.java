@@ -26,6 +26,7 @@ package net.fabricmc.loom.providers;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 
 import org.zeroturnaround.zip.ZipUtil;
 
@@ -33,27 +34,26 @@ import org.gradle.api.Project;
 
 import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.util.DownloadUtil;
-import net.fabricmc.loom.util.GradleSupport;
-import net.fabricmc.loom.util.MinecraftVersionInfo;
+import net.fabricmc.loom.util.MinecraftVersionInfo.Library;
 import net.fabricmc.loom.util.OperatingSystem;
 
 public class MinecraftNativesProvider {
-	public static void provide(MinecraftProvider minecraftProvider, Project project) throws IOException {
-		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
-		if (!extension.hasLWJGL2() && !GradleSupport.extractNatives(project)) return; //No need to do this
+	public static void provide(Project project, LoomGradleExtension extension) throws IOException {
+		List<Library> natives = extension.getDependencyManager().getProvider(MinecraftLibraryProvider.class).natives;
+		if (natives.isEmpty()) return; //No need to do this
 
 		File nativesDir = extension.getNativesDirectory();
 		File jarStore = extension.getNativesJarStore();
 
-		for (MinecraftVersionInfo.Library library : minecraftProvider.getLibraries()) {
-			if (library.shouldUse() && library.isNative()) {
-				String[] parts = library.getArtifactName(OperatingSystem.ACTIVE).split(":", 4);
-				File libJarFile = new File(jarStore, parts[0].replace('.', File.separatorChar) + File.separator + parts[1] + File.separator + parts[2] + File.separator + parts[1] + '-' + parts[2] + parts[3] + ".jar");
+		for (Library library : natives) {
+			assert library.shouldUse() && library.isNative();
+			String[] parts = library.getArtifactName(OperatingSystem.ACTIVE).split(":", 4);
 
-				DownloadUtil.downloadIfChanged(library.getDownload(OperatingSystem.ACTIVE).url, libJarFile, project.getLogger());
-				//TODO possibly find a way to prevent needing to re-extract after each run, doesnt seem too slow
-				ZipUtil.unpack(libJarFile, nativesDir);
-			}
+			File libJarFile = new File(jarStore, parts[0].replace('.', File.separatorChar) + File.separator + parts[1] + File.separator + parts[2] + File.separator + parts[1] + '-' + parts[2] + parts[3] + ".jar");
+			DownloadUtil.downloadIfChanged(library.getDownload(OperatingSystem.ACTIVE).url, libJarFile, project.getLogger());
+
+			//TODO possibly find a way to prevent needing to re-extract after each run, doesnt seem too slow
+			ZipUtil.unpack(libJarFile, nativesDir);
 		}
 	}
 }

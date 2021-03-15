@@ -54,7 +54,6 @@ import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.dependencies.DependencyProvider;
 import net.fabricmc.loom.dependencies.LogicalDependencyProvider;
 import net.fabricmc.loom.util.Constants;
-import net.fabricmc.loom.util.GradleSupport;
 
 public class LaunchProvider extends LogicalDependencyProvider {
 	@Override
@@ -79,7 +78,7 @@ public class LaunchProvider extends LogicalDependencyProvider {
 				.argument("client", "--assetsDir")
 				.argument("client", new File(extension.getUserCache(), "assets").getAbsolutePath());
 
-		if (extension.hasLWJGL2() || GradleSupport.extractNatives(project)) {
+		if (extension.extractNatives()) {
 			launchConfig.property("client", "java.library.path", extension.getNativesDirectory().getAbsolutePath())
 						.property("client", "org.lwjgl.librarypath", extension.getNativesDirectory().getAbsolutePath());
 		}
