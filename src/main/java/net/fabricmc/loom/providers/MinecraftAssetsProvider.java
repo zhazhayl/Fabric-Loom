@@ -64,7 +64,7 @@ public class MinecraftAssetsProvider {
 
 		File assetsInfo = new File(assets, "indexes" + File.separator + assetIndex.getFabricId(minecraftProvider.minecraftVersion) + ".json");
 
-		if (!assetsInfo.exists() || !Checksum.equals(assetsInfo, assetIndex.sha1)) {
+		if (!assetsInfo.exists() || !Checksum.equals(assetsInfo, assetIndex.hash)) {
 			project.getLogger().lifecycle(":downloading asset index");
 
 			if (offline) {
@@ -76,7 +76,7 @@ public class MinecraftAssetsProvider {
 					throw new GradleException("Asset index not found at " + assetsInfo.getAbsolutePath());
 				}
 			} else {
-				DownloadUtil.downloadIfChanged(new URL(assetIndex.url), assetsInfo, project.getLogger());
+				DownloadUtil.downloadIfChanged(assetIndex.url, assetsInfo, project.getLogger());
 			}
 		}
 

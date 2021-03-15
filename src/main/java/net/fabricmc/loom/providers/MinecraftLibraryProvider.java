@@ -39,7 +39,6 @@ import net.fabricmc.loom.util.GradleSupport;
 import net.fabricmc.loom.util.MinecraftVersionInfo;
 
 public class MinecraftLibraryProvider extends LogicalDependencyProvider {
-	private File MINECRAFT_LIBS;
 	private Set<File> libs = Collections.emptySet();
 
 	@Override
@@ -50,21 +49,10 @@ public class MinecraftLibraryProvider extends LogicalDependencyProvider {
 	@Override
 	public void provide(Project project, LoomGradleExtension extension, Consumer<Runnable> postPopulationScheduler) throws Exception {
 		MinecraftProvider minecraftProvider = getProvider(MinecraftProvider.class);
-
-		initFiles(extension, minecraftProvider);
 		boolean useNatives = !GradleSupport.extractNatives(project);
 
 		for (MinecraftVersionInfo.Library library : minecraftProvider.getLibraries()) {
-			if (library.allowed() && (useNatives || !library.isNative()) && library.getFile(MINECRAFT_LIBS) != null) {
-				// TODO: Add custom library locations
-
-				// By default, they are all available on all sides
-				/* boolean isClientOnly = false;
-
-				if (library.name.contains("java3d") || library.name.contains("paulscode") || library.name.contains("lwjgl") || library.name.contains("twitch") || library.name.contains("jinput") || library.name.contains("text2speech") || library.name.contains("objc")) {
-					isClientOnly = true;
-				} */
-
+			if (library.shouldUse() && (useNatives || !library.isNative())) {
 				addDependency(library.getArtifactName(), project, Constants.MINECRAFT_LIBRARIES);
 			}
 		}
@@ -74,9 +62,5 @@ public class MinecraftLibraryProvider extends LogicalDependencyProvider {
 
 	public Set<File> getLibraries() {
 		return Collections.unmodifiableSet(libs);
-	}
-
-	private void initFiles(LoomGradleExtension extension, MinecraftProvider minecraftProvider) {
-		MINECRAFT_LIBS = new File(extension.getUserCache(), "libraries");
 	}
 }

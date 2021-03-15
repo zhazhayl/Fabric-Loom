@@ -1,48 +1,43 @@
 /*
- * This file is part of fabric-loom, licensed under the MIT License (MIT).
+ * Copyright 2019, 2021 Chocohead
  *
- * Copyright (c) 2016, 2017, 2018 FabricMC
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-
 package net.fabricmc.loom.util;
 
-public class OperatingSystem {
-	public static String getOS() {
-		String osName = System.getProperty("os.name").toLowerCase();
+import java.util.Locale;
 
-		if (osName.contains("win")) {
-			return "windows";
-		} else if (osName.contains("mac")) {
-			return "osx";
-		} else {
-			return "linux";
-		}
+import com.google.gson.annotations.SerializedName;
+
+public enum OperatingSystem {
+	@SerializedName(value = "windows", alternate = "win")
+	WINDOWS("win"),
+	@SerializedName(value = "osx", alternate = "mac")
+	OSX("mac"),
+	@SerializedName(value = "linux", alternate = "unix")
+	LINUX("linux", "unix");
+	public static final transient OperatingSystem ACTIVE = get();
+
+	private final String[] names;
+
+	private OperatingSystem(String... names) {
+		this.names = names;
 	}
 
-	public static String getArch() {
-		if (is64Bit()) {
-			return "64";
-		} else {
-			return "32";
+	private static OperatingSystem get() {
+		String osName = System.getProperty("os.name").toLowerCase(Locale.ENGLISH);
+
+		for (OperatingSystem os : values()) {
+			for (String name : os.names) {
+				if (osName.contains(name)) {
+					return os;
+				}
+			}
 		}
+
+		throw new IllegalStateException("Unable to find OS for current system: " + osName);
 	}
 
 	public static boolean is64Bit() {

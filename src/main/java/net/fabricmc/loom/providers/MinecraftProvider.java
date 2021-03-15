@@ -184,7 +184,7 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 
 		@Override
 		public Set<File> getJavaLibraries(Project project) {
-			return project.getConfigurations().detachedConfiguration(getLibraries().stream().filter(library -> library.allowed() && !library.isNative())
+			return project.getConfigurations().detachedConfiguration(getLibraries().stream().filter(library -> library.shouldUse() && !library.isNative())
 					.map(library -> project.getDependencies().module(library.getArtifactName())).toArray(Dependency[]::new)).getFiles();
 		}
 
@@ -462,7 +462,7 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 	}
 
 	private static void downloadJar(Logger logger, String minecraftVersion, MinecraftVersionInfo versionInfo, File to, String name) throws IOException {
-		downloadJar(logger, minecraftVersion, new URL(versionInfo.downloads.get(name).url), to, name, versionInfo.downloads.get(name).sha1);
+		downloadJar(logger, minecraftVersion, versionInfo.downloads.get(name).url, to, name, versionInfo.downloads.get(name).hash);
 	}
 
 	private static void downloadJar(Logger logger, String minecraftVersion, URL from, File to, String name, String hash) throws IOException {

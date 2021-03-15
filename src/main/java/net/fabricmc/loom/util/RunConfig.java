@@ -203,7 +203,7 @@ public class RunConfig {
 	}
 
 	public static String getOSClientJVMArgs() {
-		if (OperatingSystem.getOS().equalsIgnoreCase("osx")) {
+		if (OperatingSystem.ACTIVE == OperatingSystem.OSX) {
 			return " -XstartOnFirstThread";
 		}
 

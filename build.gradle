@@ -119,6 +119,8 @@ license {
 	exclude '**/loom/providers/openfine/*.java'
 	exclude '**/loom/util/Closer.java'
 	exclude '**/loom/util/HexaFunction.java'
+	exclude '**/loom/util/MinecraftVersionInfo.java'
+	exclude '**/loom/util/OperatingSystem.java'
 	exclude '**/loom/util/ThrowingIntObjConsumer.java'
 	exclude '**/loom/task/fernflower/JavadocProvider.java'
 	exclude '**/loom/task/lvt/*.java'

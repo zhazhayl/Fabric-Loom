@@ -23,7 +23,7 @@ import com.google.common.net.UrlEscapers;
 import net.fabricmc.loom.LoomGradleExtension.JarMergeOrder;
 import net.fabricmc.loom.providers.mappings.TinyDuplicator;
 import net.fabricmc.loom.util.MinecraftVersionInfo;
-import net.fabricmc.loom.util.MinecraftVersionInfo.Downloads;
+import net.fabricmc.loom.util.MinecraftVersionInfo.Download;
 
 /** It's not hard coded, it's just inflexible */
 class SpecialCases {
@@ -49,8 +49,12 @@ class SpecialCases {
 
 		protected abstract StringBuilder getDownload(StringBuilder url, String version);
 
-		public String getDownloadURL(String version) {
-			return getDownload(new StringBuilder("https://archive.org/download/20180501AoMCollection/Omniarchive.zip/"), version).toString();
+		public URL getDownloadURL(String version) {
+			try {
+				return new URL(getDownload(new StringBuilder("https://archive.org/download/20180501AoMCollection/Omniarchive.zip/"), version).toString());
+			} catch (MalformedURLException e) {
+				throw new RuntimeException("Unable to make URL?", e);
+			}
 		}
 	}
 
@@ -377,9 +381,9 @@ class SpecialCases {
 			throw new IllegalArgumentException("Unexpected Minecraft version " + version.id + " without server jar");
 		}
 
-		Downloads server = version.new Downloads();
+		Download server = new Download();
 		server.url = type.getDownloadURL(serverVersion);
-		server.sha1 = hash;
+		server.hash = hash;
 		version.downloads.put("server", server);
 	}
 
