@@ -25,31 +25,29 @@
 package net.fabricmc.loom.dependencies;
 
 import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.jar.JarFile;
-import java.util.zip.ZipEntry;
 
 import com.google.common.base.Throwables;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.ExternalModuleDependency;
+import org.gradle.api.artifacts.repositories.ArtifactRepository;
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.plugins.JavaPlugin;
 
 import net.fabricmc.loom.LoomGradleExtension;
+import net.fabricmc.loom.providers.MappedModsResolver;
 import net.fabricmc.loom.util.Constants;
 
 public class LoomDependencyManager {
@@ -180,25 +178,19 @@ public class LoomDependencyManager {
 		if (extension.getInstallerJson() == null) {
 			//If we've not found the installer JSON we've probably skipped remapping Fabric loader, let's go looking
 			project.getLogger().info("Searching through modCompileClasspath for installer JSON");
+
 			Configuration configuration = project.getConfigurations().getByName(Constants.MOD_COMPILE_CLASSPATH);
+			findInstallerJson(project.getLogger(), extension, configuration, extension.getLoaderLaunchMethod());
 
-			for (File input : configuration.resolve()) {
-				JsonObject jsonObject = findInstallerJson(project.getLogger(), input, extension.getLoaderLaunchMethod());
+			if (extension.getInstallerJson() == null && !extension.getLoaderLaunchMethod().isEmpty()) {
+				project.getLogger().warn("Could not find installer JSON for launch method '{}', falling back", extension.getLoaderLaunchMethod());
 
-				if (jsonObject != null) {
-					if (extension.getInstallerJson() != null) {
-						project.getLogger().info("Found another installer JSON in, ignoring it! " + input);
-						continue;
-					}
-
-					project.getLogger().info("Found installer JSON in " + input);
-					extension.setInstallerJson(jsonObject);
-				}
+				findInstallerJson(project.getLogger(), extension, configuration, "");
 			}
 		}
 
 		if (extension.getInstallerJson() != null) {
-			handleInstallerJson(extension.getInstallerJson(), project);
+			handleInstallerJson(project, extension, extension.getInstallerJson());
 		} else {
 			project.getLogger().warn("fabric-installer.json not found in classpath!");
 		}
@@ -208,45 +200,31 @@ public class LoomDependencyManager {
 		}
 	}
 
-	private static JsonObject findInstallerJson(Logger logger, File file, String launchMethod) {
-		try (JarFile jarFile = new JarFile(file)) {
-			ZipEntry entry = null;
+	private static void findInstallerJson(Logger logger, LoomGradleExtension extension, Configuration configuration, String launchMethod) {
+		for (File input : configuration.resolve()) {
+			JsonObject jsonObject = MappedModsResolver.findInstallerJson(logger, input, extension.getLoaderLaunchMethod());
 
-			if (!launchMethod.isEmpty()) {
-				entry = jarFile.getEntry("fabric-installer." + launchMethod + ".json");
-
-				if (entry == null) {
-					logger.warn("Could not find loader launch method '{}', falling back", launchMethod);
+			if (jsonObject != null) {
+				if (extension.getInstallerJson() != null) {
+					logger.info("Found another installer JSON in {}, ignoring it!", input);
+					continue;
 				}
-			}
 
-			if (entry == null) {
-				entry = jarFile.getEntry("fabric-installer.json");
-
-				if (entry == null) {
-					return null;
-				}
+				logger.info("Found installer JSON in {}", input);
+				extension.setInstallerJson(jsonObject);
 			}
-
-			try (Reader reader = new InputStreamReader(jarFile.getInputStream(entry), StandardCharsets.UTF_8)) {
-				return new JsonParser().parse(reader).getAsJsonObject();
-			}
-		} catch (IOException e) {
-			logger.warn("Error finding installer JSON in {}", file.getPath(), e);
 		}
-
-		return null;
 	}
 
-	private static void handleInstallerJson(JsonObject jsonObject, Project project) {
-		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
-
-		JsonObject libraries = jsonObject.get("libraries").getAsJsonObject();
+	private static void handleInstallerJson(Project project, LoomGradleExtension extension, JsonObject json) {
 		Configuration mcDepsConfig = project.getConfigurations().getByName(Constants.MINECRAFT_DEPENDENCIES);
 		Configuration apDepsConfig = project.getConfigurations().getByName(JavaPlugin.ANNOTATION_PROCESSOR_CONFIGURATION_NAME);
+		Set<String> urls = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
 
-		libraries.get("common").getAsJsonArray().forEach(jsonElement -> {
-			String name = jsonElement.getAsJsonObject().get("name").getAsString();
+		for (JsonElement element : json.getAsJsonObject("libraries").getAsJsonArray("common")) {
+			JsonObject library = element.getAsJsonObject();
+
+			String name = library.get("name").getAsString();
 
 			ExternalModuleDependency modDep = (ExternalModuleDependency) project.getDependencies().create(name);
 			modDep.setTransitive(false);
@@ -258,16 +236,18 @@ public class LoomDependencyManager {
 
 			project.getLogger().debug("Loom adding " + name + " from installer JSON");
 
-			if (jsonElement.getAsJsonObject().has("url")) {
-				String url = jsonElement.getAsJsonObject().get("url").getAsString();
-				long count = project.getRepositories().stream().filter(artifactRepository -> artifactRepository instanceof MavenArtifactRepository)
-						.map(artifactRepository -> (MavenArtifactRepository) artifactRepository)
-						.filter(mavenArtifactRepository -> mavenArtifactRepository.getUrl().toString().equalsIgnoreCase(url)).count();
-
-				if (count == 0) {
-					project.getRepositories().maven(mavenArtifactRepository -> mavenArtifactRepository.setUrl(jsonElement.getAsJsonObject().get("url").getAsString()));
-				}
+			if (library.has("url")) {
+				urls.add(library.get("url").getAsString());
 			}
-		});
+		}
+
+		for (ArtifactRepository repo : project.getRepositories()) {
+			if (repo instanceof MavenArtifactRepository) {
+				urls.remove(((MavenArtifactRepository) repo).getUrl().toString());
+			}
+		}
+		for (String url : urls) {
+			project.getRepositories().maven(repo -> repo.setUrl(url));
+		}
 	}
 }

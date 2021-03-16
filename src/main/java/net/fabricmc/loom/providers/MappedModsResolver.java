@@ -10,6 +10,7 @@ package net.fabricmc.loom.providers;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Queue;
@@ -19,6 +20,8 @@ import java.util.function.Consumer;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipError;
+import java.util.zip.ZipException;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
@@ -29,7 +32,10 @@ import org.gradle.api.logging.Logger;
 import com.google.common.collect.ImmutableSet;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
+import com.google.gson.JsonIOException;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonSyntaxException;
 
 import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.dependencies.ArtifactInfo;
@@ -95,6 +101,16 @@ public class MappedModsResolver extends LogicalDependencyProvider {
 				}
 			});
 
+			JsonObject json = findInstallerJson(project.getLogger(), input, extension.getLoaderLaunchMethod());
+			if (json != null) {
+				if (extension.getInstallerJson() == null) {
+					logger.info("Found installer JSON in {}", input);
+					extension.setInstallerJson(json);
+				} else {
+					logger.info("Found another installer JSON in {}, ignoring it!", input);
+				}
+			}
+
 			addDependency(String.format("%s:%s:%s@%s%s", group, name, version, mappingsSuffix, classifier), project, mod.getLeft());
 		}
 	}
@@ -158,5 +174,24 @@ public class MappedModsResolver extends LogicalDependencyProvider {
 		handleNestedJars(project, extension, origin, nestedFile, config);
 
 		addDependency(remappedFile, project, config);
+	}
+
+	public static JsonObject findInstallerJson(Logger logger, File file, String launchMethod) {
+		try (JarFile jarFile = new JarFile(file)) {
+			ZipEntry entry = jarFile.getEntry(!launchMethod.isEmpty() ? "fabric-installer." + launchMethod + ".json" : "fabric-installer.json");
+			if (entry == null) return null;
+
+			try (Reader reader = new InputStreamReader(jarFile.getInputStream(entry), StandardCharsets.UTF_8)) {
+				return new JsonParser().parse(reader).getAsJsonObject();
+			} catch (JsonSyntaxException e) {
+				logger.warn("Error reading installer JSON in {}", file.getPath(), e);
+			}
+		} catch (ZipException | ZipError e) {
+			logger.error("{} is corrupt", file.getPath(), e);
+		} catch (IOException | JsonIOException e) {
+			logger.warn("Error finding installer JSON in {}", file.getPath(), e);
+		}
+
+		return null;
 	}
 }
