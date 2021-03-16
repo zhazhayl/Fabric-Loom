@@ -120,7 +120,7 @@ public class LoomDependencyManager {
 							}
 						}).whenComplete((success, exception) -> {
 							if (exception == null) {
-								graph.markComplete(provider);
+								if (!didBreak.get()) graph.markComplete(provider);
 							} else {
 								didBreak.set(true);
 
