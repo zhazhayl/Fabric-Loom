@@ -356,6 +356,10 @@ public class LoomGradleExtension {
 		return getDependencyManager().getProvider(MinecraftLibraryProvider.class).extractNatives();
 	}
 
+	public boolean hasLWJGL2() {
+		return getDependencyManager().getProvider(MinecraftLibraryProvider.class).hasLWJGL2();
+	}
+
 	public FileCollection getFernFlowerClasspath() {
 		return recurseProjects(project -> {
 			ConfigurationContainer configurations = project.getBuildscript().getConfigurations();

@@ -163,7 +163,7 @@ public class RunConfig {
 		RunConfig ideaClient = new RunConfig();
 		ideaClient.configName = "Minecraft Client";
 		populate(project, extension, ideaClient, "client");
-		ideaClient.vmArgs += getOSClientJVMArgs();
+		ideaClient.vmArgs += getOSClientJVMArgs(extension);
 
 		return ideaClient;
 	}
@@ -202,8 +202,8 @@ public class RunConfig {
 		return dummyConfig;
 	}
 
-	public static String getOSClientJVMArgs() {
-		if (OperatingSystem.ACTIVE == OperatingSystem.OSX) {
+	public static String getOSClientJVMArgs(LoomGradleExtension extension) {
+		if (OperatingSystem.ACTIVE == OperatingSystem.OSX && !extension.hasLWJGL2()) {
 			return " -XstartOnFirstThread";
 		}
 

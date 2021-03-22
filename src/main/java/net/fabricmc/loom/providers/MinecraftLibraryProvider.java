@@ -43,6 +43,7 @@ import net.fabricmc.loom.util.MinecraftVersionInfo.Library;
 public class MinecraftLibraryProvider extends LogicalDependencyProvider {
 	final List<Library> natives = new ArrayList<>();
 	private Set<File> libs = Collections.emptySet();
+	private boolean hasLWJGL2;
 
 	@Override
 	public Set<Class<? extends DependencyProvider>> getDependencies() {
@@ -72,6 +73,7 @@ public class MinecraftLibraryProvider extends LogicalDependencyProvider {
 			natives.clear();
 		}
 
+		hasLWJGL2 = lwjgl2;
 		libs = project.getConfigurations().getByName(Constants.MINECRAFT_LIBRARIES).getFiles();
 	}
 
@@ -86,5 +88,9 @@ public class MinecraftLibraryProvider extends LogicalDependencyProvider {
 
 	public boolean extractNatives() {
 		return !natives.isEmpty();
+	}
+
+	public boolean hasLWJGL2() {
+		return hasLWJGL2;
 	}
 }
