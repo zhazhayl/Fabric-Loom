@@ -268,7 +268,13 @@ public class LoomGradleExtension {
 	}
 
 	public File getDevLauncherConfig() {
-		return new File(getProjectBuildCache(), "launch.cfg");
+		File projectCache = new File(project.file(".gradle"), "loom-cache");
+
+		if (!projectCache.exists()) {
+			projectCache.mkdirs();
+		}
+
+		return new File(projectCache, "launch.cfg");
 	}
 
 	@Nullable
