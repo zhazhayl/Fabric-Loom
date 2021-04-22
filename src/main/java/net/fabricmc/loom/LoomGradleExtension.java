@@ -44,6 +44,8 @@ import java.util.function.Supplier;
 
 import javax.annotation.Nullable;
 
+import com.google.common.base.Predicate;
+import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.gson.JsonObject;
@@ -137,6 +139,7 @@ public class LoomGradleExtension {
 	public String customManifest = null;
 
 	private JarMergeOrder mergeOrder = JarMergeOrder.INDIFFERENT;
+	private final List<Predicate<String>> libraryFilters = new ArrayList<>();
 	private boolean bulldozeMappings;
 	private NameAcceptor fieldInferenceFilter = (inputMapping, originalName, replacementName) -> originalName.startsWith("field_");
 	private final List<LocalNameSuggestor> nameSuggestors = new ArrayList<>();
@@ -446,6 +449,14 @@ public class LoomGradleExtension {
 
 	public JarMergeOrder getJarMergeOrder() {
 		return mergeOrder;
+	}
+
+	public void addLibraryFilter(Predicate<String> filter) {
+		libraryFilters.add(filter);
+	}
+
+	public java.util.function.Predicate<String> getLibraryFilters() {
+		return libraryFilters.isEmpty() ? Predicates.alwaysTrue() : Predicates.and(libraryFilters);
 	}
 
 	public void setBulldozeMappings(boolean force) {

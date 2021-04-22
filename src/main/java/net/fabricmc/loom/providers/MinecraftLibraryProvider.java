@@ -30,6 +30,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import org.gradle.api.Project;
 
@@ -53,10 +54,11 @@ public class MinecraftLibraryProvider extends LogicalDependencyProvider {
 	@Override
 	public void provide(Project project, LoomGradleExtension extension, Consumer<Runnable> postPopulationScheduler) throws Exception {
 		MinecraftProvider minecraftProvider = getProvider(MinecraftProvider.class);
+		Predicate<String> filter = extension.getLibraryFilters();
 		boolean lwjgl2 = false;
 
 		for (Library library : minecraftProvider.getLibraries()) {
-			if (library.shouldUse()) {
+			if (library.shouldUse() && filter.test(library.getArtifactName())) {
 				if (!library.isNative()) {
 					addDependency(library.getArtifactName(), project, Constants.MINECRAFT_LIBRARIES);
 					lwjgl2 |= library.name.startsWith("org.lwjgl.lwjgl:lwjgl:2.");
