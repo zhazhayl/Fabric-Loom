@@ -44,7 +44,6 @@ import org.gradle.api.artifacts.ExternalModuleDependency;
 import org.gradle.api.artifacts.repositories.ArtifactRepository;
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
 import org.gradle.api.logging.Logger;
-import org.gradle.api.plugins.JavaPlugin;
 
 import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.providers.MappedModsResolver;
@@ -190,7 +189,7 @@ public class LoomDependencyManager {
 		}
 
 		if (extension.getInstallerJson() != null) {
-			handleInstallerJson(project, extension, extension.getInstallerJson());
+			handleInstallerJson(project, extension.getInstallerJson());
 		} else {
 			project.getLogger().warn("fabric-installer.json not found in classpath!");
 		}
@@ -216,9 +215,8 @@ public class LoomDependencyManager {
 		}
 	}
 
-	private static void handleInstallerJson(Project project, LoomGradleExtension extension, JsonObject json) {
+	private static void handleInstallerJson(Project project, JsonObject json) {
 		Configuration mcDepsConfig = project.getConfigurations().getByName(Constants.MINECRAFT_DEPENDENCIES);
-		Configuration apDepsConfig = project.getConfigurations().getByName(JavaPlugin.ANNOTATION_PROCESSOR_CONFIGURATION_NAME);
 		Set<String> urls = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
 
 		for (JsonElement element : json.getAsJsonObject("libraries").getAsJsonArray("common")) {
@@ -229,10 +227,6 @@ public class LoomDependencyManager {
 			ExternalModuleDependency modDep = (ExternalModuleDependency) project.getDependencies().create(name);
 			modDep.setTransitive(false);
 			mcDepsConfig.getDependencies().add(modDep);
-
-			if (!extension.ideSync()) {
-				apDepsConfig.getDependencies().add(modDep);
-			}
 
 			project.getLogger().debug("Loom adding " + name + " from installer JSON");
 
