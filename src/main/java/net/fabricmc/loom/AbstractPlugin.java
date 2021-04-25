@@ -411,7 +411,7 @@ public class AbstractPlugin implements Plugin<Project> {
 			LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
 
 			try {//Try avoid daemons causing caching problems
-				extension.getMinecraftProvider().clearCache();
+				if (extension.hasMinecraftProvider()) extension.getMinecraftProvider().clearCache();
 				for (FernFlowerTask task : project.getTasks().withType(FernFlowerTask.class)) {
 					task.resetClaims();
 				}

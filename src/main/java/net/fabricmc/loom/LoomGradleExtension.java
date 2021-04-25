@@ -400,6 +400,10 @@ public class LoomGradleExtension {
 		return dependencyManager;
 	}
 
+	boolean hasMinecraftProvider() {
+		return getDependencyManager() != null && getDependencyManager().hasProvider(MinecraftProvider.class);
+	}
+
 	public MinecraftProvider getMinecraftProvider() {
 		return getDependencyManager().getProvider(MinecraftProvider.class);
 	}
