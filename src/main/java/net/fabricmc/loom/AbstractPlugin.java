@@ -31,7 +31,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
@@ -527,22 +526,23 @@ public class AbstractPlugin implements Plugin<Project> {
 							((MavenPublication) publication).pom(pom -> {
 								pom.withXml(xml -> {
 									Node dependencies = GroovyXmlUtil.getOrCreateNode(xml.asNode(), "dependencies");
-									Set<String> foundArtifacts = new HashSet<>();
+									Map<String, Dependency> extraDependencies = new HashMap<>();
+
+									for (Dependency dependency : compileModsConfig.getAllDependencies()) {
+										extraDependencies.put(dependency.getGroup() + ':' + dependency.getName(), dependency);
+									}
 
 									GroovyXmlUtil.getNodes(dependencies, "dependency").forEach(node -> {
 										Optional<Node> groupId = GroovyXmlUtil.getNode(node, "groupId");
 										Optional<Node> artifactId = GroovyXmlUtil.getNode(node, "artifactId");
 
 										if (groupId.isPresent() && artifactId.isPresent()) {
-											foundArtifacts.add(groupId.get().text() + ':' + artifactId.get().text());
+											Dependency artifact = extraDependencies.remove(groupId.get().text() + ':' + artifactId.get().text());
+											if (artifact != null) GroovyXmlUtil.getOrCreateNode(node, "version").setValue(artifact.getVersion());
 										}
 									});
 
-									for (Dependency dependency : compileModsConfig.getAllDependencies()) {
-										if (foundArtifacts.contains(dependency.getGroup() + ':' + dependency.getName())) {
-											continue;
-										}
-
+									for (Dependency dependency : extraDependencies.values()) {
 										Node depNode = dependencies.appendNode("dependency");
 										depNode.appendNode("groupId", dependency.getGroup());
 										depNode.appendNode("artifactId", dependency.getName());
