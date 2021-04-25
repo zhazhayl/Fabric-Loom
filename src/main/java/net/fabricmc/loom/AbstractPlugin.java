@@ -518,28 +518,28 @@ public class AbstractPlugin implements Plugin<Project> {
 					continue;
 				}
 
-				Configuration compileModsConfig = project.getConfigurations().getByName(entry.getSourceConfiguration());
+				//Add modsCompile to maven-publish
+				mavenPublish.publications(publications -> {
+					Configuration compileModsConfig = project.getConfigurations().getByName(entry.getSourceConfiguration());
 
-				// add modsCompile to maven-publish
-				mavenPublish.publications((publications) -> {
 					for (Publication publication : publications) {
 						if (publication instanceof MavenPublication) {
-							((MavenPublication) publication).pom((pom) -> {
-								pom.withXml((xml) -> {
+							((MavenPublication) publication).pom(pom -> {
+								pom.withXml(xml -> {
 									Node dependencies = GroovyXmlUtil.getOrCreateNode(xml.asNode(), "dependencies");
 									Set<String> foundArtifacts = new HashSet<>();
 
-									GroovyXmlUtil.childrenNodesStream(dependencies).filter((n) -> "dependency".equals(n.name())).forEach((n) -> {
-										Optional<Node> groupId = GroovyXmlUtil.getNode(n, "groupId");
-										Optional<Node> artifactId = GroovyXmlUtil.getNode(n, "artifactId");
+									GroovyXmlUtil.getNodes(dependencies, "dependency").forEach(node -> {
+										Optional<Node> groupId = GroovyXmlUtil.getNode(node, "groupId");
+										Optional<Node> artifactId = GroovyXmlUtil.getNode(node, "artifactId");
 
 										if (groupId.isPresent() && artifactId.isPresent()) {
-											foundArtifacts.add(groupId.get().text() + ":" + artifactId.get().text());
+											foundArtifacts.add(groupId.get().text() + ':' + artifactId.get().text());
 										}
 									});
 
 									for (Dependency dependency : compileModsConfig.getAllDependencies()) {
-										if (foundArtifacts.contains(dependency.getGroup() + ":" + dependency.getName())) {
+										if (foundArtifacts.contains(dependency.getGroup() + ':' + dependency.getName())) {
 											continue;
 										}
 
@@ -550,7 +550,7 @@ public class AbstractPlugin implements Plugin<Project> {
 										depNode.appendNode("scope", entry.getMavenScope());
 
 										if (dependency instanceof ModuleDependency) {
-											final Set<ExcludeRule> exclusions = ((ModuleDependency) dependency).getExcludeRules();
+											Set<ExcludeRule> exclusions = ((ModuleDependency) dependency).getExcludeRules();
 
 											if (!exclusions.isEmpty()) {
 												Node exclusionsNode = depNode.appendNode("exclusions");

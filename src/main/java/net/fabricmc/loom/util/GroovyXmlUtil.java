@@ -25,10 +25,10 @@
 package net.fabricmc.loom.util;
 
 import java.util.Optional;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import groovy.util.Node;
+import groovy.xml.QName;
 
 public final class GroovyXmlUtil {
 	private GroovyXmlUtil() { }
@@ -38,10 +38,27 @@ public final class GroovyXmlUtil {
 	}
 
 	public static Optional<Node> getNode(Node parent, String name) {
-		return childrenNodesStream(parent).filter(node -> name.equals(node.name())).findFirst();
+		return getNodes(parent, name).findFirst();
 	}
 
-	public static Stream<Node> childrenNodesStream(Node node) {
+	public static Stream<Node> getNodes(Node parent, String name) {
+		return childrenNodesStream(parent).filter(node -> {
+			Object nodeName = node.name();
+			if (nodeName == null) return name == null; //Probably shouldn't be null but...
+
+			if (nodeName instanceof CharSequence) {
+				return name.contentEquals((CharSequence) nodeName);
+			}
+
+			if (nodeName instanceof QName) {
+				return ((QName) nodeName).matches(name);
+			}
+
+			throw new UnsupportedOperationException("Cannot determine if " + nodeName.getClass() + " is the same as a String");
+		});
+	}
+
+	private static Stream<Node> childrenNodesStream(Node node) {
 		return fishForNodes(node.children().stream());
 	}
 
@@ -54,9 +71,5 @@ public final class GroovyXmlUtil {
 	 */
 	private static Stream<Node> fishForNodes(Stream<?> stuff) {
 		return stuff.filter(o -> o instanceof Node).map(Node.class::cast);
-	}
-
-	public static Iterable<Node> childrenNodes(Node node) {
-		return childrenNodesStream(node).collect(Collectors.toList());
 	}
 }
