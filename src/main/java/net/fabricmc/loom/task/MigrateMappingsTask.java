@@ -42,6 +42,7 @@ import com.google.common.collect.Iterables;
 import org.cadixdev.lorenz.MappingSet;
 import org.cadixdev.lorenz.io.MappingsReader;
 import org.cadixdev.mercury.Mercury;
+import org.cadixdev.mercury.mixin.MixinRemapper;
 import org.cadixdev.mercury.remapper.MercuryRemapper;
 
 import org.gradle.api.GradleException;
@@ -64,6 +65,7 @@ public class MigrateMappingsTask extends AbstractLoomTask {
 	private Path inputDir;
 	private Path outputDir;
 	private String mappings;
+	private boolean doMixins;
 
 	public MigrateMappingsTask() {
 		inputDir = getProject().file("src/main/java").toPath();
@@ -85,6 +87,11 @@ public class MigrateMappingsTask extends AbstractLoomTask {
 		this.mappings = mappings;
 	}
 
+	@Option(option = "mixins", description = "Also remap Mixins")
+	public void setDoMixins(boolean doMixins) {
+		this.doMixins = doMixins;
+	}
+
 	@TaskAction
 	public void doTask() throws Throwable {
 		Project project = getProject();
@@ -104,7 +111,7 @@ public class MigrateMappingsTask extends AbstractLoomTask {
 		try {
 			Mappings currentMappings = mappingsProvider.getMappings();
 			Mappings targetMappings = getMappings(mappings);
-			migrateMappings(project, extension.getMinecraftMappedProvider(), inputDir, outputDir, currentMappings, targetMappings);
+			migrateMappings(project, extension.getMinecraftMappedProvider(), inputDir, outputDir, currentMappings, targetMappings, doMixins);
 			project.getLogger().lifecycle(":remapped project written to " + outputDir.toAbsolutePath());
 		} catch (IOException e) {
 			throw new IllegalArgumentException("Error while loading mappings", e);
@@ -147,7 +154,7 @@ public class MigrateMappingsTask extends AbstractLoomTask {
 	}
 
 	private static void migrateMappings(Project project, MinecraftMappedProvider minecraftMappedProvider,
-										Path inputDir, Path outputDir, Mappings currentMappings, Mappings targetMappings
+										Path inputDir, Path outputDir, Mappings currentMappings, Mappings targetMappings, boolean doMixins
 	) throws IOException {
 		project.getLogger().lifecycle(":joining mappings");
 		@SuppressWarnings("resource") //Hush, it doesn't need closing
@@ -159,6 +166,7 @@ public class MigrateMappingsTask extends AbstractLoomTask {
 		mercury.getClassPath().add(minecraftMappedProvider.MINECRAFT_MAPPED_JAR.toPath());
 		mercury.getClassPath().add(minecraftMappedProvider.MINECRAFT_INTERMEDIARY_JAR.toPath());
 
+		if (doMixins) mercury.getProcessors().add(MixinRemapper.create(mappingSet));
 		mercury.getProcessors().add(MercuryRemapper.create(mappingSet));
 
 		try {

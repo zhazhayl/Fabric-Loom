@@ -3,6 +3,7 @@ plugins {
 	id 'java-gradle-plugin'
 	id 'idea'
 	id 'eclipse'
+	id 'com.github.johnrengelman.shadow' version '4.0.4' apply false
 }
 
 sourceCompatibility = 1.8
@@ -25,6 +26,9 @@ if (ENV.BUILD_NUMBER) {
 repositories {
 	mavenCentral()
 	maven {
+		url 'https://oss.sonatype.org/content/groups/public/'
+	}
+	maven {
 		name = "Fabric"
 		url = 'https://maven.fabricmc.net/'
 	}
@@ -35,6 +39,12 @@ repositories {
 	maven {
 		url "https://repo.gradle.org/gradle/libs-releases-local"
 	}
+}
+
+configurations {
+	shade
+	compileOnly.extendsFrom shade
+	runtimeClasspath.extendsFrom shade
 }
 
 dependencies {
@@ -69,16 +79,30 @@ dependencies {
 	implementation ('com.github.Chocohead:ForgedFlower:d6b8cf1')
 
 	// source code remapping
-	implementation ('org.cadixdev:mercury:0.1.0-rc1')
-
+	shade ('org.cadixdev:mercury:0.1.0-rc1')
+	shade ('org.cadixdev:mercurymixin:0.1.0-SNAPSHOT')
 }
 
 jar {
+	classifier = 'unshaded'
 	manifest {
 		attributes 'Implementation-Title': "Loom $version"
 		attributes 'Implementation-Version': "$version Build($build)"
 	}
 }
+
+task shadowJar(type: com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
+	dependsOn 'jar'
+    from(zipTree(jar.archivePath))
+    classifier ''
+    manifest.inheritFrom jar.manifest
+
+    configurations = [project.configurations.shade]
+	relocate 'org.cadixdev.mercury', 'com.chocohead.shade.mercury'
+	exclude('META-INF/INDEX.LIST', 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA', 'module-info.class')
+}
+
+assemble.dependsOn shadowJar
 
 task sourcesJar(type: Jar, dependsOn: classes) {
 	classifier = 'sources'
@@ -148,6 +172,7 @@ publishing {
 
 			from components["java"]
 
+			artifact shadowJar
 			artifact sourcesJar
 			//artifact javadocJar
 		}
