@@ -23,7 +23,7 @@ if (ENV.BUILD_NUMBER) {
 }
 
 repositories {
-	jcenter()
+	mavenCentral()
 	maven {
 		name = "Fabric"
 		url = 'https://maven.fabricmc.net/'
@@ -43,11 +43,11 @@ dependencies {
 	// libraries
 	implementation ('commons-io:commons-io:2.6')
 	implementation ('org.zeroturnaround:zt-zip:1.13')
-	implementation ('com.google.code.gson:gson:2.8.5')
-	implementation ('com.google.guava:guava:28.0-jre')
+	implementation ('com.google.code.gson:gson:2.8.6')
+	implementation ('com.google.guava:guava:30.1-jre')
 
 	// game handling utils
-	implementation ('com.github.Chocohead:Stitch:c5d2287') {
+	implementation ('com.github.Chocohead:Stitch:8befa96') {
 		exclude module: 'enigma'
 		exclude module: 'tiny-mappings-parser'
 	}
@@ -62,10 +62,10 @@ dependencies {
 	implementation ('com.github.Chocohead:tiny-remapper:ab144ea') {
 		transitive = false
 	}
-	implementation 'cuchaz:enigma:0.15.3+build.170:lib'
+	implementation 'cuchaz:enigma-cli:0.27.1'
 
 	// decompilers
-	implementation ('net.fabricmc:procyon-fabric-compilertools:0.5.35.+')
+	//implementation ('org.benf:cfr:0.151')
 	implementation ('com.github.Chocohead:ForgedFlower:d6b8cf1')
 
 	// source code remapping
@@ -76,7 +76,7 @@ dependencies {
 jar {
 	manifest {
 		attributes 'Implementation-Title': "Loom $version"
-		attributes 'Implementation-Version': version + " Build(" + build + ")"
+		attributes 'Implementation-Version': "$version Build($build)"
 	}
 }
 
