@@ -80,8 +80,10 @@ dependencies {
 	implementation ('com.github.Chocohead:ForgedFlower:d6b8cf1')
 
 	// source code remapping
-	shade ('org.cadixdev:mercury:0.1.0-rc1')
-	shade ('org.cadixdev:mercurymixin:0.1.0-SNAPSHOT')
+	implementation ('org.cadixdev:mercury:0.1.0-rc1')
+	shade ('org.cadixdev:mercurymixin:0.1.0-SNAPSHOT') {
+		transitive = false
+	}
 }
 
 jar {
