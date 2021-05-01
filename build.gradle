@@ -72,6 +72,7 @@ dependencies {
 	implementation ('com.github.Chocohead:tiny-remapper:ab144ea') {
 		transitive = false
 	}
+	compileOnly 'cuchaz:enigma:0.27.1'
 	implementation 'cuchaz:enigma-cli:0.27.1'
 
 	// decompilers
