@@ -137,9 +137,7 @@ public class MappingsProvider extends LogicalDependencyProvider {
 		initFiles(extension, project.getLogger(), minecraftProvider);
 
 		if (!MAPPINGS_TINY_BASE.exists() || !MAPPINGS_TINY.exists()) {
-			if (!MAPPINGS_DIR.exists()) {
-				MAPPINGS_DIR.mkdir();
-			}
+			FileUtils.forceMkdir(MAPPINGS_DIR);
 
 			free: if (!MAPPINGS_TINY_BASE.exists()) {
 				Map<String, List<MappingFile>> versionToMappings = new HashMap<>();
