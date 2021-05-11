@@ -101,7 +101,7 @@ task shadowJar(type: com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar)
     manifest.inheritFrom jar.manifest
 
     configurations = [project.configurations.shade]
-	relocate 'org.cadixdev.mercury', 'com.chocohead.shade.mercury'
+	relocate 'org.cadixdev.mercury.mixin', 'com.chocohead.shade.mercury.mixin'
 	exclude('META-INF/INDEX.LIST', 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA', 'module-info.class')
 }
 
