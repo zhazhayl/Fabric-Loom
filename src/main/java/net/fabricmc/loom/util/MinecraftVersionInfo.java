@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import com.google.common.collect.ObjectArrays;
 import com.google.gson.annotations.SerializedName;
 
 import net.fabricmc.loom.util.MinecraftVersionInfo.Library.Rule.Action;
@@ -142,6 +143,10 @@ public class MinecraftVersionInfo {
 		@SerializedName("sha1")
 		public String hash;
 		public int size;
+
+		public URL[] getURLs() {
+			return ObjectArrays.concat(url, altUrls);
+		}
 	}
 
 	public static class AssetIndex {
