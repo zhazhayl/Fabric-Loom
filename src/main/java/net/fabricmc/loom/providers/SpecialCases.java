@@ -14,6 +14,7 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
@@ -30,28 +31,48 @@ class SpecialCases {
 	private enum ServerType {
 		RELEASE {
 			@Override
-			protected StringBuilder getDownload(StringBuilder url, String version) {
+			protected StringBuilder getPymclDownload(StringBuilder url, String version) {
+				return url.append("Release ").append(version).append(".jar");
+			}
+
+			@Override
+			protected StringBuilder getArchiveDownload(StringBuilder url, String version) {
 				return url.append("Omniarchive/Miscellaneous Files/CURLs/maven.sk89q.com/minecraft-server-").append(version).append(".jar");
 			}
 		},
 		BETA {
 			@Override
-			protected StringBuilder getDownload(StringBuilder url, String version) {
+			protected StringBuilder getPymclDownload(StringBuilder url, String version) {
+				return url.append(version.replace("b", "Beta ")).append(".jar");
+			}
+
+			@Override
+			protected StringBuilder getArchiveDownload(StringBuilder url, String version) {
 				return url.append("Omniarchive/Java Edition/Servers/Beta/").append(version).append("/minecraft_server.jar");
 			}
 		},
 		ALPHA {
 			@Override
-			protected StringBuilder getDownload(StringBuilder url, String version) {
+			protected StringBuilder getPymclDownload(StringBuilder url, String version) {
+				return url.append(version.replace("a", "Alpha ")).append(".jar");
+			}
+
+			@Override
+			protected StringBuilder getArchiveDownload(StringBuilder url, String version) {
 				return url.append("Omniarchive/Java Edition/Servers/Alpha/").append(version, 1, version.length()).append("/minecraft_server.jar");
 			}
 		};
 
-		protected abstract StringBuilder getDownload(StringBuilder url, String version);
+		protected abstract StringBuilder getPymclDownload(StringBuilder url, String version);
 
-		public URL getDownloadURL(String version) {
+		protected abstract StringBuilder getArchiveDownload(StringBuilder url, String version);
+
+		public URL[] getDownloadURLs(String version) {
 			try {
-				return new URL(getDownload(new StringBuilder("https://archive.org/download/20180501AoMCollection/Omniarchive.zip/"), version).toString());
+				return new URL[] {
+						new URL(getPymclDownload(new StringBuilder("https://files.pymcl.net/server/vanilla/bin/"), version).toString()),
+						new URL(getArchiveDownload(new StringBuilder("https://archive.org/download/20180501AoMCollection/Omniarchive.zip/"), version).toString())
+				};
 			} catch (MalformedURLException e) {
 				throw new RuntimeException("Unable to make URL?", e);
 			}
@@ -382,7 +403,9 @@ class SpecialCases {
 		}
 
 		Download server = new Download();
-		server.url = type.getDownloadURL(serverVersion);
+		URL[] urls = type.getDownloadURLs(serverVersion);
+		server.url = urls[0];
+		server.altUrls = Arrays.copyOfRange(urls, 1, urls.length);
 		server.hash = hash;
 		version.downloads.put("server", server);
 	}
