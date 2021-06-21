@@ -462,22 +462,54 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 	}
 
 	private static void downloadJar(Logger logger, String minecraftVersion, MinecraftVersionInfo versionInfo, File to, String name) throws IOException {
-		downloadJar(logger, minecraftVersion, versionInfo.downloads.get(name).url, to, name, versionInfo.downloads.get(name).hash);
+		MinecraftVersionInfo.Download download = versionInfo.downloads.get(name);
+		downloadJar(logger, minecraftVersion, download.url, download.altUrls, to, name, download.hash);
 	}
 
-	private static void downloadJar(Logger logger, String minecraftVersion, URL from, File to, String name, String hash) throws IOException {
+	private static void downloadJar(Logger logger, String minecraftVersion, URL from, URL[] alts, File to, String name, String hash) throws IOException {
 		if (!to.exists() || !Checksum.equals(to, hash) && StaticPathWatcher.INSTANCE.hasFileChanged(to.toPath())) {
 			logger.debug("Downloading Minecraft {} {} jar", minecraftVersion, name);
 
-			int attempt = 1;
-			do {
-				DownloadUtil.delete(to); //Clear the existing (wrong) contents out of the way
-				DownloadUtil.downloadIfChanged(from, to, logger);
-			} while (attempt++ <= DOWNLOAD_ATTEMPTS && !Checksum.equals(to, hash));
+			URL[] urls = new URL[alts.length + 1];
+			urls[0] = from;
+			System.arraycopy(alts, 0, urls, 1, alts.length);
 
-			if (attempt > DOWNLOAD_ATTEMPTS) {//Apparently we just couldn't get a jar which had the right hash
+			boolean downloadFailed = false;
+			IOException exception = null;
+			for (URL fromCandidate : urls) {
+				downloadFailed = false;
+				int attempt = 1;
+				try {
+					do {
+						DownloadUtil.delete(to); //Clear the existing (wrong) contents out of the way
+						DownloadUtil.downloadIfChanged(fromCandidate, to, logger);
+					} while (attempt++ <= DOWNLOAD_ATTEMPTS && !Checksum.equals(to, hash));
+
+					if (attempt > DOWNLOAD_ATTEMPTS) {//Apparently we just couldn't get a jar which had the right hash
+						downloadFailed = true;
+					}
+				} catch (IOException e) {
+					if (exception == null) {
+						exception = e;
+					}
+					downloadFailed = true;
+				}
+
+				if (downloadFailed) {
+					logger.debug("Failed to download from {}", fromCandidate);
+				} else {
+					logger.debug("Successfully downloaded from {}", fromCandidate);
+					break;
+				}
+			}
+
+			if (downloadFailed) {
+				if (exception != null) {
+					throw exception;
+				}
 				throw new IllegalStateException("Unable to successfully download an intact " + minecraftVersion + ' ' + name + " jar!");
 			}
+
 
 			StaticPathWatcher.INSTANCE.resetFile(to.toPath());
 		}

@@ -138,6 +138,7 @@ public class MinecraftVersionInfo {
 
 	public static class Download {
 		public URL url;
+		public URL[] altUrls = new URL[0];
 		@SerializedName("sha1")
 		public String hash;
 		public int size;
