@@ -15,6 +15,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
+import java.util.Objects;
+import java.util.stream.Stream;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
@@ -32,7 +34,21 @@ class SpecialCases {
 		RELEASE {
 			@Override
 			protected StringBuilder getPymclDownload(StringBuilder url, String version) {
+				switch (version) {
+				case "1.2.4":
+				case "1.2.3":
+				case "1.2.2":
+				case "1.2.1":
+				case "1.0.1": //Actually has 1.0.0 not 1.0.1
+					return null;
+				}
+
 				return url.append("Release ").append(version).append(".jar");
+			}
+
+			@Override
+			protected StringBuilder getBetacraftDownload(StringBuilder url, String version) {
+				return url.append(version).append(".jar");
 			}
 
 			@Override
@@ -43,7 +59,55 @@ class SpecialCases {
 		BETA {
 			@Override
 			protected StringBuilder getPymclDownload(StringBuilder url, String version) {
-				return url.append(version.replace("b", "Beta ")).append(".jar");
+				switch (version) {
+				case "b1.7.2":
+				case "b1.7_01":
+				case "b1.7":
+				case "b1.6.5":
+				case "b1.6.4":
+				case "b1.6.3":
+				case "b1.6.2":
+				case "b1.6.1":
+				case "b1.5":
+				case "b1.4":
+				case "b1.1_02":
+				case "b1.1_01":
+				case "b1.0-2":
+					return null;
+
+				case "b1.3":
+					version = "Beta 1.3B";
+					break;
+
+				case "b1.0-1":
+					version = "Beta 1.0.2";
+					break;
+
+				default:
+					version = version.replaceFirst("b", "Beta ");
+					break;
+				}
+
+				return url.append(version).append(".jar");
+			}
+
+			@Override
+			protected StringBuilder getBetacraftDownload(StringBuilder url, String version) {
+				switch (version) {
+				case "b1.3":
+					version = "b1.3-221731";
+					break;
+
+				case "b1.0-2":
+					version = "b1.0_01";
+					break;
+
+				case "b1.0-1":
+					version = "b1.0";
+					break;
+				}
+
+				return url.append(version).append(".jar");
 			}
 
 			@Override
@@ -54,7 +118,60 @@ class SpecialCases {
 		ALPHA {
 			@Override
 			protected StringBuilder getPymclDownload(StringBuilder url, String version) {
-				return url.append(version.replace("a", "Alpha ")).append(".jar");
+				switch (version) {
+				case "a0.2.8":
+					version = "Alpha 1.2.6"; //Same as Beta(!) 1.0
+					break;
+
+				case "a0.2.6_02":
+					version = "Alpha 1.2.5";
+					break;
+
+				case "a0.2.5_02":
+					version = "Alpha 1.2.4_01";
+					break;
+
+				case "a0.2.4":
+					version = "Alpha 1.2.2B"; //Same as Alpha 1.2.3
+					break;
+
+				case "a0.2.2_01":
+					version = "Alpha 1.2.0_02";
+					break;
+
+				case "a0.2.1":
+					version = "Alpha 1.2.0";
+					break;
+
+				case "a0.2.0_01":
+					version = "Alpha 1.1.2_01";
+					break;
+
+				case "a0.1.4":
+					version = "Alpha 1.0.17_04"; //Same as Alpha 1.1.0, likewise 1.0.17_02 but compressed less
+
+				case "a0.2.7":
+				case "a0.2.6":
+				case "a0.2.5_01":
+				case "a0.2.5-2":
+				case "a0.2.5-1":
+				case "a0.2.3":
+				case "a0.2.2":
+				case "a0.1.2_01":
+				case "a0.1.0":
+					return null; //Not present
+
+				default:
+					version = version.replaceFirst("a", "Alpha ");
+					break;
+				}
+
+				return url.append(version).append(".jar");
+			}
+
+			@Override
+			protected StringBuilder getBetacraftDownload(StringBuilder url, String version) {
+				return url.append(version).append(".jar");
 			}
 
 			@Override
@@ -65,17 +182,21 @@ class SpecialCases {
 
 		protected abstract StringBuilder getPymclDownload(StringBuilder url, String version);
 
+		protected abstract StringBuilder getBetacraftDownload(StringBuilder url, String version);
+
 		protected abstract StringBuilder getArchiveDownload(StringBuilder url, String version);
 
 		public URL[] getDownloadURLs(String version) {
-			try {
-				return new URL[] {
-						new URL(getPymclDownload(new StringBuilder("https://files.pymcl.net/server/vanilla/bin/"), version).toString()),
-						new URL(getArchiveDownload(new StringBuilder("https://archive.org/download/20180501AoMCollection/Omniarchive.zip/"), version).toString())
-				};
-			} catch (MalformedURLException e) {
-				throw new RuntimeException("Unable to make URL?", e);
-			}
+			return Stream.of(getPymclDownload(new StringBuilder("https://files.pymcl.net/server/vanilla/bin/"), version),
+							getBetacraftDownload(new StringBuilder("https://betacraft.pl/server-archive/minecraft/"), version),
+							getArchiveDownload(new StringBuilder("https://archive.org/download/20180501AoMCollection/Omniarchive.zip/"), version)
+						).filter(Objects::nonNull).map(url -> {
+							try {
+								return new URL(url.toString());
+							} catch (MalformedURLException e) {
+								throw new RuntimeException("Unable to make URL?", e);
+							}
+						}).toArray(URL[]::new);
 		}
 	}
 
@@ -230,7 +351,7 @@ class SpecialCases {
 		case "b1.3_01": //The server didn't seem to get a hot patch despite the client doing so
 		case "b1.3b":
 			type = ServerType.BETA;
-			serverVersion = "b1.3"; //b1.3-221731
+			serverVersion = "b1.3";
 			hash = "5cc2aa79b477761cd229d1c3075a6a3afb2bc3ce";
 			break;
 
@@ -262,7 +383,7 @@ class SpecialCases {
 		case "b1.0.2": //The server didn't seem to get a version bump despite the client doing so
 		case "b1.0_01":
 			type = ServerType.BETA;
-			serverVersion = "b1.0-2"; //Sometimes listed as b1.0_01
+			serverVersion = "b1.0-2";
 			hash = "5270b250d8a1c48f170d53b4b3874b01c55ec72c";
 			break;
 
