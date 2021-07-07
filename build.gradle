@@ -57,7 +57,7 @@ dependencies {
 	implementation ('com.google.guava:guava:30.1-jre')
 
 	// game handling utils
-	implementation ('com.github.Chocohead:Stitch:8abf370') {
+	implementation ('com.github.Chocohead:Stitch:8085309') {
 		exclude module: 'enigma'
 		exclude module: 'tiny-mappings-parser'
 	}
