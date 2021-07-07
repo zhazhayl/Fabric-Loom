@@ -46,8 +46,8 @@ public class MinecraftNativesProvider {
 		File jarStore = extension.getNativesJarStore();
 
 		for (Library library : natives) {
-			assert library.shouldUse() && library.isNative();
-			String[] parts = library.getArtifactName(OperatingSystem.ACTIVE).split(":", 4);
+			assert library.shouldUse() && library.isNative() && library.hasNativeFor(OperatingSystem.ACTIVE);
+			String[] parts = library.getArtifactName().split(":", 4);
 
 			File libJarFile = new File(jarStore, parts[0].replace('.', File.separatorChar) + File.separator + parts[1] + File.separator + parts[2] + File.separator + parts[1] + '-' + parts[2] + parts[3] + ".jar");
 			DownloadUtil.downloadIfChanged(library.getDownload(OperatingSystem.ACTIVE).url, libJarFile, project.getLogger());

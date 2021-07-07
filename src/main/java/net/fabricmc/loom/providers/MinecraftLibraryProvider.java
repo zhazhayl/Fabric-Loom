@@ -58,7 +58,7 @@ public class MinecraftLibraryProvider extends LogicalDependencyProvider {
 		boolean lwjgl2 = false;
 
 		for (Library library : minecraftProvider.getLibraries()) {
-			if (library.shouldUse() && filter.test(library.getArtifactName())) {
+			if (library.willUse() && filter.test(library.getArtifactName())) {
 				if (!library.isNative()) {
 					addDependency(library.getArtifactName(), project, Constants.MINECRAFT_LIBRARIES);
 					lwjgl2 |= library.name.startsWith("org.lwjgl.lwjgl:lwjgl:2.");

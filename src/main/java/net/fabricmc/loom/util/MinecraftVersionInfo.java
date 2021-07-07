@@ -102,6 +102,14 @@ public class MinecraftVersionInfo {
 			return false;
 		}
 
+		public boolean willUse() {
+			return willUse(OperatingSystem.ACTIVE);
+		}
+
+		public boolean willUse(OperatingSystem os) {
+			return shouldUse(os) && (!isNative() || hasNativeFor(os));
+		}
+
 		public String getArtifactName() {
 			return getArtifactName(OperatingSystem.ACTIVE);
 		}
