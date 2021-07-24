@@ -26,15 +26,16 @@ package net.fabricmc.loom.dependencies;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.base.Throwables;
+import com.google.common.collect.Iterables;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
@@ -48,6 +49,7 @@ import org.gradle.api.logging.Logger;
 import net.fabricmc.loom.LoomGradleExtension;
 import net.fabricmc.loom.providers.MappedModsResolver;
 import net.fabricmc.loom.util.Constants;
+import net.fabricmc.stitch.util.StitchUtil;
 
 public class LoomDependencyManager {
 	private final List<DependencyProvider> dependencyProviderList = new ArrayList<>();
@@ -103,64 +105,39 @@ public class LoomDependencyManager {
 		List<Runnable> afterTasks = new ArrayList<>();
 
 		if (extension.shouldLoadInParallel()) {
-			List<CompletableFuture<?>> tasks = new ArrayList<>();
-			AtomicBoolean didBreak = new AtomicBoolean();
-
-			try {
-				while (graph.waitForWork() && !didBreak.get()) {
-					for (DependencyProvider provider : graph.allAvailable()) {
-						tasks.add(CompletableFuture.runAsync(() -> {
-							try {
-								provider.provide(project, extension, afterTasks::add);
-							} catch (Throwable t) {
-								throw new RuntimeException("Failed to provide " + provider.getType() + " dependency of type " + provider.getClass(), t);
-							}
-						}).whenComplete((success, exception) -> {
-							if (exception == null) {
-								if (!didBreak.get()) graph.markComplete(provider);
-							} else {
-								didBreak.set(true);
-
-								synchronized (graph) {
-									graph.notifyAll();
-								}
-							}
-						}));
-					}
+			Collection<CompletableFuture<Void>> tasks = graph.asFutures(provider -> {
+				try {
+					provider.provide(project, extension, afterTasks::add);
+				} catch (Throwable t) {
+					throw new RuntimeException("Failed to provide " + provider.getType() + " dependency of type " + provider.getClass(), t);
 				}
-			} catch (InterruptedException e) {
-				throw new RuntimeException("Unexpected halt to processing dependencies", e);
+			});
+			Set<Throwable> thrown = StitchUtil.newIdentityHashSet();
+
+			for (CompletableFuture<?> task : tasks) {
+				try {
+					task.join();
+				} catch (CancellationException e) {
+					//Well it didn't strictly go wrong if cancelled
+				} catch (CompletionException e) {
+					thrown.add(e.getCause());
+				} catch (Throwable t) {
+					thrown.add(t);
+				}
 			}
 
-			if (didBreak.get()) {//Bailed early, time to unpack the exceptions
-				Throwable thrown = null;
+			if (!thrown.isEmpty()) {
+				RuntimeException e = new RuntimeException("Error providing Loom dependencies");
 
-				for (CompletableFuture<?> task : tasks) {
-					try {
-						task.join();
-					} catch (CancellationException e) {
-						//Well it didn't strictly go wrong if cancelled
-					} catch (CompletionException e) {
-						if (thrown == null) {
-							thrown = e.getCause();
-						} else {
-							thrown.addSuppressed(e.getCause());
-						}
-					} catch (Throwable t) {
-						if (thrown == null) {
-							thrown = t;
-						} else {
-							thrown.addSuppressed(t);
-						}
-					}
-				}
-
-				if (thrown == null) {
-					throw new IllegalStateException("Error processing dependencies, unable to find cause");
+				if (thrown.size() == 1) {
+					Throwable t = Iterables.getOnlyElement(thrown);
+					Throwables.throwIfUnchecked(t); //Should be but you never know
+					e.initCause(t);
 				} else {
-					Throwables.throwIfUnchecked(thrown);
-					throw new RuntimeException("Error processing dependencies", thrown);
+					for (Throwable t : thrown) e.addSuppressed(t);
 				}
+
+				throw e;
 			}
 		} else {
 			for (DependencyProvider provider : graph.asIterable()) {
@@ -169,8 +146,6 @@ public class LoomDependencyManager {
 				} catch (Throwable t) {
 					throw new RuntimeException("Failed to provide " + provider.getType() + " dependency of type " + provider.getClass(), t);
 				}
-
-				graph.markComplete(provider);
 			}
 		}
 

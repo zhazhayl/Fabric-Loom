@@ -9,15 +9,22 @@ package net.fabricmc.loom.dependencies;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
+
+import com.google.common.collect.Iterables;
 
 import net.fabricmc.stitch.util.StitchUtil;
 
@@ -86,18 +93,17 @@ class DependencyGraph {
 			return dependencies.isEmpty();
 		}
 	}
-
 	private final Queue<DependencyNode> currentActive = new ArrayDeque<>();
-	private final Set<DependencyNode> awaiting = StitchUtil.newIdentityHashSet();
 
 	public DependencyGraph(List<DependencyProvider> dependencies) {
-		Set<Class<? extends DependencyProvider>> seenDependencies = StitchUtil.newIdentityHashSet();
 		Map<Class<? extends DependencyProvider>, DependencyNode> dependenciesGraph = new IdentityHashMap<>();
 		List<DependencyNode> roots = new ArrayList<>();
 
 		for (DependencyProvider dependency : dependencies) {
 			Class<? extends DependencyProvider> type = dependency.getClass();
-			if (!seenDependencies.add(type)) {
+
+			DependencyNode existing = dependenciesGraph.get(type);
+			if (existing != null && !existing.isEmpty()) {
 				throw new IllegalArgumentException("Duplicate dependency types of " + type);
 			}
 
@@ -105,8 +111,6 @@ class DependencyGraph {
 			Set<Class<? extends DependencyProvider>> after = dependency.getDependents();
 
 			if (before.isEmpty() && after.isEmpty()) {
-				DependencyNode existing = dependenciesGraph.get(type);
-
 				if (existing != null) {
 					existing.fill(dependency);
 				} else {
@@ -114,8 +118,6 @@ class DependencyGraph {
 					roots.add(existing);
 				}
 			} else {
-				DependencyNode existing = dependenciesGraph.get(type);
-
 				if (existing != null) {
 					//If we have dependencies of our own we aren't a root
 					if (!before.isEmpty()) roots.remove(existing);
@@ -187,91 +189,117 @@ class DependencyGraph {
 		currentActive.addAll(roots);
 	}
 
-	/**
-	 * Pops the next available {@link DependencyProvider} out of the queue to be processed
-	 *
-	 * @throws NoSuchElementException If there are no providers available (ie {@link #hasAvailable()} returns <code>false</code>)
-	 */
-	public synchronized DependencyProvider nextAvailable() {
-		if (!hasAvailable()) {
-			throw new NoSuchElementException("No more providers");
-		}
-
-		assert currentActive.stream().allMatch(node -> node.getDependencies().isEmpty());
-		DependencyNode node = currentActive.poll();
-		awaiting.add(node);
-		return node.getProvider();
-	}
-
-	/**
-	 * Drain all available {@link DependencyProvider}s, designed for threading the processing each
-	 *
-	 * @throws NoSuchElementException If there are no providers available (ie {@link #hasAvailable()} returns <code>false</code>)
-	 */
-	public synchronized List<DependencyProvider> allAvailable() {
-		if (!hasAvailable()) {
-			throw new NoSuchElementException("No more providers");
-		}
-
-		assert currentActive.stream().allMatch(node -> node.getDependencies().isEmpty());
-		List<DependencyProvider> out = currentActive.stream().map(DependencyNode::getProvider).collect(Collectors.toList());
-		awaiting.addAll(currentActive);
-		currentActive.clear();
-		return out;
-	}
-
-	/** Flags the given {@link DependencyProvider} as complete for the purposes of allowing dependent providers to run */
-	public synchronized void markComplete(DependencyProvider provider) {
-		for (Iterator<DependencyNode> it = awaiting.iterator(); it.hasNext();) {
-			DependencyNode node = it.next();
-
-			if (node.getProvider() == provider) {
-				it.remove();
-				currentActive.addAll(node.flagComplete());
-
-				if (currentActive.isEmpty() && !node.getDependents().stream().map(DependencyNode::getDependencies).allMatch(awaiting::containsAll)) {
-					throw new IllegalStateException("All remaining dependencies have dependencies!");
-				}
-
-				if (!currentActive.isEmpty() || awaiting.isEmpty()) notifyAll();
-				break;
-			}
-		}
-	}
-
 	/** Whether there are any more {@link DependencyProvider} currently capable of being processed */
-	public synchronized boolean hasAvailable() {
+	public boolean hasAvailable() {
 		return !currentActive.isEmpty();
-	}
-
-	/** Whether there are any {@link DependencyProvider}s waiting to be {@link #markComplete(DependencyProvider) marked complete} */
-	public synchronized boolean hasActive() {
-		return !awaiting.isEmpty();
 	}
 
 	/** {@link Iterable} form of the graph designed to loop over all the {@link DependencyProvider}s in it */
 	public Iterable<DependencyProvider> asIterable() {
-		return () -> new Iterator<DependencyProvider>() {
+		return new Iterable<DependencyProvider>() {
+			private final Iterable<DependencyNode> real = asIterableNodes();
+
+			@Override
+			public Iterator<DependencyProvider> iterator() {
+				return new Iterator<DependencyProvider>() {
+					private final Iterator<DependencyNode> it = real.iterator();
+
+					@Override
+					public boolean hasNext() {
+						return it.hasNext();
+					}
+
+					@Override
+					public DependencyProvider next() {
+						return it.next().getProvider();
+					}
+
+					@Override
+					public void remove() {
+						it.remove();
+					}
+				};
+			}
+		};
+	}
+
+	private Iterable<DependencyNode> asIterableNodes() {
+		return () -> new Iterator<DependencyNode>() {
+			private DependencyNode last;
+
 			@Override
 			public boolean hasNext() {
+				if (last != null) {
+					currentActive.addAll(last.flagComplete());
+
+					if (currentActive.isEmpty() && !last.getDependents().isEmpty()) {
+						throw new IllegalStateException("All remaining dependencies have dependencies!");
+					}
+
+					last = null;
+				}
+
 				return hasAvailable();
 			}
 
 			@Override
-			public DependencyProvider next() {
-				return nextAvailable();
+			public DependencyNode next() {
+				if (!hasNext()) {
+					throw new NoSuchElementException("No more providers");
+				}
+
+				assert currentActive.stream().map(DependencyNode::getDependencies).allMatch(Set::isEmpty);
+				return last = currentActive.poll();
 			}
 		};
 	}
 
 	/**
-	 * Waits until either {@link #hasAvailable()} is true or there are no remaining {@link DependencyProvider}s to process
+	 * The graph formed as chained {@link CompletableFuture}s which have automatically started
 	 *
-	 * @throws InterruptedException If the current thread is interrupted before work is available
+	 * @param task The task each node in the graph should have applied asynchronously
+	 *
+	 * @return Each node as a future, chained together according to their respective dependencies
 	 */
-	public synchronized boolean waitForWork() throws InterruptedException {
-		if (currentActive.isEmpty() && !awaiting.isEmpty()) wait();
+	public Collection<CompletableFuture<Void>> asFutures(Consumer<DependencyProvider> task) {
+		CountDownLatch starter = new CountDownLatch(1);
+		CompletableFuture<Void> start = CompletableFuture.runAsync(() -> {
+			while (true) {
+				try {
+					starter.await();
+					break; //Time to start
+				} catch (InterruptedException e) {
+					//We've still (probably) not started
+				}
+			}
+		});
 
-		return !currentActive.isEmpty();
+		Map<Class<? extends DependencyProvider>, CompletableFuture<Void>> tasks = new IdentityHashMap<>();
+
+		for (DependencyNode dependency : asIterableNodes()) {
+			CompletableFuture<?> parent;
+			switch (dependency.getDependencies().size()) {
+			case 0:
+				parent = start;
+				break;
+
+			case 1:
+				parent = fetchTask(tasks, Iterables.getOnlyElement(dependency.getDependencies()).type);
+				break;
+
+			default:
+				parent = CompletableFuture.allOf(dependency.getDependencies().stream().map(dep -> fetchTask(tasks, dep.type)).toArray(CompletableFuture[]::new));
+				break;
+			}
+
+			tasks.put(dependency.type, parent.thenRunAsync(() -> task.accept(dependency.getProvider())));
+		}
+
+		starter.countDown(); //Ready to go now
+		return tasks.values();
+	}
+
+	private static <K> CompletableFuture<?> fetchTask(Map<K, CompletableFuture<Void>> map, K key) {
+		return Objects.requireNonNull(map.get(key), "Unable to find task to depend on for " + key);
 	}
 }
