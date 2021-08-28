@@ -43,7 +43,7 @@ class SpecialCases {
 					return null;
 				}
 
-				return url.append("Release ").append(version).append(".jar");
+				return url.append(escape("Release ")).append(version).append(".jar");
 			}
 
 			@Override
@@ -88,7 +88,7 @@ class SpecialCases {
 					break;
 				}
 
-				return url.append(version).append(".jar");
+				return url.append(escape(version)).append(".jar");
 			}
 
 			@Override
@@ -149,6 +149,7 @@ class SpecialCases {
 
 				case "a0.1.4":
 					version = "Alpha 1.0.17_04"; //Same as Alpha 1.1.0, likewise 1.0.17_02 but compressed less
+					break;
 
 				case "a0.2.7":
 				case "a0.2.6":
@@ -166,7 +167,7 @@ class SpecialCases {
 					break;
 				}
 
-				return url.append(version).append(".jar");
+				return url.append(escape(version)).append(".jar");
 			}
 
 			@Override
@@ -553,93 +554,26 @@ class SpecialCases {
 	private static String intermediaries(String version) {
 		switch (version) {
 		case "1.2.5":
-			return "https://gist.githubusercontent.com/Chocohead/b7ea04058776495a93ed2d13f34d697a/raw/1.2.5 Merge.tiny".replace(" ", "%20");
+			return "https://gist.githubusercontent.com/Chocohead/b7ea04058776495a93ed2d13f34d697a/raw/".concat(escape("1.2.5 Merge.tiny"));
 
 		case "b1.7.3":
-			return "https://gist.githubusercontent.com/Chocohead/b7ea04058776495a93ed2d13f34d697a/raw/Beta 1.7.3 Merge.tiny".replace(" ", "%20");
+			return "https://gist.githubusercontent.com/Chocohead/b7ea04058776495a93ed2d13f34d697a/raw/".concat(escape("Beta 1.7.3 Merge.tiny"));
 
 		case "inf-20100618":
 			return "https://maven.concern.i.ng/net/textilemc/intermediary/inf-20100618/inf-20100618.tiny";
 
-		case "1.8":
-		//1.8.1-7 aren't included
-		case "1.8.8":
+		case "1.6.4":
+		case "1.7.10":
 		case "1.8.9":
-		//15w31a - 1.11.1 aren't included
-		case "1.11.2":
-		//17w06a - 1.12-pre7 aren't included
-		case "1.12":
-		//17w31a - 1.12.2-pre2 aren't included
 		case "1.12.2":
-		case "17w43a":
-		case "17w43b":
-		case "17w45a":
-		case "17w45b":
-		case "17w46a":
-		case "17w47a":
-		case "17w47b":
-		case "17w48a":
-		case "17w49a":
-		case "17w49b":
-		case "17w50a":
-		case "18w01a":
-		case "18w02a":
-		case "18w03a":
-		case "18w03b":
-		case "18w05a":
-		case "18w06a":
-		case "18w07a":
-		case "18w07b":
-		case "18w07c":
-		case "18w08a":
-		case "18w08b":
-		case "18w09a":
-		case "18w10a":
-		case "18w10b":
-		case "18w10c":
-		case "18w10d":
-		case "18w11a":
-		case "18w14a":
-		case "18w14b":
-		case "18w15a":
-		case "18w16a":
-		case "18w19a":
-		case "18w19b":
-		case "18w20a":
-		case "18w20b":
-		case "18w20c":
-		case "18w21a":
-		case "18w21b":
-		case "18w22a":
-		case "18w22b":
-		case "18w22c":
-		case "1.13-pre1":
-		case "1.13-pre2":
-		case "1.13-pre3":
-		case "1.13-pre4":
-		case "1.13-pre5":
-		case "1.13-pre6":
-		case "1.13-pre7":
-		case "1.13-pre8":
-		case "1.13-pre9":
-		case "1.13-pre10":
-		case "1.13":
-		case "18w30a":
-		case "18w30b":
-		case "18w31a":
-		case "18w32a":
-		case "18w33a":
-		case "1.13.1-pre1":
-		case "1.13.1-pre2":
-		case "1.13.1":
-		case "1.13.2-pre1":
-		case "1.13.2-pre2":
-		case "1.13.2":
-		case "18w43a": //18w43b onwards Fabric officially supports
-			return "https://github.com/Legacy-Fabric/Legacy-Intermediaries/raw/master/mappings/" + UrlEscapers.urlPathSegmentEscaper().escape(version) + ".tiny";
+			return "https://github.com/Legacy-Fabric/Legacy-Intermediaries/raw/master/mappings/" + version + ".tiny";
 
 		default:
-			return "https://github.com/FabricMC/intermediary/raw/master/mappings/" + UrlEscapers.urlPathSegmentEscaper().escape(version) + ".tiny";
+			return "https://github.com/FabricMC/intermediary/raw/master/mappings/" + escape(version) + ".tiny";
 		}
+	}
+
+	static String escape(String url) {
+		return UrlEscapers.urlPathSegmentEscaper().escape(url);
 	}
 }
