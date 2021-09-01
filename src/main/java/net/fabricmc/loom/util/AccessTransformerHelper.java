@@ -406,7 +406,7 @@ public class AccessTransformerHelper {
 
 				@Override
 				public void visitInnerClass(String name, String outerName, String innerName, int access) {
-					super.visitInnerClass(name, outerName, innerName, innerTransforms.contains(innerName) ? flipBits(access, Opcodes.ACC_PUBLIC) : access);
+					super.visitInnerClass(name, outerName, innerName, innerTransforms.contains(name) ? flipBits(access, Opcodes.ACC_PUBLIC) : access);
 				}
 
 				@Override
