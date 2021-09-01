@@ -22,53 +22,22 @@
  * SOFTWARE.
  */
 
-package net.fabricmc.loom.task;
-
-import java.io.File;
+package net.fabricmc.loom.decompilers.fernflower;
 
 import org.gradle.api.Project;
-import org.gradle.api.tasks.InputFile;
-import org.gradle.api.tasks.TaskAction;
 
-import net.fabricmc.loom.task.fernflower.FernFlowerTask;
-import net.fabricmc.loom.util.LineNumberRemapper;
-import net.fabricmc.loom.util.progress.ProgressLogger;
-
-public class RemapLineNumbersTask extends AbstractLoomTask {
-	private Object input;
-	private Object lineMapFile;
-
-	@TaskAction
-	public void doTask() throws Throwable {
-		Project project = getProject();
-
-		project.getLogger().info(":adjusting line numbers");
-		LineNumberRemapper remapper = new LineNumberRemapper();
-		remapper.readMappings(getLineMapFile());
-
-		ProgressLogger progressLogger = ProgressLogger.getProgressFactory(project, FernFlowerTask.class.getName());
-		progressLogger.start("Adjusting line numbers", "linemap");
-
-		remapper.process(progressLogger, getInput());
-
-		progressLogger.completed();
+public class ForgeFlowerDecompiler extends AbstractFernFlowerDecompiler {
+	public ForgeFlowerDecompiler(Project project) {
+		super(project);
 	}
 
-	@InputFile
-	public File getInput() {
-		return getProject().file(input);
+	@Override
+	public String name() {
+		return "ForgeFlower"; // Or something else?
 	}
 
-	@InputFile
-	public File getLineMapFile() {
-		return getProject().file(lineMapFile);
-	}
-
-	public void setInput(Object input) {
-		this.input = input;
-	}
-
-	public void setLineMapFile(Object lineMapFile) {
-		this.lineMapFile = lineMapFile;
+	@Override
+	public Class<? extends AbstractForkedFFExecutor> fernFlowerExecutor() {
+		return FabricForkedFFExecutor.class;
 	}
 }

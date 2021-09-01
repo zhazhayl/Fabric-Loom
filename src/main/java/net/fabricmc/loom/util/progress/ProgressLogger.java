@@ -24,73 +24,20 @@
 
 package net.fabricmc.loom.util.progress;
 
-import java.lang.reflect.Method;
-
 import org.gradle.api.Project;
+import org.gradle.api.internal.project.ProjectInternal;
 import org.gradle.api.logging.Logger;
+import org.gradle.internal.logging.progress.ProgressLoggerFactory;
+import org.gradle.internal.service.ServiceRegistry;
 
 /**
  * Wrapper to ProgressLogger internal API.
  */
-public class ProgressLogger {
-	private final Logger logger;
-	private final Object logFactory;
-	private final Method getDescription, setDescription, start, started, startedArg, progress, completed, completedArg;
+public abstract class ProgressLogger {
+	protected final Logger logger;
 
-	private ProgressLogger(Logger logger, Object logFactory) {
+	ProgressLogger(Logger logger) {
 		this.logger = logger;
-		this.logFactory = logFactory;
-		this.getDescription = getMethod("getDescription");
-		this.setDescription = getMethod("setDescription", String.class);
-		this.start = getMethod("start", String.class, String.class);
-		this.started = getMethod("started");
-		this.startedArg = getMethod("started", String.class);
-		this.progress = getMethod("progress", String.class);
-		this.completed = getMethod("completed");
-		this.completedArg = getMethod("completed", String.class, boolean.class);
-	}
-
-	private static Class<?> getFactoryClass() {
-		Class<?> progressLoggerFactoryClass = null;
-
-		try {
-			//Gradle 2.14 and higher
-			progressLoggerFactoryClass = Class.forName("org.gradle.internal.logging.progress.ProgressLoggerFactory");
-		} catch (ClassNotFoundException e) {
-			//prior to Gradle 2.14
-			try {
-				progressLoggerFactoryClass = Class.forName("org.gradle.logging.ProgressLoggerFactory");
-			} catch (ClassNotFoundException oldE) {
-				// Unsupported Gradle version
-			}
-		}
-
-		return progressLoggerFactoryClass;
-	}
-
-	private Method getMethod(String methodName, Class<?>... args) {
-		if (logFactory != null) {
-			try {
-				return logFactory.getClass().getMethod(methodName, args);
-			} catch (NoSuchMethodException e) {
-				logger.warn("Error reflecting ProgressLoggerFactory#" + methodName, e);
-			}
-		}
-
-		return null;
-	}
-
-	private Object invoke(Method method, Object... args) {
-		if (logFactory != null) {
-			try {
-				method.setAccessible(true);
-				return method.invoke(logFactory, args);
-			} catch (ReflectiveOperationException e) {
-				logger.warn("Error reflecting ProgressLoggerFactory#" + method, e);
-			}
-		}
-
-		return null;
 	}
 
 	/**
@@ -102,15 +49,14 @@ public class ProgressLogger {
 	 */
 	public static ProgressLogger getProgressFactory(Project project, String category) {
 		try {
-			Method getServices = project.getClass().getMethod("getServices");
-			Object serviceFactory = getServices.invoke(project);
-			Method get = serviceFactory.getClass().getMethod("get", Class.class);
-			Object progressLoggerFactory = get.invoke(serviceFactory, getFactoryClass());
-			Method newOperation = progressLoggerFactory.getClass().getMethod("newOperation", String.class);
-			return new ProgressLogger(project.getLogger(), newOperation.invoke(progressLoggerFactory, category));
-		} catch (Exception e) {
-			project.getLogger().error("Unable to get progress logger. Download progress will not be displayed.");
-			return new ProgressLogger(project.getLogger(), null);
+			ServiceRegistry registry = ((ProjectInternal) project).getServices();
+			ProgressLoggerFactory factory = registry.get(ProgressLoggerFactory.class);
+			return new ProgressLoggerImpl(project.getLogger(), factory.newOperation(category), factory);
+		} catch (OutOfMemoryError e) {
+			throw e;
+		} catch (Throwable t) {
+			project.getLogger().error("Unable to get progress logger. Task progress will not be displayed.", t);
+			return new ProgressLoggerShim(project.getLogger()).setDescription(category);
 		}
 	}
 
@@ -119,9 +65,7 @@ public class ProgressLogger {
 	 *
 	 * @return the description, must not be empty.
 	 */
-	public String getDescription() {
-		return (String) invoke(getDescription);
-	}
+	public abstract String getDescription();
 
 	/**
 	 * Sets the description of the operation. This should be a full, stand-alone description of the operation.
@@ -130,52 +74,38 @@ public class ProgressLogger {
 	 *
 	 * @param description The description.
 	 */
-	public ProgressLogger setDescription(String description) {
-		invoke(setDescription, description);
-		return this;
-	}
+	public abstract ProgressLogger setDescription(String description);
 
 	/**
 	 * Convenience method that sets descriptions and logs started() event.
 	 *
 	 * @return this logger instance
 	 */
-	public ProgressLogger start(String description, String shortDescription) {
-		invoke(start, description, shortDescription);
-		return this;
-	}
+	public abstract ProgressLogger start(String description, String shortDescription);
 
 	/**
 	 * Logs the start of the operation, with no initial status.
 	 */
-	public void started() {
-		invoke(started);
-	}
+	public abstract void started();
 
 	/**
 	 * Logs the start of the operation, with the given status.
 	 *
 	 * @param status The initial status message. Can be null or empty.
 	 */
-	public void started(String status) {
-		invoke(startedArg, status);
-	}
+	public abstract void started(String status);
 
 	/**
 	 * Logs some progress, indicated by a new status.
 	 *
 	 * @param status The new status message. Can be null or empty.
 	 */
-	public void progress(String status) {
-		invoke(progress, status);
-	}
+	public abstract void progress(String status);
 
 	/**
 	 * Logs the completion of the operation, with no final status.
 	 */
-	public void completed() {
-		invoke(completed);
-	}
+	public abstract void completed();
 
 	/**
 	 * Logs the completion of the operation, with a final status. This is generally logged along with the description.
@@ -183,7 +113,7 @@ public class ProgressLogger {
 	 * @param status The final status message. Can be null or empty.
 	 * @param failed Whether the operation failed.
 	 */
-	public void completed(String status, boolean failed) {
-		invoke(completedArg, status, failed);
-	}
+	public abstract void completed(String status, boolean failed);
+
+	public abstract ProgressLogger newChild(Class<?> category);
 }

@@ -32,32 +32,28 @@ import org.gradle.api.Action;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.plugins.ExtraPropertiesExtension;
-import org.gradle.api.specs.Spec;
 import org.gradle.api.tasks.TaskContainer;
 import org.gradle.api.tasks.TaskProvider;
 
+import net.fabricmc.loom.decompilers.fernflower.ForgeFlowerDecompiler;
 import net.fabricmc.loom.providers.MinecraftLibraryProvider;
 import net.fabricmc.loom.providers.MinecraftMappedProvider;
-import net.fabricmc.loom.task.AbstractDecompileTask;
 import net.fabricmc.loom.task.CleanLoomBinaries;
 import net.fabricmc.loom.task.CleanLoomMappings;
 import net.fabricmc.loom.task.DownloadAssetsTask;
 import net.fabricmc.loom.task.GenEclipseRunsTask;
 import net.fabricmc.loom.task.GenIdeaProjectTask;
 import net.fabricmc.loom.task.GenVsCodeProjectTask;
+import net.fabricmc.loom.task.GenerateSourcesTask;
 import net.fabricmc.loom.task.MigrateMappingsTask;
 import net.fabricmc.loom.task.RemapJarTask;
-import net.fabricmc.loom.task.RemapLineNumbersTask;
 import net.fabricmc.loom.task.RemapSourcesJarTask;
 import net.fabricmc.loom.task.RunClientTask;
 import net.fabricmc.loom.task.RunServerTask;
-import net.fabricmc.loom.task.fernflower.FernFlowerTask;
 import net.fabricmc.loom.task.lvt.RebuildLVTTask;
 
 public class LoomGradlePlugin extends AbstractPlugin {
-	private static File getMappedByproduct(Project project, String suffix) {
-		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
-		File mappedJar = extension.getMinecraftMappedProvider().getMappedJar();
+	private static File getMappedByproduct(File mappedJar, String suffix) {
 		String path = mappedJar.getAbsolutePath();
 
 		if (!path.toLowerCase(Locale.ROOT).endsWith(".jar")) {
@@ -90,39 +86,22 @@ public class LoomGradlePlugin extends AbstractPlugin {
 
 		tasks.register("remapJar", RemapJarTask.class);
 
-		TaskProvider<FernFlowerTask> decompileTask = register("genSourcesDecompile", FernFlowerTask.class, task -> {
-			task.getOutputs().upToDateWhen(t -> false);
-			task.onlyIf(new Spec<Task>() {
-				private Boolean shouldRun;
-
-				@Override
-				public boolean isSatisfiedBy(Task t) {
-					return shouldRun == null ? shouldRun = task.shouldRun() : shouldRun;
-				}
-			});
-		}, (project, task) -> {
+		addAfterEvaluate(() -> {
 			LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
+			if (!extension.hasMinecraftProvider()) return; //Just to be sure
 			MinecraftLibraryProvider libraryProvider = extension.getMinecraftProvider().getLibraryProvider();
 			MinecraftMappedProvider minecraftProvider = extension.getMinecraftMappedProvider();
 
 			File mappedJar = minecraftProvider.getMappedJar();
-			File sourcesJar = getMappedByproduct(project, "-sources.jar");
-			File linemapFile = getMappedByproduct(project, "-sources.lmap");
+			File sourcesJar = getMappedByproduct(mappedJar, "-sources.jar");
+			File linemapFile = getMappedByproduct(mappedJar, "-sources.lmap");
 
-			task.setInput(mappedJar);
-			task.setOutput(sourcesJar);
-			task.setLineMapFile(linemapFile);
-			task.setLibraries(libraryProvider.getLibraries());
-		});
-
-		register("genSources", RemapLineNumbersTask.class, task -> {
-			task.dependsOn(decompileTask);
-		}, (project, task) -> {
-			AbstractDecompileTask decompile = decompileTask.get();
-			task.onlyIf(t -> !decompile.getState().getSkipped());
-
-			task.setInput(decompile.getInput());
-			task.setLineMapFile(decompile.getLineMapFile());
+			tasks.withType(GenerateSourcesTask.class, task -> {
+				task.setInput(mappedJar);
+				task.setOutput(sourcesJar);
+				task.setLineMap(linemapFile);
+				task.setLibraries(libraryProvider.getLibraries());
+			});
 		});
 
 		register("rebuildLVT", RebuildLVTTask.class, task -> {
@@ -166,6 +145,9 @@ public class LoomGradlePlugin extends AbstractPlugin {
 			t.dependsOn("assemble");
 			t.setGroup("minecraftMapped");
 		});
+
+		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
+		extension.addDecompiler(new ForgeFlowerDecompiler(project));
 	}
 
 	/**

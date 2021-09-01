@@ -75,7 +75,6 @@ import net.fabricmc.loom.providers.StackedMappingsProvider;
 import net.fabricmc.loom.providers.mappings.TinyWriter;
 import net.fabricmc.loom.task.RemapJarTask;
 import net.fabricmc.loom.task.RemapSourcesJarTask;
-import net.fabricmc.loom.task.fernflower.FernFlowerTask;
 import net.fabricmc.loom.util.AccessTransformerHelper;
 import net.fabricmc.loom.util.Constants;
 import net.fabricmc.loom.util.GroovyXmlUtil;
@@ -412,9 +411,6 @@ public class AbstractPlugin implements Plugin<Project> {
 
 			try {//Try avoid daemons causing caching problems
 				if (extension.hasMinecraftProvider()) extension.getMinecraftProvider().clearCache();
-				for (FernFlowerTask task : project.getTasks().withType(FernFlowerTask.class)) {
-					task.resetClaims();
-				}
 			} catch (Throwable t) {
 				project.getLogger().warn("Error cleaning up after evaluation", t);
 			}

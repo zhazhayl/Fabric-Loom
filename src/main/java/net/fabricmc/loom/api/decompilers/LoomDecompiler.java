@@ -22,31 +22,27 @@
  * SOFTWARE.
  */
 
-package net.fabricmc.loom.task.fernflower;
+package net.fabricmc.loom.api.decompilers;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
+import java.nio.file.Path;
 
-import org.jetbrains.java.decompiler.util.InterpreterUtil;
+import org.gradle.api.Project;
+import org.gradle.api.artifacts.ConfigurationContainer;
 
-public class FernFlowerUtils {
-	public static byte[] getBytecode(String externalPath, String internalPath) throws IOException {
-		File file = new File(externalPath);
+public interface LoomDecompiler {
+	String name();
 
-		if (internalPath == null) {
-			return InterpreterUtil.getBytes(file);
-		} else {
-			try (ZipFile archive = new ZipFile(file)) {
-				ZipEntry entry = archive.getEntry(internalPath);
-
-				if (entry == null) {
-					throw new IOException("Entry not found: " + internalPath);
-				}
-
-				return InterpreterUtil.getBytes(archive, entry);
-			}
-		}
+	default Object[] getClasspath(Project project) {
+		ConfigurationContainer configurations = project.getBuildscript().getConfigurations();
+		return new Object[] {configurations.getByName("classpath"), configurations.detachedConfiguration(project.getDependencies().localGroovy())};
 	}
+
+	/**
+	 * @param sourcesDestination Decompiled sources jar
+	 * @param linemapDestination A byproduct of decompilation that lines up the compiled jar's line numbers with the decompiled
+	 *                           sources jar for debugging.
+	 *                           A decompiler may not produce a linemap at all.
+	 * @param metaData Additional information that may or may not be needed while decompiling
+	 */
+	void decompile(Path compiledJar, Path sourcesDestination, Path linemapDestination, DecompilationMetadata metaData);
 }

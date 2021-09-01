@@ -22,54 +22,25 @@
  * SOFTWARE.
  */
 
-package net.fabricmc.loom.task;
+package net.fabricmc.loom.api.decompilers;
 
-import java.io.File;
+import java.nio.file.Path;
+import java.util.Collection;
 
-import org.gradle.api.file.FileCollection;
-import org.gradle.api.tasks.InputFile;
-import org.gradle.api.tasks.InputFiles;
-import org.gradle.api.tasks.OutputFile;
+public class DecompilationMetadata {
+	public final int numberOfThreads;
+	public final boolean fork;
+	public final Path javaDocs;
+	public final Collection<Path> libraries;
 
-public abstract class AbstractDecompileTask extends AbstractLoomTask {
-	private Object input;
-	private Object output;
-	private Object lineMapFile;
-	private Object libraries;
-
-	@InputFile
-	public File getInput() {
-		return getProject().file(input);
+	public DecompilationMetadata(int numberOfThreads, Path javaDocs, Collection<Path> libraries) {
+		this(numberOfThreads, true, javaDocs, libraries);
 	}
 
-	@OutputFile
-	public File getOutput() {
-		return getProject().file(output);
-	}
-
-	@OutputFile
-	public File getLineMapFile() {
-		return getProject().file(lineMapFile);
-	}
-
-	@InputFiles
-	public FileCollection getLibraries() {
-		return getProject().files(libraries);
-	}
-
-	public void setInput(Object input) {
-		this.input = input;
-	}
-
-	public void setOutput(Object output) {
-		this.output = output;
-	}
-
-	public void setLineMapFile(Object lineMapFile) {
-		this.lineMapFile = lineMapFile;
-	}
-
-	public void setLibraries(Object libraries) {
+	public DecompilationMetadata(int numberOfThreads, boolean fork, Path javaDocs, Collection<Path> libraries) {
+		this.numberOfThreads = numberOfThreads;
+		this.fork = fork;
+		this.javaDocs = javaDocs;
 		this.libraries = libraries;
 	}
 }

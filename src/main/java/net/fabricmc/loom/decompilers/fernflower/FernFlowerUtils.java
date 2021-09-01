@@ -22,18 +22,31 @@
  * SOFTWARE.
  */
 
-package net.fabricmc.loom.task.fernflower;
+package net.fabricmc.loom.decompilers.fernflower;
 
-import org.jetbrains.java.decompiler.main.extern.IFernflowerLogger;
+import java.io.File;
+import java.io.IOException;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
-/**
- * Literally does nothing.
- * Created by covers1624 on 11/02/19.
- */
-public class NoopFFLogger extends IFernflowerLogger {
-	@Override
-	public void writeMessage(String message, Severity severity) { }
+import org.jetbrains.java.decompiler.util.InterpreterUtil;
 
-	@Override
-	public void writeMessage(String message, Severity severity, Throwable t) { }
+public class FernFlowerUtils {
+	public static byte[] getBytecode(String externalPath, String internalPath) throws IOException {
+		File file = new File(externalPath);
+
+		if (internalPath == null) {
+			return InterpreterUtil.getBytes(file);
+		} else {
+			try (ZipFile archive = new ZipFile(file)) {
+				ZipEntry entry = archive.getEntry(internalPath);
+
+				if (entry == null) {
+					throw new IOException("Entry not found: " + internalPath);
+				}
+
+				return InterpreterUtil.getBytes(archive, entry);
+			}
+		}
+	}
 }

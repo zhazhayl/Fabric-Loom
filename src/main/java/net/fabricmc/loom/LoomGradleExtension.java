@@ -63,6 +63,8 @@ import org.gradle.api.file.FileCollection;
 import org.gradle.api.initialization.dsl.ScriptHandler;
 import org.gradle.api.plugins.BasePluginConvention;
 
+import net.fabricmc.loom.api.decompilers.LoomDecompiler;
+import net.fabricmc.loom.decompilers.fernflower.ForgeFlowerDecompiler;
 import net.fabricmc.loom.dependencies.LoomDependencyManager;
 import net.fabricmc.loom.providers.JarNameFactory;
 import net.fabricmc.loom.providers.JarNamingStrategy;
@@ -70,6 +72,7 @@ import net.fabricmc.loom.providers.MappingsProvider;
 import net.fabricmc.loom.providers.MinecraftLibraryProvider;
 import net.fabricmc.loom.providers.MinecraftMappedProvider;
 import net.fabricmc.loom.providers.MinecraftProvider;
+import net.fabricmc.loom.task.GenerateSourcesTask;
 import net.fabricmc.loom.util.GradleSupport;
 import net.fabricmc.loom.util.TinyRemapperMappingsHelper.LocalNameSuggestor;
 import net.fabricmc.stitch.commands.CommandProposeFieldNames.NameAcceptor;
@@ -150,12 +153,24 @@ public class LoomGradleExtension {
 	private final List<Path> unmappedModsBuilt = new ArrayList<>();
 	private final List<BiConsumer<Dependency, JsonObject>> includeTweakers = new ArrayList<>();
 
+	final List<LoomDecompiler> decompilers = new ArrayList<>();
+
 	//Not to be set in the build.gradle
 	private final Project project;
 	private LoomDependencyManager dependencyManager;
 	private boolean parallelLoad;
 	private JsonObject installerJson;
 	private Mercury[] srcMercuryCache = new Mercury[2];
+
+	/**
+	 * Loom will generate a new genSources task (with a new name, based off of {@link LoomDecompiler#name()})
+	 * that uses the specified decompiler instead.
+	 */
+	public void addDecompiler(LoomDecompiler decompiler) {
+		String taskName = decompiler instanceof ForgeFlowerDecompiler ? "genSources" : "genSourcesWith" + decompiler.name();
+		// decompiler will be passed to the constructor of GenerateSourcesTask
+		project.getTasks().register(taskName, GenerateSourcesTask.class, decompiler);
+	}
 
 	public Mercury getOrCreateSrcMercuryCache(int id, Supplier<Mercury> factory) {
 		return srcMercuryCache[id] != null ? srcMercuryCache[id] : (srcMercuryCache[id] = factory.get());

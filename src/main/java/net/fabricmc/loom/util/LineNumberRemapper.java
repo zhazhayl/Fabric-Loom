@@ -86,7 +86,7 @@ public class LineNumberRemapper {
 		}
 	}
 
-	public void process(ProgressLogger logger, File jar) {
+	public void process(ProgressLogger logger, File from, File to) {
 		ZipEntryTransformerEntry[] transformers = lineMap.entrySet().stream().map(entry -> {
 			String className = entry.getKey();
 
@@ -111,7 +111,7 @@ public class LineNumberRemapper {
 			});
 		}).toArray(ZipEntryTransformerEntry[]::new);
 
-		ZipUtil.transformEntries(jar, transformers);
+		ZipUtil.transformEntries(from, transformers, to);
 	}
 
 	private static class LineNumberVisitor extends ClassVisitor {
