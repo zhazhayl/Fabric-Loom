@@ -389,17 +389,20 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 
 				versionURL = customManifest;
 			} else {
-				File manifests = new File(extension.getUserCache(), "version_manifest.json");
+				File officialManifests = new File(extension.getUserCache(), "version_manifest.json");
+				File experimentalManifests = new File(officialManifests.getParentFile(), "experimental_version_manifest.json");
 
-				logger.debug("Downloading version manifests");
-				DownloadUtil.downloadIfChanged(new URL("https://launchermeta.mojang.com/mc/game/version_manifest.json"), manifests, logger);
+				logger.debug("Checking official version manifests");
+				versionURL = readManifest(logger, "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json", officialManifests, minecraftVersion);
 
-				try (Reader versionManifest = Files.newBufferedReader(manifests.toPath(), StandardCharsets.UTF_8)) {
-					ManifestVersion mcManifest = GSON.fromJson(versionManifest, ManifestVersion.class);
-					versionURL = mcManifest.versions.stream().filter(versions -> versions.id.equalsIgnoreCase(minecraftVersion)).findFirst().map(version -> version.url);
+				if (!versionURL.isPresent()) {
+					logger.debug("Checking experimental Fabric version manifests");
+					versionURL = readManifest(logger, "https://maven.fabricmc.net/net/minecraft/experimental_versions.json", experimentalManifests, minecraftVersion);
 				}
 
 				out: if (!versionURL.isPresent()) {
+					logger.debug("Checking special cased versions");
+
 					String url;
 					switch (minecraftVersion) {
 					case "1.14.3 - Combat Test":
@@ -460,6 +463,15 @@ public class MinecraftProvider extends PhysicalDependencyProvider implements Min
 		}
 
 		return MINECRAFT_JSON;
+	}
+
+	private static Optional<String> readManifest(Logger logger, String url, File manifest, String minecraftVersion) throws IOException {
+		DownloadUtil.downloadIfChanged(new URL(url), manifest, logger);
+
+		try (Reader versionManifest = Files.newBufferedReader(manifest.toPath(), StandardCharsets.UTF_8)) {
+			ManifestVersion mcManifest = GSON.fromJson(versionManifest, ManifestVersion.class);
+			return mcManifest.versions.stream().filter(versions -> versions.id.equalsIgnoreCase(minecraftVersion)).findFirst().map(version -> version.url);
+		}
 	}
 
 	private static void downloadJar(Logger logger, String minecraftVersion, MinecraftVersionInfo versionInfo, File to, String name) throws IOException {
