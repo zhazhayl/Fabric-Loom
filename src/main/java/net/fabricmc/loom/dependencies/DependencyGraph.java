@@ -33,7 +33,9 @@ class DependencyGraph {
 		public final Class<? extends DependencyProvider> type;
 		private DependencyProvider provider;
 		private final Set<DependencyNode> dependencies = StitchUtil.newIdentityHashSet();
+		private final Set<DependencyNode> remainingDependencies = StitchUtil.newIdentityHashSet();
 		private final Set<DependencyNode> dependents = StitchUtil.newIdentityHashSet();
+		private boolean isFixed;
 
 		static DependencyNode emptyOf(Class<? extends DependencyProvider> type) {
 			return new DependencyNode(type, null);
@@ -54,6 +56,7 @@ class DependencyGraph {
 
 		void fill(DependencyProvider provider) {
 			if (!isEmpty()) throw new IllegalStateException("Duplicate providers given for " + type);
+			if (isFixed) throw new IllegalStateException("Node is fixed");
 
 			this.provider = provider;
 		}
@@ -66,6 +69,7 @@ class DependencyGraph {
 
 		boolean addDependency(DependencyNode node) {
 			if (node.type == type) throw new IllegalArgumentException("Provider cannot depend on itself");
+			if (isFixed) throw new IllegalStateException("Node is fixed");
 
 			return dependencies.add(node);
 		}
@@ -76,6 +80,7 @@ class DependencyGraph {
 
 		boolean addDependent(DependencyNode node) {
 			if (node.type == type) throw new IllegalArgumentException("Provider cannot depend on itself");
+			if (isFixed) throw new IllegalStateException("Node is fixed");
 
 			return dependents.add(node);
 		}
@@ -84,13 +89,23 @@ class DependencyGraph {
 			return Collections.unmodifiableSet(dependents);
 		}
 
+		void setFixed() {
+			isFixed = true;
+			remainingDependencies.addAll(dependencies);
+		}
+
 		Set<DependencyNode> flagComplete() {
 			return dependents.stream().filter(dependent -> dependent.dependencyComplete(this)).collect(Collectors.toSet());
 		}
 
 		private boolean dependencyComplete(DependencyNode node) {
-			dependencies.remove(node);
-			return dependencies.isEmpty();
+			remainingDependencies.remove(node);
+			return remainingDependencies.isEmpty();
+		}
+
+		@Override
+		public String toString() {
+			return isEmpty() ? '(' + type.getName() + ')' : '[' + type.getName() + ']';
 		}
 	}
 	private final Queue<DependencyNode> currentActive = new ArrayDeque<>();
@@ -162,6 +177,7 @@ class DependencyGraph {
 			if (node.isEmpty()) {
 				throw new IllegalStateException("Missing dependency type: " + node.type);
 			}
+			node.setFixed();
 
 			Set<DependencyNode> checkedDependents = StitchUtil.newIdentityHashSet();
 			Queue<DependencyNode> depenentList = new ArrayDeque<>(node.getDependents());
@@ -196,31 +212,7 @@ class DependencyGraph {
 
 	/** {@link Iterable} form of the graph designed to loop over all the {@link DependencyProvider}s in it */
 	public Iterable<DependencyProvider> asIterable() {
-		return new Iterable<DependencyProvider>() {
-			private final Iterable<DependencyNode> real = asIterableNodes();
-
-			@Override
-			public Iterator<DependencyProvider> iterator() {
-				return new Iterator<DependencyProvider>() {
-					private final Iterator<DependencyNode> it = real.iterator();
-
-					@Override
-					public boolean hasNext() {
-						return it.hasNext();
-					}
-
-					@Override
-					public DependencyProvider next() {
-						return it.next().getProvider();
-					}
-
-					@Override
-					public void remove() {
-						it.remove();
-					}
-				};
-			}
-		};
+		return Iterables.transform(asIterableNodes(), DependencyNode::getProvider);
 	}
 
 	private Iterable<DependencyNode> asIterableNodes() {
