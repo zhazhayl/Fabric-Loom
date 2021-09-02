@@ -149,7 +149,9 @@ license {
 	exclude '**/loom/util/MinecraftVersionInfo.java'
 	exclude '**/loom/util/OperatingSystem.java'
 	exclude '**/loom/util/ThrowingIntObjConsumer.java'
-	exclude '**/loom/task/fernflower/JavadocProvider.java'
+	exclude '**/loom/util/progress/ProgressLoggerImpl.java'
+	exclude '**/loom/util/progress/ProgressLoggerShim.java'
+	exclude '**/loom/decompilers/fernflower/JavadocProvider.java'
 	exclude '**/loom/task/lvt/*.java'
 }
 
