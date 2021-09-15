@@ -31,11 +31,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import groovy.util.Node;
 
@@ -55,6 +57,7 @@ import org.gradle.api.publish.Publication;
 import org.gradle.api.publish.PublishingExtension;
 import org.gradle.api.publish.maven.MavenPublication;
 import org.gradle.api.tasks.SourceSet;
+import org.gradle.api.tasks.TaskDependency;
 import org.gradle.api.tasks.bundling.AbstractArchiveTask;
 import org.gradle.api.tasks.compile.JavaCompile;
 import org.gradle.api.tasks.javadoc.Javadoc;
@@ -75,10 +78,10 @@ import net.fabricmc.loom.providers.StackedMappingsProvider;
 import net.fabricmc.loom.providers.mappings.TinyWriter;
 import net.fabricmc.loom.task.RemapJarTask;
 import net.fabricmc.loom.task.RemapSourcesJarTask;
+import net.fabricmc.loom.task.RemappingJar;
 import net.fabricmc.loom.util.AccessTransformerHelper;
 import net.fabricmc.loom.util.Constants;
 import net.fabricmc.loom.util.GroovyXmlUtil;
-import net.fabricmc.loom.util.NestedJars;
 import net.fabricmc.loom.util.SetupIntelijRunConfigs;
 import net.fabricmc.mappings.EntryTriple;
 
@@ -384,6 +387,7 @@ public class AbstractPlugin implements Plugin<Project> {
 	 * Add Minecraft dependencies to compile time.
 	 */
 	protected void configureCompile() {
+		LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
 		JavaPluginConvention javaModule = (JavaPluginConvention) project.getConvention().getPlugins().get("java");
 
 		SourceSet main = javaModule.getSourceSets().getByName(SourceSet.MAIN_SOURCE_SET_NAME);
@@ -392,23 +396,24 @@ public class AbstractPlugin implements Plugin<Project> {
 		Javadoc javadoc = (Javadoc) project.getTasks().getByName(JavaPlugin.JAVADOC_TASK_NAME);
 		javadoc.setClasspath(main.getOutput().plus(main.getCompileClasspath()));
 
-		project.getTasks().getByName("jar").getExtensions().create("AT", JarSettings.class);
-		project.getTasks().whenTaskAdded(task -> {
-			if (task instanceof AbstractArchiveTask) {
-				JarSettings settings = task.getExtensions().create("AT", JarSettings.class);
-				//Only include the AT by default to the main sources task
-				if (!"sourcesJar".equals(task.getName())) settings.setInclude(false);
-			}
+		project.getTasks().withType(AbstractArchiveTask.class).whenTaskAdded(task -> {
+			JarSettings settings = task.getExtensions().create("AT", JarSettings.class);
+			//Only include the AT by default to the main sources task
+			if (!"sourcesJar".equals(task.getName())) settings.setInclude(false);
+
+			addAfterEvaluate(() -> {
+				if (settings.includeAT) {
+					AccessTransformerHelper.copyInAT(extension, task);
+				}
+			});
 		});
 
-		if (!project.getExtensions().getByType(LoomGradleExtension.class).ideSync()) {
+		if (!extension.ideSync()) {
 			// Add Mixin dependencies
 			project.getDependencies().add(JavaPlugin.ANNOTATION_PROCESSOR_CONFIGURATION_NAME, "net.fabricmc:fabric-mixin-compile-extensions:" + Constants.MIXIN_COMPILE_EXTENSIONS_VERSION);
 		}
 
 		project.getGradle().buildFinished(result -> {
-			LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
-
 			try {//Try avoid daemons causing caching problems
 				if (extension.hasMinecraftProvider()) extension.getMinecraftProvider().clearCache();
 			} catch (Throwable t) {
@@ -417,9 +422,6 @@ public class AbstractPlugin implements Plugin<Project> {
 		});
 
 		addAfterEvaluate(() -> {
-			LoomGradleExtension extension = project.getExtensions().getByType(LoomGradleExtension.class);
-
-
 			LoomDependencyManager dependencyManager = new LoomDependencyManager();
 			extension.setDependencyManager(dependencyManager);
 
@@ -442,11 +444,8 @@ public class AbstractPlugin implements Plugin<Project> {
 
 			// Enables the default mod remapper
 			if (extension.remapMod) {
-				AbstractArchiveTask jarTask = (AbstractArchiveTask) project.getTasks().getByName("jar");
-
-				RemapJarTask remapJarTask = (RemapJarTask) project.getTasks().findByName("remapJar");
-
-				assert remapJarTask != null;
+				AbstractArchiveTask jarTask = (AbstractArchiveTask) project.getTasks().getByName(JavaPlugin.JAR_TASK_NAME);
+				RemapJarTask remapJarTask = (RemapJarTask) project.getTasks().getByName("remapJar");
 
 				if (!remapJarTask.getInput().isPresent()) {
 					jarTask.setClassifier("dev");
@@ -462,22 +461,13 @@ public class AbstractPlugin implements Plugin<Project> {
 				remapJarTask.dependsOn(jarTask);
 				project.getTasks().getByName("build").dependsOn(remapJarTask);
 
-				Map<Project, Set<Task>> taskMap = project.getAllTasks(true);
+				List<Task> remappingTasks = Stream.concat(project.getTasks().withType(RemapJarTask.class).matching(RemapJarTask::isAddNestedDependencies).stream(),
+						project.getTasks().withType(RemappingJar.class).matching(RemappingJar::isNestJar).stream()).collect(Collectors.toList());
+				if (!remappingTasks.isEmpty()) {
+					TaskDependency dependency = project.getConfigurations().getByName(Constants.INCLUDE).getTaskDependencyFromProjectDependency(true, "remapJar");
 
-				for (Map.Entry<Project, Set<Task>> entry : taskMap.entrySet()) {
-					Set<Task> taskSet = entry.getValue();
-
-					for (Task task : taskSet) {
-						if (task instanceof RemapJarTask && ((RemapJarTask) task).isAddNestedDependencies()) {
-							//Run all the sub project remap jars tasks before the root projects jar, this is to allow us to include projects
-							NestedJars.getRequiredTasks(project).forEach(task::dependsOn);
-						}
-
-						if (task instanceof AbstractArchiveTask && task.getExtensions().findByType(JarSettings.class) != null) {
-							if (task.getExtensions().getByType(JarSettings.class).includeAT) {
-								AccessTransformerHelper.copyInAT(extension, (AbstractArchiveTask) task);
-							}
-						}
+					for (Task remappingTask : remappingTasks) {
+						remappingTask.dependsOn(dependency);
 					}
 				}
 
