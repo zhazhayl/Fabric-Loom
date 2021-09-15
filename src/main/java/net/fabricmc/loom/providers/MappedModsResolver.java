@@ -134,7 +134,7 @@ public class MappedModsResolver extends LogicalDependencyProvider {
 			ZipEntry entry = zip.getEntry("fabric.mod.json");
 			if (entry == null) throw new IllegalStateException("Mod collector missed a non-Fabric mod: " + origin);
 
-			JsonElement json = new JsonParser().parse(new InputStreamReader(zip.getInputStream(entry), StandardCharsets.UTF_8));
+			JsonElement json = JsonParser.parseReader(new InputStreamReader(zip.getInputStream(entry), StandardCharsets.UTF_8));
 			if (json == null) return; //Apparently the mod has an empty json?
 
 			if (!json.isJsonArray() && !json.isJsonObject()) {//The mod JSON should be one of these two options
@@ -182,7 +182,7 @@ public class MappedModsResolver extends LogicalDependencyProvider {
 			if (entry == null) return null;
 
 			try (Reader reader = new InputStreamReader(jarFile.getInputStream(entry), StandardCharsets.UTF_8)) {
-				return new JsonParser().parse(reader).getAsJsonObject();
+				return JsonParser.parseReader(reader).getAsJsonObject();
 			} catch (JsonSyntaxException e) {
 				logger.warn("Error reading installer JSON in {}", file.getPath(), e);
 			}

@@ -193,7 +193,7 @@ public class AccessTransformerHelper {
 
 			off: if (entry != null) {
 				try (Reader in = new InputStreamReader(zip.getInputStream(entry), StandardCharsets.UTF_8)) {
-					JsonElement json = new JsonParser().parse(in);
+					JsonElement json = JsonParser.parseReader(in);
 
 					if (!json.isJsonObject() || !json.getAsJsonObject().has(BAD_AT_NAME) || (entry = zip.getEntry(json.getAsJsonObject().get(BAD_AT_NAME).getAsString())) == null) {
 						break off;
