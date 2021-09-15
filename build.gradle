@@ -187,22 +187,6 @@ gradlePlugin {
 	}
 }
 
-import org.w3c.dom.Document
-import org.w3c.dom.Element
-import org.w3c.dom.Node
-
-def patchPom(groovy.util.Node node) {
-	node.dependencies.first().each {
-		def groupId = it.get("groupId").first().value().first()
-
-		// Patch all eclipse deps to use a strict version
-		if (groupId.startsWith("org.eclipse.")) {
-			def version = it.get("version").first().value().first()
-			it.get("version").first().value = new groovy.util.NodeList(["[$version]"])
-		}
-	}
-}
-
 publishing {
 	publications {
 		plugin(MavenPublication) { publication ->
@@ -215,10 +199,6 @@ publishing {
 			artifact shadowJar
 			artifact sourcesJar
 			//artifact javadocJar
-
-			pom.withXml {
-				patchPom(asNode())
-			}
 		}
 	}
 	repositories {
