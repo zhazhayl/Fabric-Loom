@@ -396,10 +396,10 @@ public class AbstractPlugin implements Plugin<Project> {
 		Javadoc javadoc = (Javadoc) project.getTasks().getByName(JavaPlugin.JAVADOC_TASK_NAME);
 		javadoc.setClasspath(main.getOutput().plus(main.getCompileClasspath()));
 
-		project.getTasks().withType(AbstractArchiveTask.class).whenTaskAdded(task -> {
+		project.getTasks().withType(AbstractArchiveTask.class).all(task -> {
 			JarSettings settings = task.getExtensions().create("AT", JarSettings.class);
-			//Only include the AT by default to the main sources task
-			if (!"sourcesJar".equals(task.getName())) settings.setInclude(false);
+			//Only include the AT by default in the main jar and sources tasks
+			if (!JavaPlugin.JAR_TASK_NAME.equals(task.getName()) && !"sourcesJar".equals(task.getName())) settings.setInclude(false);
 
 			addAfterEvaluate(() -> {
 				if (settings.includeAT) {
