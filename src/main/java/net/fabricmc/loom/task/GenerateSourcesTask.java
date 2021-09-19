@@ -115,18 +115,22 @@ public class GenerateSourcesTask extends AbstractLoomTask {
 
 		Path compiledJar = getInput().toPath();
 		assert Files.exists(compiledJar);
-		Path temporarySources = new File(getTemporaryDir(), "sources.jar").toPath();
-		Files.deleteIfExists(temporarySources); //Just to make sure
 		Path sourcesDestination = getOutput().toPath();
 		Files.deleteIfExists(sourcesDestination);
 		Path linemap = getLineMap().toPath();
 		Files.deleteIfExists(linemap);
+
 		decompiler.decompile(compiledJar, sourcesDestination, linemap, metadata);
 
 		if (Files.exists(linemap)) {
-			remapLineNumbers(compiledJar, temporarySources, sourcesDestination);
+			Path lineMapped = new File(getTemporaryDir(), "line-mapped.jar").toPath();
+			Files.deleteIfExists(lineMapped); //Just to make sure
+
+			remapLineNumbers(compiledJar, linemap, lineMapped);
+
+			Files.move(lineMapped, compiledJar, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
 		} else {
-			Files.move(temporarySources, sourcesDestination, StandardCopyOption.REPLACE_EXISTING);
+			getLogger().info("Skipping line mapping as " + linemap + " doesn't exist");
 		}
 	}
 
